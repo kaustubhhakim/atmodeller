@@ -38,7 +38,7 @@ from scipy.constants import mega
 
 from atmodeller import TAU, override
 from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
-from atmodeller.constants import AVOGADRO
+from atmodeller.constants import AVOGADRO, GAS_CONSTANT
 from atmodeller.containers import (
     FixedParameters,
     Planet,
@@ -187,7 +187,8 @@ class Output:
         number_density: NpFloat = self.number_density()
         activity: NpFloat = self.activity()
 
-        out |= self.gas_species_asdict(molar_mass, number_density, activity)
+        gas_species_asdict = self.gas_species_asdict(molar_mass, number_density, activity)
+        out |= gas_species_asdict
         out |= self.condensed_species_asdict(molar_mass, number_density, activity)
         out |= self.elements_asdict()
 
@@ -210,6 +211,7 @@ class Output:
         )
 
         out["residual"] = self.residual_asdict()  # type: ignore since keys are int
+        out["disequilibrium"] = self.disequilibrium_asdict(gas_species_asdict, out["residual"])
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -382,6 +384,67 @@ class Output:
         }
 
         return species_out
+
+    def disequilibrium_asdict(
+        self,
+        gas_species_asdict: dict[str, dict[str, NpArray]],
+        residual_asdict: dict[int, NpArray],
+    ) -> dict[str, NpArray]:
+        """Gets the reaction disequilibrium as a dictionary
+
+        Args:
+            gas_species_asdict: Gas species as a dictionary
+            residual_asdict: Residual as a dictionary
+
+        Returns:
+            Reaction disequilibrium as a dictionary
+        """
+        reaction_matrix: NpFloat = np.array(self._fixed_parameters.reaction_matrix)
+        species_names: tuple[str, ...] = self._species.get_species_names()
+        # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
+
+        # FIXME: Could break for condensates
+        # To compute the limiting reactant/product in each reaction we need to know the volume
+        # mixing ratio of each species, ordered according to the species names
+        vmr_array: NpFloat = np.column_stack(
+            [
+                gas_species_asdict[species_name]["volume_mixing_ratio"]
+                for species_name in self._species.get_species_names()
+            ]
+        )
+
+        out: dict[str, NpArray] = {}
+
+        for k, v in residual_asdict.items():
+            reaction_index: int = int(k)
+            # reaction_str: str = reactions[reaction_index]
+            per_mole_of_reaction: NpFloat = v * GAS_CONSTANT * self.temperature
+            out[f"Reaction_{reaction_index}"] = per_mole_of_reaction
+
+            # Get reaction stoichiometry
+            # reaction_stoich is shape (n_species,)
+            reaction_stoich: NpFloat = reaction_matrix[k]
+            logger.debug("reaction_stoich = %s", reaction_stoich)
+            # value is shape (batch_dim, n_species)
+            value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
+
+            limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
+
+            # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
+            mask_back: NpBool = per_mole_of_reaction > 0
+            if np.any(mask_back):
+                limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
+            # Forward favoured -> reactants limit it -> stoich < 0
+            # NOTE: want largest negative number (closest to zero)
+            mask_fwd: NpBool = ~mask_back
+            if np.any(mask_fwd):
+                limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
+
+            energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
+
+            out[f"Reaction_{reaction_index}_per_atmosphere"] = energy_per_mol_atmosphere
+
+        return out
 
     def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
         """Gets the element properties as a dictionary
