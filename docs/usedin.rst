@@ -10,3 +10,5 @@ If you use *Atmodeller* in your research, we'd be happy to include a link to you
 1. :cite:t:`BTT25`
    
 2. :cite:t:`Cherubim2025`
+
+3. :cite:t:`Hakim2025`
