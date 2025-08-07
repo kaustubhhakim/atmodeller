@@ -36,7 +36,7 @@ from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
-from atmodeller import TAU
+from atmodeller import TAU, override
 from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
@@ -73,12 +73,8 @@ class Output:
         species: Species
         solution: Array output from solve
         active_indices: Indices of the residual array that are active
-        solver_status: Solver status
-        solver_steps: Number of solver steps
-        solver_attempts: Number of solver attempts (multistart)
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
-        solver_parameters: Solver parameters
     """
 
     def __init__(
@@ -86,23 +82,15 @@ class Output:
         species: SpeciesCollection,
         solution: Float[Array, " batch_dim sol_dim"],
         active_indices: Integer[Array, " res_dim"],
-        solver_status: Bool[Array, " batch_dim"],
-        solver_steps: Integer[Array, " batch_dim"],
-        solver_attempts: Integer[Array, " batch_dim"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
-        solver_parameters: SolverParameters,
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
         self._solution: NpFloat = np.asarray(solution)
         self._active_indices: NpInt = np.asarray(active_indices)
-        self._solver_status: NpBool = np.asarray(solver_status)
-        self._solver_steps: NpInt = np.asarray(solver_steps)
-        self._solver_attempts: NpInt = np.asarray(solver_attempts)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
-        self._solver_parameters: SolverParameters = solver_parameters
 
         log_number_density, log_stability = np.split(self._solution, 2, axis=1)
         self._log_number_density: NpFloat = log_number_density
@@ -237,12 +225,6 @@ class Output:
             log10_shift_at_P: NpFloat = log10_fugacity - buffer_at_P
             # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
-
-        out["solver"] = {
-            "status": self._solver_status,
-            "steps": self._solver_steps,
-            "attempts": self._solver_attempts,
-        }
 
         # For debugging to confirm all outputs are numpy arrays
         # def find_non_numpy(d) -> None:
@@ -732,7 +714,6 @@ class Output:
                     "active_indices": None,
                     "tau": None,
                     "fixed_parameters": None,
-                    "solver_parameters": None,
                 },
             ),
         )
@@ -743,7 +724,6 @@ class Output:
                 "active_indices": jnp.asarray(self.active_indices),
                 "tau": jnp.asarray(TAU),
                 "fixed_parameters": self._fixed_parameters,
-                "solver_parameters": self._solver_parameters,
             },
         )
 
@@ -807,24 +787,8 @@ class Output:
         """Gets vmap axes for traced parameters"""
         return vmap_axes_spec(self._traced_parameters)
 
-    def _drop_unsuccessful_solves(
-        self, dataframes: dict[str, pd.DataFrame]
-    ) -> dict[str, pd.DataFrame]:
-        """Drops unsuccessful solves
-
-        Args:
-            dataframes: Dataframes from which to drop unsuccessful models
-
-        Returns:
-            Dictionary of dataframes without unsuccessful models
-        """
-        return {key: df.loc[self._solver_status] for key, df in dataframes.items()}
-
-    def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
+    def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
-
-        Args:
-            drop_unsuccessful: Drop models that did not solve. Defaults to False.
 
         Returns:
             Output in a dictionary of dataframes
@@ -838,12 +802,98 @@ class Output:
             self._cached_dataframes = dataframes
             # logger.debug("to_dataframes = %s", self._cached_dataframes)
 
+        return dataframes
+
+    def to_excel(self, file_prefix: Path | str = "new_atmodeller_out") -> None:
+        """Writes the output to an Excel file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
+        """
+        logger.info("Writing output to excel")
+        out: dict[str, pd.DataFrame] = self.to_dataframes()
+        output_file: Path = Path(f"{file_prefix}.xlsx")
+
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+            for df_name, df in out.items():
+                df.to_excel(writer, sheet_name=df_name, index=True)
+
+        logger.info("Output written to %s", output_file)
+
+    def to_pickle(self, file_prefix: Path | str = "new_atmodeller_out") -> None:
+        """Writes the output to a pickle file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
+        """
+        logger.info("Writing output to pickle")
+        out: dict[str, pd.DataFrame] = self.to_dataframes()
+        output_file: Path = Path(f"{file_prefix}.pkl")
+
+        with open(output_file, "wb") as handle:
+            pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        logger.info("Output written to %s", output_file)
+
+
+class OutputSolution(Output):
+    def __init__(
+        self,
+        species: SpeciesCollection,
+        solution: Float[Array, " batch_dim sol_dim"],
+        active_indices: Integer[Array, " res_dim"],
+        fixed_parameters: FixedParameters,
+        traced_parameters: TracedParameters,
+        solver_parameters: SolverParameters,
+        solver_status: Bool[Array, " batch_dim"],
+        solver_steps: Integer[Array, " batch_dim"],
+        solver_attempts: Integer[Array, " batch_dim"],
+    ):
+        """Output
+
+        Args:
+            species: Species
+            solution: Array output from solve
+            active_indices: Indices of the residual array that are active
+            fixed_parameters: Fixed parameters
+            traced_parameters: Traced parameters
+            solver_parameters: Solver parameters
+            solver_status: Solver status
+            solver_steps: Number of solver steps
+            solver_attempts: Number of solver attempts (multistart)
+
+        """
+        super().__init__(species, solution, active_indices, fixed_parameters, traced_parameters)
+        self._solver_status: NpBool = np.asarray(solver_status)
+        self._solver_steps: NpInt = np.asarray(solver_steps)
+        self._solver_attempts: NpInt = np.asarray(solver_attempts)
+        self._solver_parameters: SolverParameters = solver_parameters
+
+    @override
+    def asdict(self) -> dict[str, dict[str, NpArray]]:
+        out = super().asdict()
+
+        out["solver"] = {
+            "status": self._solver_status,
+            "steps": self._solver_steps,
+            "attempts": self._solver_attempts,
+        }
+
+        self._cached_dict = out  # Cache result for faster re-accessing
+
+        return out
+
+    @override
+    def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
+        dataframes = super().to_dataframes()
+
         if drop_unsuccessful:
             logger.info("Dropping models that did not solve")
             dataframes: dict[str, pd.DataFrame] = self._drop_unsuccessful_solves(dataframes)
 
         return dataframes
 
+    @override
     def to_excel(
         self, file_prefix: Path | str = "new_atmodeller_out", drop_unsuccessful: bool = False
     ) -> None:
@@ -881,6 +931,7 @@ class Output:
 
         logger.info("Output written to %s", output_file)
 
+    @override
     def to_pickle(
         self, file_prefix: Path | str = "new_atmodeller_out", drop_unsuccessful: bool = False
     ) -> None:
@@ -898,6 +949,19 @@ class Output:
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logger.info("Output written to %s", output_file)
+
+    def _drop_unsuccessful_solves(
+        self, dataframes: dict[str, pd.DataFrame]
+    ) -> dict[str, pd.DataFrame]:
+        """Drops unsuccessful solves
+
+        Args:
+            dataframes: Dataframes from which to drop unsuccessful models
+
+        Returns:
+            Dictionary of dataframes without unsuccessful models
+        """
+        return {key: df.loc[self._solver_status] for key, df in dataframes.items()}
 
 
 def broadcast_arrays_in_dict(some_dict: dict[str, NpArray], shape: int) -> dict[str, NpArray]:
