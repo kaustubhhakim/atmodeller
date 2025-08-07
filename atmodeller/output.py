@@ -837,6 +837,20 @@ class Output:
 
 
 class OutputSolution(Output):
+    """Output equilibrium solution(s)
+
+    Args:
+        species: Species
+        solution: Array output from solve
+        active_indices: Indices of the residual array that are active
+        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
+        solver_parameters: Solver parameters
+        solver_status: Solver status
+        solver_steps: Number of solver steps
+        solver_attempts: Number of solver attempts (multistart)
+    """
+
     def __init__(
         self,
         species: SpeciesCollection,
@@ -849,29 +863,22 @@ class OutputSolution(Output):
         solver_steps: Integer[Array, " batch_dim"],
         solver_attempts: Integer[Array, " batch_dim"],
     ):
-        """Output
-
-        Args:
-            species: Species
-            solution: Array output from solve
-            active_indices: Indices of the residual array that are active
-            fixed_parameters: Fixed parameters
-            traced_parameters: Traced parameters
-            solver_parameters: Solver parameters
-            solver_status: Solver status
-            solver_steps: Number of solver steps
-            solver_attempts: Number of solver attempts (multistart)
-
-        """
         super().__init__(species, solution, active_indices, fixed_parameters, traced_parameters)
+        self._solver_parameters: SolverParameters = solver_parameters
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
         self._solver_attempts: NpInt = np.asarray(solver_attempts)
-        self._solver_parameters: SolverParameters = solver_parameters
 
     @override
     def asdict(self) -> dict[str, dict[str, NpArray]]:
-        out = super().asdict()
+        """All outputs in a dictionary, with caching.
+
+        Additionally includes the solver group, compared to the base class.
+
+        Returns:
+            Dictionary of all output
+        """
+        out: dict[str, dict[str, NpArray]] = super().asdict()
 
         out["solver"] = {
             "status": self._solver_status,
@@ -879,13 +886,21 @@ class OutputSolution(Output):
             "attempts": self._solver_attempts,
         }
 
-        self._cached_dict = out  # Cache result for faster re-accessing
+        self._cached_dict = out  # Re-cache result for faster re-accessing
 
         return out
 
     @override
     def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
-        dataframes = super().to_dataframes()
+        """Gets the output in a dictionary of dataframes.
+
+        Args:
+            drop_unsuccessful: Drop models that did not solve. Defaults to False.
+
+        Returns:
+            Output in a dictionary of dataframes
+        """
+        dataframes: dict[str, pd.DataFrame] = super().to_dataframes()
 
         if drop_unsuccessful:
             logger.info("Dropping models that did not solve")
@@ -898,6 +913,9 @@ class OutputSolution(Output):
         self, file_prefix: Path | str = "new_atmodeller_out", drop_unsuccessful: bool = False
     ) -> None:
         """Writes the output to an Excel file.
+
+        Compared to the base class, this highlights rows where the solver failed to find a
+        a solution if `drop_successful = False`.
 
         Args:
             file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
