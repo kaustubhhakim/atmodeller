@@ -198,7 +198,7 @@ class Output:
         pressure: NpFloat = out["atmosphere"]["pressure"]
         # Convenient to also attach temperature to the atmosphere output
         out["atmosphere"]["temperature"] = temperature
-        out["raw_solution"] = self.raw_solution_asdict()
+        out["raw"] = self.raw_solution_asdict()
 
         out["constraints"] = {}
         out["constraints"] |= broadcast_arrays_in_dict(
