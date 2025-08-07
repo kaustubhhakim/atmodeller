@@ -42,7 +42,12 @@ from atmodeller.containers import (
 from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
-from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
+from atmodeller.utilities import (
+    get_batch_size,
+    get_reaction_dictionary,
+    partial_rref,
+    vmap_axes_spec,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -448,23 +453,8 @@ class InteriorAtmosphere:
             Reactions as a dictionary
         """
         reaction_matrix: NpFloat = self.get_reaction_matrix()
-        reactions: dict[int, str] = {}
-        if reaction_matrix.size != 0:
-            for reaction_index in range(reaction_matrix.shape[0]):
-                reactants: str = ""
-                products: str = ""
-                for species_index, species_ in enumerate(self.species):
-                    coeff: float = reaction_matrix[reaction_index, species_index].item()
-                    if coeff != 0:
-                        if coeff < 0:
-                            reactants += f"{abs(coeff)} {species_.data.name} + "
-                        else:
-                            products += f"{coeff} {species_.data.name} + "
-
-                reactants = reactants.rstrip(" + ")
-                products = products.rstrip(" + ")
-                reaction: str = f"{reactants} = {products}"
-                reactions[reaction_index] = reaction
+        species_names: tuple[str, ...] = self.species.get_species_names()
+        reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         return reactions
 
