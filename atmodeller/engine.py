@@ -602,7 +602,7 @@ def get_log_reaction_equilibrium_constant(
         temperature: Temperature
 
     Returns:
-        Log equilibrium constant of the reactions
+        Log equilibrium constant of the reactions, hidden unit base of molecules/m^3
     """
     species: SpeciesCollection = fixed_parameters.species
     reaction_matrix: Float[Array, "react_dim species_dim"] = jnp.array(
