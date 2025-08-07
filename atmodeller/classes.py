@@ -41,7 +41,7 @@ from atmodeller.containers import (
 )
 from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
-from atmodeller.output import Output
+from atmodeller.output import Output, OutputSolution
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -73,6 +73,66 @@ class InteriorAtmosphere:
             raise AttributeError("Output has not been set.")
 
         return self._output
+
+    def disequilibrium(
+        self,
+        *,
+        planet: Optional[Planet] = None,
+        log_number_density: Optional[ArrayLike] = None,
+        log_stability: Optional[ArrayLike] = None,
+    ) -> None:
+        """Computes the Gibbs free energy disequilibrium.
+
+        This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
+        relative to equilibrium, based on the current state of the system. A value of zero
+        indicates a reaction at equilibrium, while positive or negative values indicate departures
+        from equilibrium in terms of energetic favorability.
+
+        Note:
+            This logic partly duplicates `self.solve()` and is a candidate for refactoring.
+
+        Args:
+            planet: Planet. Defaults to None.
+            log_number_density: Log number density. Defaults to None.
+            log_stability: Log stability. Defaults to None.
+        """
+        planet_: Planet = Planet() if planet is None else planet
+
+        batch_size: int = get_batch_size((planet, None, None))
+
+        # There are no constraints, but we must specify them nonetheless
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(self.species)
+        mass_constraints_: MassConstraints = MassConstraints.create(
+            self.species, batch_size=batch_size
+        )
+
+        traced_parameters_: TracedParameters = TracedParameters(
+            planet_, fugacity_constraints_, mass_constraints_
+        )
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+
+        # NOTE: Determine active entries in the residual. Here, this will only return the reaction
+        # residual, as desired.
+        active: Bool[Array, " res_dim"] = jnp.concatenate(
+            (
+                fugacity_constraints_.active(),
+                fixed_parameters_.active_reactions(),
+                mass_constraints_.active(),
+                fixed_parameters_.active_stability(),
+            )
+        )
+        # jax.debug.print("active = {out}", out=active)
+        active_indices: Integer[Array, "..."] = jnp.where(active)[0]
+        # jax.debug.print("active_indices = {out}", out=active_indices)
+
+        solution_array: Array = broadcast_initial_solution(
+            log_number_density, log_stability, self.species.number, batch_size
+        )
+        # jax.debug.print("solution_array = {out}", out=solution_array)
+
+        self._output = Output(
+            self.species, solution_array, active_indices, fixed_parameters_, traced_parameters_
+        )
 
     def solve(
         self,
@@ -137,10 +197,7 @@ class InteriorAtmosphere:
         # jax.debug.print("active_indices = {out}", out=active_indices)
 
         base_solution_array: Array = broadcast_initial_solution(
-            initial_log_number_density,
-            initial_log_stability,
-            self.species.number,
-            batch_size,
+            initial_log_number_density, initial_log_stability, self.species.number, batch_size
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
@@ -311,16 +368,16 @@ class InteriorAtmosphere:
 
         logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
 
-        self._output = Output(
+        self._output = OutputSolution(
             self.species,
             solution,
             active_indices,
-            solver_status,
-            solver_steps,
-            solver_attempts,
             fixed_parameters_,
             traced_parameters_,
             solver_parameters_,
+            solver_status,
+            solver_steps,
+            solver_attempts,
         )
 
     def get_fixed_parameters(self) -> FixedParameters:
