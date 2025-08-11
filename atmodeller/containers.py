@@ -55,6 +55,7 @@ from atmodeller.thermodata import (
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
+    as_j64_2d,
     get_batch_size,
     get_log_number_density_from_log_pressure,
     to_hashable,
@@ -350,15 +351,15 @@ class Planet(eqx.Module):
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
     """
 
-    planet_mass: Array = eqx.field(converter=as_j64, default=5.972e24)
+    planet_mass: Array = eqx.field(converter=as_j64_2d, default=5.972e24)
     """Mass of the planet in kg"""
-    core_mass_fraction: Array = eqx.field(converter=as_j64, default=0.295334691460966)
+    core_mass_fraction: Array = eqx.field(converter=as_j64_2d, default=0.295334691460966)
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: Array = eqx.field(converter=as_j64, default=1.0)
+    mantle_melt_fraction: Array = eqx.field(converter=as_j64_2d, default=1.0)
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: Array = eqx.field(converter=as_j64, default=6371000)
+    surface_radius: Array = eqx.field(converter=as_j64_2d, default=6371000)
     """Radius of the surface in m"""
-    surface_temperature: Array = eqx.field(converter=as_j64, default=2000)
+    surface_temperature: Array = eqx.field(converter=as_j64_2d, default=2000)
     """Temperature of the surface in K"""
 
     @property
@@ -439,7 +440,7 @@ class ConstantFugacityConstraint(eqx.Module):
         fugacity: Fugacity. Defaults to nan.
     """
 
-    fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
+    fugacity: Array = eqx.field(converter=as_j64_2d, default=np.nan)
     """Fugacity"""
 
     def active(self) -> Bool[Array, ""]:
@@ -607,11 +608,11 @@ class NormalisedMass(eqx.Module):
         mass: Total mass. Defaults to 1 kg for a unit mass system.
     """
 
-    melt_fraction: Array = eqx.field(converter=as_j64, default=0.3)
+    melt_fraction: Array = eqx.field(converter=as_j64_2d, default=0.3)
     """Mass fraction of melt in kg/kg"""
-    temperature: Array = eqx.field(converter=as_j64, default=1400)
+    temperature: Array = eqx.field(converter=as_j64_2d, default=1400)
     """Temperature in K"""
-    mass: Array = eqx.field(converter=as_j64, default=1.0)
+    mass: Array = eqx.field(converter=as_j64_2d, default=1.0)
     """Total mass"""
 
     @property
@@ -633,7 +634,7 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Float64[Array, "batch_dim el_dim"] = eqx.field(converter=as_j64)
+    log_abundance: Float64[Array, "batch_dim el_dim"] = eqx.field(converter=as_j64_2d)
     elements: tuple[str, ...]
 
     @classmethod
@@ -678,6 +679,7 @@ class MassConstraints(eqx.Module):
         # Broadcast, which avoids JAX recompilation if mass constraints change since otherwise the
         # shape of self.log_abundance can vary between a 1-D and 2-D array which forces
         # recompilation of solve.
+        # TODO: Can probably clean up once everything is forced to be 2-D
         log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
