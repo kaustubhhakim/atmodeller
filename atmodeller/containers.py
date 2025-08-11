@@ -53,7 +53,6 @@ from atmodeller.thermodata import (
     thermodynamic_data_source,
 )
 from atmodeller.utilities import (
-    all_not_nan,
     as_j64,
     as_j64_2d,
     get_batch_size,
@@ -443,13 +442,13 @@ class ConstantFugacityConstraint(eqx.Module):
     fugacity: Array = eqx.field(converter=as_j64_2d, default=np.nan)
     """Fugacity"""
 
-    def active(self) -> Bool[Array, ""]:
+    def active(self) -> Bool[Array, "batch 1"]:
         """Is the fugacity constraint active.
 
         Returns:
             True if the fugacity constraint is active, otherwise False
         """
-        return all_not_nan(self.fugacity)
+        return ~jnp.isnan(self.fugacity)
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
@@ -506,17 +505,15 @@ class FugacityConstraints(eqx.Module):
 
         return cls(tuple(constraints), unique_species)
 
-    def active(self) -> Bool[Array, " species_dim"]:
+    def active(self) -> Bool[Array, "batch species"]:
         """Active fugacity constraints
 
         Returns:
             Mask indicating whether fugacity constraints are active or not
         """
-        mask: list[Array] = [
-            jnp.atleast_1d(constraint.active()) for constraint in self.constraints
-        ]
+        mask: list[Array] = [constraint.active() for constraint in self.constraints]
 
-        return jnp.concatenate(mask)
+        return jnp.column_stack(mask)
 
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
         """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
@@ -634,7 +631,7 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Float64[Array, "batch_dim el_dim"] = eqx.field(converter=as_j64_2d)
+    log_abundance: Float64[Array, "batch elements"] = eqx.field(converter=as_j64_2d)
     elements: tuple[str, ...]
 
     @classmethod
@@ -700,13 +697,13 @@ class MassConstraints(eqx.Module):
 
         return out
 
-    def active(self) -> Bool[Array, " el_dim"]:
+    def active(self) -> Bool[Array, "batch elements"]:
         """Active mass constraints
 
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return all_not_nan(self.log_abundance)
+        return ~jnp.isnan(self.log_abundance)
 
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density

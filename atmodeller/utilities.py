@@ -153,7 +153,7 @@ def as_j64_2d(x: ArrayLike | tuple) -> Float64[Array, "..."]:
     Returns:
         2-D JAX array of dtype float64
     """
-    return jnp.atleast_2d(as_j64(x))
+    return jnp.atleast_2d(as_j64(x)).T
 
 
 def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
