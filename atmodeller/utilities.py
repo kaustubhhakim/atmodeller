@@ -144,6 +144,18 @@ def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
     return jnp.asarray(x, dtype=jnp.float64)
 
 
+def as_j64_2d(x: ArrayLike | tuple) -> Float64[Array, "..."]:
+    """Converts input to a 2-D JAX array of dtype float64.
+
+    Args:
+        x: Input to convert
+
+    Returns:
+        2-D JAX array of dtype float64
+    """
+    return jnp.atleast_2d(as_j64(x))
+
+
 def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
     """Recursively converts any structure to nested tuples of native floats.
 
