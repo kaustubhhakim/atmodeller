@@ -160,7 +160,7 @@ class InteriorAtmosphere:
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            self.species, fugacity_constraints
+            self.species, fugacity_constraints, batch_size
         )
         mass_constraints_: MassConstraints = MassConstraints.create(
             self.species, mass_constraints, batch_size
@@ -173,7 +173,7 @@ class InteriorAtmosphere:
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
         )
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters(batch_size)
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
@@ -185,17 +185,18 @@ class InteriorAtmosphere:
 
         # NOTE: Determine active entries in the residual. This order must correspond to the order
         # of entries in the residual.
-        active: Bool[Array, " res_dim"] = jnp.concatenate(
+        active: Bool[Array, "batch residual"] = jnp.concatenate(
             (
                 fugacity_constraints_.active(),
                 fixed_parameters_.active_reactions(),
                 mass_constraints_.active(),
                 fixed_parameters_.active_stability(),
-            )
+            ),
+            axis=1,
         )
-        # jax.debug.print("active = {out}", out=active)
+        jax.debug.print("active = {out}", out=active)
         active_indices: Integer[Array, "..."] = jnp.where(active)[0]
-        # jax.debug.print("active_indices = {out}", out=active_indices)
+        jax.debug.print("active_indices = {out}", out=active_indices)
 
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_density, initial_log_stability, self.species.number, batch_size
@@ -204,17 +205,14 @@ class InteriorAtmosphere:
 
         # Pre-bind fixed configurations
         solver_fn: Callable = eqx.Partial(
-            solve,
-            fixed_parameters=fixed_parameters_,
-            options=options,
+            solve, fixed_parameters=fixed_parameters_, options=options
         )
         in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
 
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
-        self._solver = eqx.filter_jit(
-            eqx.filter_vmap(solver_fn, in_axes=(0, None, 0, in_axes, None))
-        )
+        # NOTE: now also vmapping over active indices
+        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, 0, 0, in_axes, None)))
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
@@ -381,8 +379,11 @@ class InteriorAtmosphere:
             solver_attempts,
         )
 
-    def get_fixed_parameters(self) -> FixedParameters:
+    def get_fixed_parameters(self, batch_size: int) -> FixedParameters:
         """Gets fixed parameters.
+
+        Args:
+            batch_size: Batch size
 
         Returns:
             Fixed parameters
@@ -400,6 +401,7 @@ class InteriorAtmosphere:
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
+            batch_size=batch_size,
         )
 
         return fixed_parameters

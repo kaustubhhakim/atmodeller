@@ -442,13 +442,17 @@ class ConstantFugacityConstraint(eqx.Module):
     fugacity: Array = eqx.field(converter=as_j64_2d, default=np.nan)
     """Fugacity"""
 
-    def active(self) -> Bool[Array, "batch 1"]:
+    def active(self, batch_size: int) -> Bool[Array, "batch 1"]:
         """Is the fugacity constraint active.
+
+        Args:
+            batch_size: Batch size
 
         Returns:
             True if the fugacity constraint is active, otherwise False
         """
-        return ~jnp.isnan(self.fugacity)
+        mask: Bool[Array, "dim 1"] = ~jnp.isnan(self.fugacity)
+        return jnp.broadcast_to(mask, (batch_size, mask.shape[1]))
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
@@ -465,18 +469,22 @@ class FugacityConstraints(eqx.Module):
     Args:
         constraints: Fugacity constraints
         species: Species corresponding to the columns of `constraints`
+        batch_size: Batch size
     """
 
     constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
     species: tuple[str, ...]
     """Species corresponding to the entries of constraints"""
+    batch_size: int
+    """Batch size"""
 
     @classmethod
     def create(
         cls,
         species: SpeciesCollection,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        batch_size: int = 1,
     ) -> "FugacityConstraints":
         """Creates an instance
 
@@ -484,6 +492,7 @@ class FugacityConstraints(eqx.Module):
             species: Species
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 None.
+            batch_size: Total batch size, which is required for broadcasting. Defaults to 1.
 
         Returns:
             An instance
@@ -503,7 +512,7 @@ class FugacityConstraints(eqx.Module):
             else:
                 constraints.append(ConstantFugacityConstraint(np.nan))
 
-        return cls(tuple(constraints), unique_species)
+        return cls(tuple(constraints), unique_species, batch_size)
 
     def active(self) -> Bool[Array, "batch species"]:
         """Active fugacity constraints
@@ -511,7 +520,7 @@ class FugacityConstraints(eqx.Module):
         Returns:
             Mask indicating whether fugacity constraints are active or not
         """
-        mask: list[Array] = [constraint.active() for constraint in self.constraints]
+        mask: list[Array] = [constraint.active(self.batch_size) for constraint in self.constraints]
 
         return jnp.column_stack(mask)
 
@@ -631,7 +640,7 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Float64[Array, "batch elements"] = eqx.field(converter=as_j64_2d)
+    log_abundance: Float64[Array, "batch elements"]
     elements: tuple[str, ...]
 
     @classmethod
@@ -646,7 +655,7 @@ class MassConstraints(eqx.Module):
         Args:
             species: Species
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
-            batch_size: Total batch size, which is required for broadcasting
+            batch_size: Total batch size, which is required for broadcasting. Defaults to 1.
 
         Returns:
             An instance
@@ -680,7 +689,7 @@ class MassConstraints(eqx.Module):
         log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-        return cls(log_abundance, unique_elements)
+        return cls(jnp.asarray(log_abundance), unique_elements)
 
     def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays
@@ -750,6 +759,7 @@ class FixedParameters(eqx.Module):
         gas_species_mask: Mask of gas species
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
+        batch_size: Batch size
     """
 
     species: SpeciesCollection
@@ -765,22 +775,26 @@ class FixedParameters(eqx.Module):
     """Index of diatomic oxygen"""
     molar_masses: Array
     """Molar masses of all species"""
+    batch_size: int
+    """Batch size"""
 
-    def active_reactions(self) -> Bool[Array, " react_dim"]:
+    def active_reactions(self) -> Bool[Array, "batch reactions"]:
         """Active reactions
 
         Returns:
             True for all reactions
         """
-        return jnp.ones(self.reaction_matrix.shape[0], dtype=bool)
+        mask: Bool[Array, " reactions"] = jnp.ones(self.reaction_matrix.shape[0], dtype=bool)
+        return jnp.broadcast_to(mask, (self.batch_size, mask.shape[0]))
 
-    def active_stability(self) -> Bool[Array, " species_dim"]:
+    def active_stability(self) -> Bool[Array, "batch species"]:
         """Active species stability
 
         Returns:
             True for species stabilities that are to be solved for, otherwise False
         """
-        return self.species.active_stability()
+        mask: Bool[Array, " species"] = self.species.active_stability()
+        return jnp.broadcast_to(mask, (self.batch_size, mask.shape[0]))
 
 
 class SolverParameters(eqx.Module):

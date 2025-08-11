@@ -396,7 +396,7 @@ def get_batch_size(x: Any) -> int:
     """
     max_size: int = 1
     for leaf in jax.tree_util.tree_leaves(x):
-        if eqx.is_array(leaf) and leaf.ndim > 0:
+        if eqx.is_array(leaf) and leaf.ndim == 2:
             max_size = max(max_size, leaf.shape[0])
 
     return max_size

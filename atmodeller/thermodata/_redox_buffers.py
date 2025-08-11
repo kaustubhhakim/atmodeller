@@ -77,9 +77,17 @@ class RedoxBuffer(eqx.Module):
             Log10 fugacity at the buffer
         """
 
-    def active(self) -> Bool[Array, "batch 1"]:
-        """True if the redox buffer is active, otherwise False"""
-        return ~jnp.isnan(self.log10_shift)
+    def active(self, batch_size: int) -> Bool[Array, "batch 1"]:
+        """True if the redox buffer is active, otherwise False
+
+        Args:
+            batch_size: Batch size
+
+        Returns:
+            Mask indicating whether the redox buffer is active
+        """
+        mask: Bool[Array, "dim 1"] = ~jnp.isnan(self.log10_shift)
+        return jnp.broadcast_to(mask, (batch_size, mask.shape[1]))
 
     def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Gets the scaled pressure.
