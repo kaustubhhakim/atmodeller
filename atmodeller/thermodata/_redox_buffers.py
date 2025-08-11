@@ -47,11 +47,11 @@ class RedoxBuffer(eqx.Module):
 
     log10_shift: Array
     """Log10 shift"""
-    evaluation_pressure: Optional[ArrayLike]
+    evaluation_pressure: Optional[float]
     """Evaluation pressure"""
 
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[ArrayLike] = 1):
-        self.log10_shift = as_j64(log10_shift)
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[float] = 1):
+        self.log10_shift = jnp.atleast_2d(as_j64(log10_shift))
         self.evaluation_pressure = evaluation_pressure
 
     @abstractmethod
@@ -135,7 +135,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
     calibration: ExperimentalCalibration
     """Experimental calibration"""
 
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[ArrayLike] = 1):
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[float] = 1):
         super().__init__(log10_shift, evaluation_pressure)
         self.calibration = ExperimentalCalibration(pressure_max=27.5 * unit_conversion.GPa_to_bar)
 
@@ -201,7 +201,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
     x: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Coefficients to define the threshold to use the hcp iron formulation"""
 
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[ArrayLike] = 1):
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[float] = 1):
         super().__init__(log10_shift, evaluation_pressure)
         self.calibration = ExperimentalCalibration(
             temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
@@ -357,7 +357,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
     high_temperature_buffer: IronWustiteBufferHirschmann21
     """High temperature buffer"""
 
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[ArrayLike] = 1):
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[float] = 1):
         super().__init__(log10_shift, evaluation_pressure)
         self.calibration = ExperimentalCalibration(pressure_max=100 * unit_conversion.GPa_to_bar)
         self.low_temperature_buffer = IronWustiteBufferHirschmann08(

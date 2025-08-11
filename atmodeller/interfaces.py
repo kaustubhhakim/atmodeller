@@ -35,7 +35,7 @@ class FugacityConstraintProtocol(Protocol):
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    evaluation_pressure: Optional[ArrayLike]
+    evaluation_pressure: Optional[float]
 
     @property
     def log10_shift(self) -> Array: ...
