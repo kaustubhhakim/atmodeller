@@ -25,12 +25,7 @@ from jaxtyping import Array, ArrayLike, Bool
 
 from atmodeller import override
 from atmodeller._mytypes import Scalar
-from atmodeller.utilities import (
-    ExperimentalCalibration,
-    as_j64,
-    to_native_floats,
-    unit_conversion,
-)
+from atmodeller.utilities import ExperimentalCalibration, as_j64, to_native_floats, unit_conversion
 
 
 class RedoxBuffer(eqx.Module):
@@ -51,7 +46,7 @@ class RedoxBuffer(eqx.Module):
     """Evaluation pressure"""
 
     def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: Optional[Scalar] = 1):
-        self.log10_shift = jnp.atleast_2d(as_j64(log10_shift))
+        self.log10_shift = as_j64(log10_shift)
         self.evaluation_pressure = evaluation_pressure
 
     @abstractmethod
@@ -77,17 +72,13 @@ class RedoxBuffer(eqx.Module):
             Log10 fugacity at the buffer
         """
 
-    def active(self, batch_size: int) -> Bool[Array, "batch 1"]:
+    def active(self) -> Bool[Array, " dim"]:
         """True if the redox buffer is active, otherwise False
-
-        Args:
-            batch_size: Batch size
 
         Returns:
             Mask indicating whether the redox buffer is active
         """
-        mask: Bool[Array, "dim 1"] = ~jnp.isnan(self.log10_shift)
-        return jnp.broadcast_to(mask, (batch_size, mask.shape[1]))
+        return ~jnp.isnan(self.log10_shift)
 
     def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Gets the scaled pressure.
