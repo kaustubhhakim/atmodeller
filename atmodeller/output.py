@@ -80,7 +80,7 @@ class Output:
     def __init__(
         self,
         species: SpeciesCollection,
-        solution: Float[Array, " batch_dim sol_dim"],
+        solution: Float[Array, " batch solution"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
     ):
@@ -113,12 +113,12 @@ class Output:
     @property
     def condensed_species_mask(self) -> NpBool:
         """Mask of condensed species"""
-        return np.invert(self._fixed_parameters.gas_species_mask)
+        return np.invert(self._fixed_parameters.species.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:
         """Mask of gas species"""
-        return np.asarray(self._fixed_parameters.gas_species_mask)
+        return np.asarray(self._fixed_parameters.species.gas_species_mask)
 
     @property
     def log_number_density(self) -> NpFloat:
@@ -133,7 +133,7 @@ class Output:
     @property
     def molar_mass(self) -> NpFloat:
         """Molar mass of all species"""
-        return np.asarray(self._fixed_parameters.molar_masses)
+        return np.asarray(self._fixed_parameters.species.molar_masses)
 
     @property
     def number_solutions(self) -> int:
@@ -398,7 +398,7 @@ class Output:
             Reaction disequilibrium as a dictionary
         """
         reaction_matrix: NpFloat = np.array(self._fixed_parameters.reaction_matrix)
-        species_names: tuple[str, ...] = self._species.get_species_names()
+        species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         # FIXME: Could break for condensates
@@ -407,7 +407,7 @@ class Output:
         vmr_array: NpFloat = np.column_stack(
             [
                 gas_species_asdict[species_name]["volume_mixing_ratio"]
-                for species_name in self._species.get_species_names()
+                for species_name in self._species.species_names
             ]
         )
 
@@ -423,7 +423,7 @@ class Output:
             # reaction_stoich is shape (n_species,)
             reaction_stoich: NpFloat = reaction_matrix[k]
             logger.debug("reaction_stoich = %s", reaction_stoich)
-            # value is shape (batch_dim, n_species)
+            # value is shape (batch, n_species)
             value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
 
             limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
@@ -473,7 +473,7 @@ class Output:
             out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
         )
 
-        unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self._species.unique_elements
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
             H_total_moles: NpArray = out["total_moles"][:, index]
@@ -557,7 +557,7 @@ class Output:
         Returns:
             Molar mass of elements
         """
-        unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self._species.unique_elements
         molar_mass: npt.ArrayLike = np.array(
             [Formula(element).mass for element in unique_elements]
         )
@@ -618,7 +618,7 @@ class Output:
         total_number_density: NpArray = number_density + dissolved_number_density
         pressure: NpArray = self.pressure()[:, self.gas_species_mask]
 
-        gas_species: tuple[str, ...] = self._species.get_gas_species_names()
+        gas_species: tuple[str, ...] = self._species.gas_species_names
 
         out: dict[str, NpArray] = {}
         out |= self._get_number_density_output(number_density, molar_mass, "atmosphere_")
@@ -747,7 +747,7 @@ class Output:
         """
         raw_solution: dict[str, NpArray] = {}
 
-        species_names: tuple[str, ...] = self._species.get_species_names()
+        species_names: tuple[str, ...] = self._species.species_names
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
@@ -914,13 +914,13 @@ class OutputSolution(Output):
     def __init__(
         self,
         species: SpeciesCollection,
-        solution: Float[Array, " batch_dim sol_dim"],
+        solution: Float[Array, " batch solution"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
         solver_parameters: SolverParameters,
-        solver_status: Bool[Array, " batch_dim"],
-        solver_steps: Integer[Array, " batch_dim"],
-        solver_attempts: Integer[Array, " batch_dim"],
+        solver_status: Bool[Array, " batch"],
+        solver_steps: Integer[Array, " batch"],
+        solver_attempts: Integer[Array, " batch"],
     ):
         super().__init__(species, solution, fixed_parameters, traced_parameters)
         self._solver_parameters: SolverParameters = solver_parameters
