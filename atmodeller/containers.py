@@ -455,7 +455,7 @@ class ConstantFugacityConstraint(eqx.Module):
     fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
     """Fugacity"""
 
-    def active(self) -> Bool[Array, " dim"]:
+    def active(self) -> Bool[Array, "..."]:
         """Active fugacity constraint
 
         Returns:
@@ -677,7 +677,7 @@ class MassConstraints(eqx.Module):
 
         return out
 
-    def active(self) -> Bool[Array, "batch elements"]:
+    def active(self) -> Bool[Array, "..."]:
         """Active mass constraints
 
         The array is squeezed to ensure it is consistently 1-D when possible. This avoids
@@ -688,9 +688,7 @@ class MassConstraints(eqx.Module):
         """
         return ~jnp.isnan(self.log_abundance.squeeze())
 
-    def log_number_density(
-        self, log_atmosphere_volume: ArrayLike
-    ) -> Float64[Array, "batch elements"]:
+    def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
         """Log number density
 
         The array is squeezed to ensure it is consistently 1-D when possible. This avoids
@@ -702,7 +700,7 @@ class MassConstraints(eqx.Module):
         Returns:
             Log number density
         """
-        log_number_density: Float64[Array, "batch elements"] = (
+        log_number_density: Float64[Array, "..."] = (
             self.log_abundance.squeeze() - log_atmosphere_volume
         )
 

@@ -364,10 +364,11 @@ def is_arraylike_batched(x: Any) -> Literal[0, None]:
         elif x.ndim == 2 and x.shape[0] > 1:
             return 0
 
-    # Return None is implicit, and is applicable for anything that is:
-    # 1. Not an array
-    # 2. A scalar array
-    # 3. A 2-D array with only one row (relevant for log_abundance in MassConstraints)
+    # Returning None is implicit, meaning "not batched".
+    # This applies when:
+    # 1. x is not an array
+    # 2. x is a scalar array (ndim == 0)
+    # 3. x is a 2-D array with only one row (e.g., log_abundance in MassConstraints)
 
 
 def vmap_axes_spec(x: Any) -> Any:

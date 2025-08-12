@@ -72,7 +72,7 @@ class RedoxBuffer(eqx.Module):
             Log10 fugacity at the buffer
         """
 
-    def active(self) -> Bool[Array, " dim"]:
+    def active(self) -> Bool[Array, "..."]:
         """True if the redox buffer is active, otherwise False
 
         Returns:
