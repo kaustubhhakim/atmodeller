@@ -32,8 +32,6 @@ from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, T
 from atmodeller._mytypes import NpFloat, NpInt
 from atmodeller.containers import (
     FixedParameters,
-    FugacityConstraints,
-    MassConstraints,
     Planet,
     SolverParameters,
     SpeciesCollection,
@@ -79,7 +77,7 @@ class InteriorAtmosphere:
 
         return self._output
 
-    def disequilibrium(
+    def calculate_disequilibrium(
         self,
         *,
         planet: Planet,
@@ -92,30 +90,20 @@ class InteriorAtmosphere:
         indicates a reaction at equilibrium, while positive or negative values indicate departures
         from equilibrium in terms of energetic favorability.
 
-        Note:
-            This logic partly duplicates `self.solve()` and is a candidate for refactoring.
-
         Args:
             planet: Planet
             log_number_density: Log number density
         """
+        traced_parameters: TracedParameters = TracedParameters.create(self.species, planet)
+        fixed_parameters: FixedParameters = self.get_fixed_parameters()
+
         batch_size: int = get_batch_size((planet, None, None))
-
-        # There are no constraints, but we must specify them nonetheless
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(self.species)
-        mass_constraints_: MassConstraints = MassConstraints.create(self.species)
-
-        traced_parameters_: TracedParameters = TracedParameters(
-            planet, fugacity_constraints_, mass_constraints_
-        )
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
-
         solution_array: Array = broadcast_initial_solution(
             log_number_density, None, self.species.number_species, batch_size
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
-        self._output = Output(self.species, solution_array, fixed_parameters_, traced_parameters_)
+        self._output = Output(self.species, solution_array, fixed_parameters, traced_parameters)
 
     def solve(
         self,
@@ -137,23 +125,16 @@ class InteriorAtmosphere:
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
         """
-        planet_: Planet = Planet() if planet is None else planet
+        traced_parameters: TracedParameters = TracedParameters.create(
+            self.species, planet, fugacity_constraints, mass_constraints
+        )
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
-
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            self.species, fugacity_constraints
-        )
-        mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
-
         # Always broadcast tau because the repeat_solver is triggered if some cases fail
         broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
         # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
 
-        traced_parameters_: TracedParameters = TracedParameters(
-            planet_, fugacity_constraints_, mass_constraints_
-        )
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
@@ -175,7 +156,7 @@ class InteriorAtmosphere:
         solver_fn: Callable = eqx.Partial(
             solve, fixed_parameters=fixed_parameters_, options=options
         )
-        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
+        in_axes: TracedParameters = vmap_axes_spec(traced_parameters)
 
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
@@ -187,7 +168,7 @@ class InteriorAtmosphere:
         solution, solver_status, solver_steps = self._solver(
             base_solution_array,
             broadcasted_tau,
-            traced_parameters_,
+            traced_parameters,
             solver_parameters_,
         )
         # jax.debug.print("solver_status = {out}", out=solver_status)
@@ -245,7 +226,7 @@ class InteriorAtmosphere:
 
                 initial_carry: tuple[Array, Array] = (subkey, solution)
                 solve_tau_step: Callable = make_solve_tau_step(
-                    self._solver, traced_parameters_, solver_parameters_
+                    self._solver, traced_parameters, solver_parameters_
                 )
                 _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
                 solution, solver_status_, solver_steps_, solver_attempts = results
@@ -285,7 +266,7 @@ class InteriorAtmosphere:
                     self._solver,
                     broadcasted_tau,
                     solution,
-                    traced_parameters_,
+                    traced_parameters,
                     solver_parameters_,
                     subkey,
                 )
@@ -334,7 +315,7 @@ class InteriorAtmosphere:
             self.species,
             solution,
             fixed_parameters_,
-            traced_parameters_,
+            traced_parameters,
             solver_parameters_,
             solver_status,
             solver_steps,

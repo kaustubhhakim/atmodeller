@@ -726,6 +726,34 @@ class TracedParameters(eqx.Module):
     mass_constraints: MassConstraints
     """Mass constraints"""
 
+    @classmethod
+    def create(
+        cls,
+        species: SpeciesCollection,
+        planet: Optional[Planet] = None,
+        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+    ):
+        """Creates an instance
+
+        Args:
+            species: Species
+            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
+                `None`.
+            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
+                `None`.
+
+        Returns:
+            An instance
+        """
+        planet_: Planet = Planet() if planet is None else planet
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+            species, fugacity_constraints
+        )
+        mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
+
+        return cls(planet_, fugacity_constraints_, mass_constraints_)
+
 
 class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
