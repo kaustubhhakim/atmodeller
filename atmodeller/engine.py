@@ -140,21 +140,58 @@ def get_active_mask(
     Returns:
         Active mask
     """
+    # Get all masks separately
+    fugacity_mask: Array = traced_parameters.fugacity_constraints.active()
+    reactions_mask: Array = fixed_parameters.active_reactions()
+    mass_mask: Array = traced_parameters.mass_constraints.active()
+    stability_mask: Array = fixed_parameters.active_stability()
+
+    # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
+    # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
+    # jax.debug.print("mass_mask = {out}", out=mass_mask)
+    # jax.debug.print("stability_mask = {out}", out=stability_mask)
+
     active_mask: Array = jnp.concatenate(
-        (
-            traced_parameters.fugacity_constraints.active(),
-            fixed_parameters.active_reactions(),
-            traced_parameters.mass_constraints.active(),
-            fixed_parameters.active_stability(),
-        )
+        (fugacity_mask, reactions_mask, mass_mask, stability_mask)
     )
 
-    # jax.debug.print("fugacity active = {out}", out=traced_parameters.fugacity_constraints.active())
-    # jax.debug.print("reactions active = {out}", out=fixed_parameters.active_reactions())
-    # jax.debug.print("mass active = {out}", out=fixed_parameters.active_reactions())
-    # jax.debug.print("stability active = {out}", out=fixed_parameters.active_stability())
-
     return active_mask
+
+
+def get_reactions_only_mask(
+    traced_parameters: TracedParameters, fixed_parameters: FixedParameters
+) -> Array:
+    """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
+
+    Args:
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+
+    Returns:
+        Reactions only mask
+    """
+    # Get all masks separately
+    fugacity_mask: Array = traced_parameters.fugacity_constraints.active()
+    reactions_mask: Array = fixed_parameters.active_reactions()
+    mass_mask: Array = traced_parameters.mass_constraints.active()
+    stability_mask: Array = fixed_parameters.active_stability()
+
+    # Compute lengths
+    len_fugacity: int = fugacity_mask.shape[0]
+    len_reactions: int = reactions_mask.shape[0]
+    len_mass: int = mass_mask.shape[0]
+    len_stability: int = stability_mask.shape[0]
+
+    # Total length of concatenated mask
+    total_len: int = len_fugacity + len_reactions + len_mass + len_stability
+
+    # Create a full mask of False
+    mask: Array = jnp.zeros(total_len, dtype=bool)
+
+    # Set True only in the slice corresponding to reactions
+    mask = mask.at[len_fugacity : len_fugacity + len_reactions].set(reactions_mask)
+
+    return mask
 
 
 def objective_function(
@@ -348,7 +385,7 @@ def objective_function(
     residual = jnp.take(
         residual, indices=active_indices, unique_indices=True, indices_are_sorted=True
     )
-    jax.debug.print("residual = {out}", out=residual)
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 
