@@ -54,6 +54,7 @@ from atmodeller.engine import (
     get_log_activity,
     get_log_number_density_from_log_pressure,
     get_pressure_from_log_number_density,
+    get_reactions_only_mask,
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
     get_total_pressure,
@@ -72,7 +73,6 @@ class Output:
     Args:
         species: Species
         solution: Array output from solve
-        active_indices: Indices of the residual array that are active
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
     """
@@ -99,11 +99,6 @@ class Output:
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
         self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
-
-    @property
-    def active_indices(self) -> NpInt:
-        """Active indices"""
-        return self._active_indices
 
     @property
     def formula_matrix(self) -> NpInt:
@@ -144,6 +139,12 @@ class Output:
     def planet(self) -> Planet:
         """Planet"""
         return self._traced_parameters.planet
+
+    # TODO: Does this require vmapping in the general case?
+    @property
+    def reaction_indices(self) -> NpInt:
+        """Reaction indices"""
+        return np.asarray(get_reactions_only_mask(self._traced_parameters, self._fixed_parameters))
 
     @property
     def temperature(self) -> NpFloat:
@@ -368,7 +369,7 @@ class Output:
         number_density = number_density[:, self.condensed_species_mask]
         activity = activity[:, self.condensed_species_mask]
 
-        condensed_species: tuple[str, ...] = self._species.get_condensed_species_names()
+        condensed_species: tuple[str, ...] = self._species.condensed_species_names
 
         out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "total_"
@@ -772,7 +773,6 @@ class Output:
                 0,
                 {
                     "traced_parameters": self.traced_parameters_vmap_axes(),
-                    "active_indices": None,
                     "tau": None,
                     "fixed_parameters": None,
                 },
@@ -782,7 +782,6 @@ class Output:
             self._solution,
             {
                 "traced_parameters": self._traced_parameters,
-                "active_indices": jnp.asarray(self.active_indices),
                 "tau": jnp.asarray(TAU),
                 "fixed_parameters": self._fixed_parameters,
             },
