@@ -140,19 +140,13 @@ class Output:
         """Planet"""
         return self._traced_parameters.planet
 
-    # TODO: Does this require vmapping in the general case?
-    @property
-    def reaction_indices(self) -> NpInt:
-        """Reaction indices"""
-        return np.asarray(get_reactions_only_mask(self._traced_parameters, self._fixed_parameters))
-
     @property
     def temperature(self) -> NpFloat:
         """Temperature"""
         return np.asarray(self.planet.temperature)
 
     def activity(self) -> NpFloat:
-        """Gets the activity of all species
+        """Gets the activity of all species.
 
         Returns:
             Activity of all species
@@ -168,7 +162,7 @@ class Output:
         return np.exp(self.log_activity_without_stability())
 
     def asdict(self) -> dict[str, dict[str, NpArray]]:
-        """All output in a dictionary, with caching.
+        """Gets all output in a dictionary, with caching.
 
         Returns:
             Dictionary of all output
@@ -245,7 +239,7 @@ class Output:
         return out
 
     def atmosphere_asdict(self) -> dict[str, NpArray]:
-        """Gets the atmosphere properties
+        """Gets the atmosphere properties.
 
         Returns:
             Atmosphere properties
@@ -280,7 +274,7 @@ class Output:
         return out
 
     def atmosphere_log_molar_mass(self) -> NpFloat:
-        """Gets log molar mass of the atmosphere
+        """Gets log molar mass of the atmosphere.
 
         Returns:
             Log molar mass of the atmosphere
@@ -295,7 +289,7 @@ class Output:
         return np.asarray(atmosphere_log_molar_mass)
 
     def atmosphere_molar_mass(self) -> NpArray:
-        """Gets the molar mass of the atmosphere
+        """Gets the molar mass of the atmosphere.
 
         Returns:
             Molar mass of the atmosphere
@@ -303,7 +297,7 @@ class Output:
         return np.exp(self.atmosphere_log_molar_mass())
 
     def atmosphere_log_volume(self) -> NpFloat:
-        """Gets the log volume of the atmosphere
+        """Gets the log volume of the atmosphere.
 
         Returns:
             Log volume of the atmosphere
@@ -325,7 +319,7 @@ class Output:
         return np.asarray(atmosphere_log_volume)
 
     def atmosphere_volume(self) -> NpFloat:
-        """Gets the volume of the atmosphere
+        """Gets the volume of the atmosphere.
 
         Returns:
             Volume of the atmosphere
@@ -333,7 +327,7 @@ class Output:
         return np.exp(self.atmosphere_log_volume())
 
     def total_pressure(self) -> NpFloat:
-        """Gets total pressure
+        """Gets total pressure.
 
         Returns:
             Total pressure
@@ -350,12 +344,9 @@ class Output:
         return np.asarray(total_pressure)
 
     def condensed_species_asdict(
-        self,
-        molar_mass: NpArray,
-        number_density: NpArray,
-        activity: NpArray,
+        self, molar_mass: NpArray, number_density: NpArray, activity: NpArray
     ) -> dict[str, dict[str, NpArray]]:
-        """Gets the condensed species output as a dictionary
+        """Gets the condensed species output as a dictionary.
 
         Args:
             molar_mass: Molar mass of all species
@@ -389,7 +380,7 @@ class Output:
         gas_species_asdict: dict[str, dict[str, NpArray]],
         residual_asdict: dict[int, NpArray],
     ) -> dict[str, NpArray]:
-        """Gets the reaction disequilibrium as a dictionary
+        """Gets the reaction disequilibrium as a dictionary.
 
         Args:
             gas_species_asdict: Gas species as a dictionary
@@ -401,6 +392,8 @@ class Output:
         reaction_matrix: NpFloat = np.array(self._fixed_parameters.reaction_matrix)
         species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
+
+        print("reaction_indices = ", self.reaction_indices())
 
         # FIXME: Could break for condensates
         # To compute the limiting reactant/product in each reaction we need to know the volume
@@ -415,6 +408,7 @@ class Output:
         out: dict[str, NpArray] = {}
 
         for k, v in residual_asdict.items():
+            print(k, v)
             reaction_index: int = int(k)
             # reaction_str: str = reactions[reaction_index]
             per_mole_of_reaction: NpFloat = v * GAS_CONSTANT * self.temperature
@@ -446,7 +440,7 @@ class Output:
         return out
 
     def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
-        """Gets the element properties as a dictionary
+        """Gets the element properties as a dictionary.
 
         Returns:
             Element outputs as a dictionary
@@ -495,7 +489,7 @@ class Output:
         return elements_out
 
     def element_density_condensed(self) -> NpFloat:
-        """Gets the number density of elements in the condensed phase
+        """Gets the number density of elements in the condensed phase.
 
         Unlike for the objective function, we want the number density of all elements, regardless
         of whether they were used to impose a mass constraint on the system.
@@ -512,7 +506,7 @@ class Output:
         return np.asarray(element_density)
 
     def element_density_dissolved(self) -> NpFloat:
-        """Gets the number density of elements dissolved in melt due to species solubility
+        """Gets the number density of elements dissolved in melt due to species solubility.
 
         Unlike for the objective function, we want the number density of all elements, regardless
         of whether they were used to impose a mass constraint on the system.
@@ -536,7 +530,7 @@ class Output:
         return np.asarray(element_density_dissolved)
 
     def element_density_gas(self) -> NpFloat:
-        """Gets the number density of elements in the gas phase
+        """Gets the number density of elements in the gas phase.
 
         Unlike for the objective function, we want the number density of all elements, regardless
         of whether they were used to impose a mass constraint on the system.
@@ -553,7 +547,7 @@ class Output:
         return np.asarray(element_density)
 
     def element_molar_mass_expanded(self) -> NpFloat:
-        """Gets molar mass of elements
+        """Gets molar mass of elements.
 
         Returns:
             Molar mass of elements
@@ -569,7 +563,7 @@ class Output:
     def _get_number_density_output(
         self, number_density: NpArray, molar_mass_expanded: NpArray, prefix: str = ""
     ) -> dict[str, NpArray]:
-        """Gets the outputs associated with a number density
+        """Gets the outputs associated with a number density.
 
         Args:
             number_density: Number density
@@ -599,7 +593,7 @@ class Output:
         number_density: NpArray,
         activity: NpArray,
     ) -> dict[str, dict[str, NpArray]]:
-        """Gets the gas species output as a dictionary
+        """Gets the gas species output as a dictionary.
 
         Args:
             molar_mass: Molar mass of all species
@@ -673,10 +667,10 @@ class Output:
         return log_activity
 
     def log_activity_without_stability(self) -> NpFloat:
-        """Gets log activity without stability of all species
+        """Gets log activity without stability of all species.
 
-        Args:
-            Log activity without stability of all species
+        Returns:
+            Log activity without stability
         """
         log_activity_func: Callable = eqx.filter_vmap(
             get_log_activity,
@@ -689,15 +683,30 @@ class Output:
         return np.asarray(log_activity)
 
     def number_density(self) -> NpFloat:
-        r"""Gets number density of all species
+        r"""Gets number density of all species.
 
         Returns:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
         return np.exp(self.log_number_density)
 
+    def reaction_indices(self) -> NpInt:
+        """Gets the reaction indices of the residual array.
+
+        Returns:
+            Reaction indices of the residual array
+        """
+        reaction_indices_func: Callable = eqx.filter_vmap(
+            get_reactions_only_mask, in_axes=(self.traced_parameters_vmap_axes(), None)
+        )
+        reaction_indices: Array = reaction_indices_func(
+            self._traced_parameters, self._fixed_parameters
+        )
+
+        return np.asarray(reaction_indices)
+
     def species_molar_mass_expanded(self) -> NpFloat:
-        r"""Gets molar mass of all species in an expanded array.
+        """Gets molar mass of all species in an expanded array.
 
         Returns:
             Molar mass of all species in an expanded array.
@@ -705,7 +714,7 @@ class Output:
         return np.tile(self.molar_mass, (self.number_solutions, 1))
 
     def pressure(self) -> NpFloat:
-        """Gets pressure of species in bar
+        """Gets pressure of species in bar.
 
         This will compute pressure of all species, including condensates, for simplicity.
 
@@ -741,7 +750,7 @@ class Output:
         return {key: np.squeeze(value) for key, value in out.items()}
 
     def raw_solution_asdict(self) -> dict[str, NpArray]:
-        """Gets the raw solution
+        """Gets the raw solution.
 
         Returns:
             Dictionary of the raw solution
@@ -762,7 +771,7 @@ class Output:
         return raw_solution
 
     def residual_asdict(self) -> dict[int, NpFloat]:
-        """Gets the residual
+        """Gets the residual.
 
         Returns:
             Dictionary of the residual
@@ -794,7 +803,7 @@ class Output:
         return out
 
     def species_density_in_melt(self) -> NpFloat:
-        """Gets species number density in the melt
+        """Gets species number density in the melt.
 
         Returns:
             Species number density in the melt
@@ -814,7 +823,7 @@ class Output:
         return np.asarray(species_density_in_melt)
 
     def species_ppmw_in_melt(self) -> NpFloat:
-        """Gets species ppmw in the melt
+        """Gets species ppmw in the melt.
 
         Return:
             Species ppmw in the melt
@@ -832,7 +841,7 @@ class Output:
         return np.asarray(species_ppmw_in_melt)
 
     def stability(self) -> NpFloat:
-        """Gets stability of relevant species
+        """Gets stability of relevant species.
 
         Returns:
             Stability of relevant species
@@ -840,11 +849,19 @@ class Output:
         return np.exp(self.log_stability)
 
     def temperature_vmap_axes(self) -> Literal[0, None]:
-        """Gets vmap axes for temperature"""
+        """Gets vmap axes for temperature.
+
+        Returns:
+            vmap axes for temperature
+        """
         return vmap_axes_spec(self._traced_parameters.planet.temperature)
 
     def traced_parameters_vmap_axes(self) -> TracedParameters:
-        """Gets vmap axes for traced parameters"""
+        """Gets vmap axes for traced parameters.
+
+        Returns:
+            vmap axes for traced parameters
+        """
         return vmap_axes_spec(self._traced_parameters)
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
@@ -1029,7 +1046,7 @@ class OutputSolution(Output):
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]
     ) -> dict[str, pd.DataFrame]:
-        """Drops unsuccessful solves
+        """Drops unsuccessful solves.
 
         Args:
             dataframes: Dataframes from which to drop unsuccessful models
@@ -1041,7 +1058,7 @@ class OutputSolution(Output):
 
 
 def broadcast_arrays_in_dict(some_dict: dict[str, NpArray], shape: int) -> dict[str, NpArray]:
-    """Gets a dictionary of broadcasted arrays
+    """Gets a dictionary of broadcasted arrays.
 
     Args:
         some_dict: Some dictionary
@@ -1081,7 +1098,7 @@ def split_dict_by_columns(dict_to_split: dict[str, NpArray]) -> list[dict[str, N
 
 
 def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[str, pd.DataFrame]:
-    """Creates a dictionary of dataframes from a nested dictionary
+    """Creates a dictionary of dataframes from a nested dictionary.
 
     Args:
         nested_dict: A nested dictionary
