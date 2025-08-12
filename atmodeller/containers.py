@@ -137,11 +137,24 @@ class Species(eqx.Module):
 class SpeciesCollection(eqx.Module):
     """A collection of species
 
+    Note:
+        The `active_stability` attribute must be a fixed, non-traced tuple because it is used in
+        JAX operations such as `jnp.where` where the `size` argument must be a static (compile-time
+        known) value. This requirement avoids recompilation and tracing errors in the engine when
+        determining the number of solution quantities.
+
     Args:
         species: Species
     """
 
-    data: tuple[Species, ...] = eqx.field(converter=tuple)
+    data: tuple[Species, ...]
+    """Species data"""
+    active_stability: tuple[bool, ...]
+    """Active stability mask"""
+
+    def __init__(self, data: Iterable[Species]):
+        self.data = tuple(data)
+        self.active_stability = tuple([species.solve_for_stability for species in self.data])
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -170,21 +183,19 @@ class SpeciesCollection(eqx.Module):
         return thermodynamic_data_source.available_species()
 
     @property
-    def number(self) -> int:
+    def number_species(self) -> int:
         """Number of species"""
         return len(self.data)
 
-    def active_stability(self) -> Bool[Array, " species"]:
-        """Active species stability
+    @property
+    def number_stability(self) -> int:
+        """Number of stability to solve for"""
+        return sum(self.active_stability)
 
-        Returns:
-            `True` for species stabilities that are to be solved for, otherwise `False`
-        """
-        mask: Bool[Array, " species"] = jnp.array(
-            [species.solve_for_stability for species in self.data], dtype=bool
-        )
-
-        return mask
+    @property
+    def number_solution(self) -> int:
+        """Number of solution quantities"""
+        return self.number_species + self.number_stability
 
     def get_condensed_species_names(self) -> tuple[str, ...]:
         """Condensed species names
@@ -311,8 +322,8 @@ class SpeciesCollection(eqx.Module):
         """
         bound: Array = jnp.concatenate(
             (
-                log_number_density_bound * jnp.ones(self.number),
-                stability_bound * jnp.ones(self.number),
+                log_number_density_bound * jnp.ones(self.number_species),
+                stability_bound * jnp.ones(self.number_species),
             )
         )
 
@@ -352,66 +363,64 @@ class Planet(eqx.Module):
         surface_temperature: Temperature of the planetary surface. Defaults to `2000` K.
     """
 
-    planet_mass: Float[Array, " dim"] = eqx.field(converter=as_j64, default=5.972e24)
+    planet_mass: Array = eqx.field(converter=as_j64, default=5.972e24)
     """Mass of the planet in kg"""
-    core_mass_fraction: Float[Array, " dim"] = eqx.field(
-        converter=as_j64, default=0.295334691460966
-    )
+    core_mass_fraction: Array = eqx.field(converter=as_j64, default=0.295334691460966)
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: Float[Array, " dim"] = eqx.field(converter=as_j64, default=1.0)
+    mantle_melt_fraction: Array = eqx.field(converter=as_j64, default=1.0)
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: Float[Array, " dim"] = eqx.field(converter=as_j64, default=6371000)
+    surface_radius: Array = eqx.field(converter=as_j64, default=6371000)
     """Radius of the surface in m"""
-    surface_temperature: Float[Array, " dim"] = eqx.field(converter=as_j64, default=2000)
+    surface_temperature: Array = eqx.field(converter=as_j64, default=2000)
     """Temperature of the surface in K"""
 
     @property
-    def mantle_mass(self) -> Float[Array, " dim"]:
+    def mantle_mass(self) -> Array:
         """Mantle mass"""
         return self.planet_mass * self.mantle_mass_fraction
 
     @property
-    def mantle_mass_fraction(self) -> Float[Array, " dim"]:
+    def mantle_mass_fraction(self) -> Array:
         """Mantle mass fraction"""
         return 1 - self.core_mass_fraction
 
     @property
-    def mantle_melt_mass(self) -> Float[Array, " dim"]:
+    def mantle_melt_mass(self) -> Array:
         """Mass of the molten mantle"""
         return self.mantle_mass * self.mantle_melt_fraction
 
     @property
-    def mantle_solid_mass(self) -> Float[Array, " dim"]:
+    def mantle_solid_mass(self) -> Array:
         """Mass of the solid mantle"""
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
 
     @property
-    def mass(self) -> Float[Array, " dim"]:
+    def mass(self) -> Array:
         """Mass"""
         return self.mantle_mass
 
     @property
-    def melt_mass(self) -> Float[Array, " dim"]:
+    def melt_mass(self) -> Array:
         """Mass of the melt"""
         return self.mantle_melt_mass
 
     @property
-    def solid_mass(self) -> Float[Array, " dim"]:
+    def solid_mass(self) -> Array:
         """Mass of the solid"""
         return self.mantle_solid_mass
 
     @property
-    def surface_area(self) -> Float[Array, " dim"]:
+    def surface_area(self) -> Array:
         """Surface area"""
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
     @property
-    def surface_gravity(self) -> Float[Array, " dim"]:
+    def surface_gravity(self) -> Array:
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
     @property
-    def temperature(self) -> Float[Array, " dim"]:
+    def temperature(self) -> Array:
         """Temperature"""
         return self.surface_temperature
 
@@ -443,20 +452,18 @@ class ConstantFugacityConstraint(eqx.Module):
         fugacity: Fugacity. Defaults to `np.nan`.
     """
 
-    fugacity: Float[Array, " dim"] = eqx.field(converter=as_j64, default=np.nan)
+    fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
     """Fugacity"""
 
     def active(self) -> Bool[Array, " dim"]:
-        """Is the fugacity constraint active.
-
-        This function is intended to be called only after `vmap`-ping.
+        """Active fugacity constraint
 
         Returns:
             `True` if the fugacity constraint is active, otherwise `False`
         """
         return ~jnp.isnan(self.fugacity)
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, " dim"]:
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
 
@@ -511,10 +518,8 @@ class FugacityConstraints(eqx.Module):
 
         return cls(tuple(constraints), unique_species)
 
-    def active(self) -> Bool[Array, " dim"]:
+    def active(self) -> Array:
         """Active fugacity constraints
-
-        This function is intended to be called only after `vmap`-ping.
 
         Returns:
             Mask indicating whether fugacity constraints are active or not
@@ -547,7 +552,7 @@ class FugacityConstraints(eqx.Module):
 
         return out
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, " dim"]:
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
         Args:
@@ -566,9 +571,7 @@ class FugacityConstraints(eqx.Module):
         # Temperature must be a float array to ensure branches have have identical types
         temperature = as_j64(temperature)
 
-        def apply_fugacity(
-            index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
-        ) -> Float[Array, " dim"]:
+        def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
             return lax.switch(
                 index,
@@ -577,16 +580,14 @@ class FugacityConstraints(eqx.Module):
                 pressure,
             )
 
-        indices: Integer[Array, " dim"] = jnp.arange(len(self.constraints))
+        indices: Array = jnp.arange(len(self.constraints))
         vmap_fugacity: Callable = eqx.filter_vmap(apply_fugacity, in_axes=(0, None, None))
-        log_fugacity: Float[Array, " dim"] = vmap_fugacity(indices, temperature, pressure)
+        log_fugacity: Array = vmap_fugacity(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
 
-    def log_number_density(
-        self, temperature: ArrayLike, pressure: ArrayLike
-    ) -> Float[Array, " dim"]:
+    def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density
 
         Args:
@@ -596,8 +597,8 @@ class FugacityConstraints(eqx.Module):
         Returns:
             Log number density
         """
-        log_fugacity: Float[Array, " dim"] = self.log_fugacity(temperature, pressure)
-        log_number_density: Float[Array, " dim"] = get_log_number_density_from_log_pressure(
+        log_fugacity: Array = self.log_fugacity(temperature, pressure)
+        log_number_density: Array = get_log_number_density_from_log_pressure(
             log_fugacity, temperature
         )
 
@@ -765,7 +766,7 @@ class FixedParameters(eqx.Module):
         Returns:
             `True` for species stabilities that are to be solved for, otherwise `False`
         """
-        return self.species.active_stability()
+        return jnp.array(self.species.active_stability)
 
 
 class SolverParameters(eqx.Module):

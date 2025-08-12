@@ -113,7 +113,7 @@ class InteriorAtmosphere:
         fixed_parameters_: FixedParameters = self.get_fixed_parameters()
 
         solution_array: Array = broadcast_initial_solution(
-            log_number_density, None, self.species.number, batch_size
+            log_number_density, None, self.species.number_species, batch_size
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
@@ -151,7 +151,7 @@ class InteriorAtmosphere:
         )
 
         # Always broadcast tau because the repeat_solver is triggered if some cases fail
-        broadcasted_tau: Float[Array, " batch_dim"] = jnp.full((batch_size,), TAU)
+        broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
         # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
 
         traced_parameters_: TracedParameters = TracedParameters(
@@ -168,7 +168,10 @@ class InteriorAtmosphere:
         }
 
         base_solution_array: Array = broadcast_initial_solution(
-            initial_log_number_density, initial_log_stability, self.species.number, batch_size
+            initial_log_number_density,
+            initial_log_stability,
+            self.species.number_species,
+            batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
@@ -210,7 +213,7 @@ class InteriorAtmosphere:
             )
 
             # Restore the base solution for cases that failed since this will be perturbed
-            solution: Float[Array, "batch_dim sol_dim"] = cast(
+            solution: Float[Array, "batch solution"] = cast(
                 Array, jnp.where(solver_status[:, None], solution, base_solution_array)
             )
             # jax.debug.print("solution = {out}", out=solution)
@@ -376,7 +379,7 @@ class InteriorAtmosphere:
         """
         unique_elements: tuple[str, ...] = self.species.get_unique_elements_in_species()
         formula_matrix: NpInt = np.zeros(
-            (len(unique_elements), self.species.number), dtype=np.int_
+            (len(unique_elements), self.species.number_species), dtype=np.int_
         )
 
         for element_index, element in enumerate(unique_elements):
@@ -398,7 +401,7 @@ class InteriorAtmosphere:
         Returns:
             A matrix of linearly independent reactions or an empty array if no reactions
         """
-        if self.species.number == 1:
+        if self.species.number_species == 1:
             logger.debug("Only one species therefore no reactions")
             return np.array([], dtype=np.float64)
 
