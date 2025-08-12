@@ -393,7 +393,7 @@ def objective_function(
 def get_atmosphere_log_molar_mass(
     fixed_parameters: FixedParameters, log_number_density: Float[Array, " species"]
 ) -> Float[Array, ""]:
-    """Gets log molar mass of the atmosphere
+    """Gets log molar mass of the atmosphere.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -422,7 +422,7 @@ def get_atmosphere_log_volume(
     log_number_density: Float[Array, " species"],
     planet: Planet,
 ) -> Float[Array, ""]:
-    """Gets log volume of the atmosphere
+    """Gets log volume of the atmosphere.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -448,7 +448,7 @@ def get_total_pressure(
     log_number_density: Float[Array, " species"],
     temperature: Float[Array, ""],
 ) -> Float[Array, ""]:
-    """Gets total pressure
+    """Gets total pressure.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -524,7 +524,7 @@ def get_element_density_in_melt(
 def get_gas_species_data(
     fixed_parameters: FixedParameters, some_array: ArrayLike
 ) -> Shaped[Array, " species"]:
-    """Masks the gas species data from an array
+    """Masks the gas species data from an array.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -545,7 +545,7 @@ def get_log_activity(
     fixed_parameters: FixedParameters,
     log_number_density: Float[Array, " species"],
 ) -> Float[Array, " species"]:
-    """Gets the log activity
+    """Gets the log activity.
 
     Args:
         traced_parameters: Traced parameters
@@ -592,7 +592,7 @@ def get_log_activity_ideal_mixing(
     log_number_density: Float[Array, " species"],
     log_activity_pure_species: Float[Array, " species"],
 ) -> Float[Array, " species"]:
-    """Gets the log activity of species in the atmosphere assuming an ideal mixture
+    """Gets the log activity of species in the atmosphere assuming an ideal mixture.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -622,7 +622,7 @@ def get_log_activity_ideal_mixing(
 def get_log_pressure_from_log_number_density(
     log_number_density: Float[Array, " species"], temperature: Float[Array, ""]
 ) -> Float[Array, " species"]:
-    """Gets log pressure from log number density
+    """Gets log pressure from log number density.
 
     Args:
         log_number_density: Log number density
@@ -643,7 +643,7 @@ def get_log_Kp(
     reaction_matrix: Float[Array, "reactions species"],
     temperature: Float[Array, ""],
 ) -> Float[Array, " reactions"]:
-    """Gets log of the equilibrium constant in terms of partial pressures
+    """Gets log of the equilibrium constant in terms of partial pressures.
 
     Args:
         species: Species
@@ -674,7 +674,7 @@ def get_log_Kp(
 def get_log_reaction_equilibrium_constant(
     fixed_parameters: FixedParameters, temperature: Float[Array, ""]
 ) -> Float[Array, " reactions"]:
-    """Gets the log equilibrium constant of the reactions
+    """Gets the log equilibrium constant of the reactions.
 
     Args:
         fixed_parameters: Fixed parameters
@@ -704,7 +704,7 @@ def get_log_reaction_equilibrium_constant(
 def get_pressure_from_log_number_density(
     log_number_density: Float[Array, " species"], temperature: Float[Array, ""]
 ) -> Float[Array, " species"]:
-    """Gets pressure from log number density
+    """Gets pressure from log number density.
 
     Args:
         log_number_density: Log number density
@@ -723,7 +723,7 @@ def get_species_density_in_melt(
     log_activity: Float[Array, " species"],
     log_volume: Float[Array, ""],
 ) -> Float[Array, " species"]:
-    """Gets the number density of species dissolved in melt due to species solubility
+    """Gets the number density of species dissolved in melt due to species solubility.
 
     Args:
         traced_parameters: Traced parameters
@@ -760,7 +760,7 @@ def get_species_ppmw_in_melt(
     log_number_density: Float[Array, " species"],
     log_activity: Float[Array, " species"],
 ) -> Float[Array, " species"]:
-    """Gets the ppmw of species dissolved in melt due to species solubility
+    """Gets the ppmw of species dissolved in melt due to species solubility.
 
     Args:
         traced_parameters: Traced parameters
