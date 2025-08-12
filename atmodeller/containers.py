@@ -151,10 +151,38 @@ class SpeciesCollection(eqx.Module):
     """Species data"""
     active_stability: tuple[bool, ...]
     """Active stability mask"""
+    gas_species_mask: tuple[bool, ...]
+    """Gas species mask"""
+    species_names: tuple[str, ...]
+    """Unique names of all species"""
+    gas_species_names: tuple[str, ...]
+    """Gas species names"""
+    condensed_species_names: tuple[str, ...]
+    """Condensed species names"""
+    molar_masses: tuple[float, ...]
+    """Molar masses"""
+    unique_elements: tuple[str, ...]
+    """Unique elements in species in alphabetical order"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
         self.active_stability = tuple([species.solve_for_stability for species in self.data])
+        self.gas_species_mask = tuple([species.data.state == GAS_STATE for species in self.data])
+        self.species_names = tuple([species_.name for species_ in self.data])
+        self.gas_species_names = tuple(
+            [species.name for species in self.data if species.data.state == GAS_STATE]
+        )
+        self.condensed_species_names = tuple(
+            [species.name for species in self.data if species.data.state != GAS_STATE]
+        )
+        self.molar_masses = tuple([species_.data.molar_mass for species_ in self.data])
+
+        # Unique elements
+        elements: list[str] = []
+        for species_ in self.data:
+            elements.extend(species_.data.elements)
+        unique_elements: list[str] = list(set(elements))
+        self.unique_elements = tuple(sorted(unique_elements))
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -197,18 +225,6 @@ class SpeciesCollection(eqx.Module):
         """Number of solution quantities"""
         return self.number_species + self.number_stability
 
-    def get_condensed_species_names(self) -> tuple[str, ...]:
-        """Condensed species names
-
-        Returns:
-            Condensed species names
-        """
-        condensed_names: list[str] = [
-            species.name for species in self.data if species.data.state != GAS_STATE
-        ]
-
-        return tuple(condensed_names)
-
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
@@ -227,30 +243,6 @@ class SpeciesCollection(eqx.Module):
         # if so, and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_mask(self) -> Bool[Array, " species"]:
-        """Gets the gas species mask
-
-        Returns:
-            Mask for the gas species
-        """
-        gas_species_mask: Bool[Array, " species"] = jnp.array(
-            [species.data.state == GAS_STATE for species in self.data], dtype=bool
-        )
-
-        return gas_species_mask
-
-    def get_gas_species_names(self) -> tuple[str, ...]:
-        """Gas species names
-
-        Returns:
-            Gas species names
-        """
-        gas_names: list[str] = [
-            species.name for species in self.data if species.data.state == GAS_STATE
-        ]
-
-        return tuple(gas_names)
-
     def get_lower_bound(self) -> Float[Array, " dim"]:
         """Gets the lower bound for truncating the solution during the solve
 
@@ -266,47 +258,6 @@ class SpeciesCollection(eqx.Module):
             Upper bound for truncating the solution during the solve
         """
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
-
-    def get_molar_masses(self) -> Float[Array, " species"]:
-        """Gets the molar masses of all species.
-
-        Returns:
-            Molar masses of all species
-        """
-        molar_masses: Float[Array, " species"] = jnp.array(
-            [species_.data.molar_mass for species_ in self.data]
-        )
-        # logger.debug("molar_masses = %s", molar_masses)
-
-        return molar_masses
-
-    def get_species_names(self) -> tuple[str, ...]:
-        """Gets the unique names of all species.
-
-        Unique names by combining Hill notation and state
-
-        Returns:
-            Species names
-        """
-        return tuple([species_.name for species_ in self.data])
-
-    def get_unique_elements_in_species(self) -> tuple[str, ...]:
-        """Gets unique elements.
-
-        Args:
-            species: A list of species
-
-        Returns:
-            Unique elements in the species ordered alphabetically
-        """
-        elements: list[str] = []
-        for species_ in self.data:
-            elements.extend(species_.data.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
-        # logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-        return tuple(sorted_elements)
 
     def _get_hypercube_bound(
         self, log_number_density_bound: float, stability_bound: float
@@ -506,7 +457,7 @@ class FugacityConstraints(eqx.Module):
         )
 
         # All unique species
-        unique_species: tuple[str, ...] = species.get_species_names()
+        unique_species: tuple[str, ...] = species.species_names
 
         constraints: list[FugacityConstraintProtocol] = []
 
@@ -637,7 +588,7 @@ class MassConstraints(eqx.Module):
         )
 
         # All unique elements in alphabetical order
-        unique_elements: tuple[str, ...] = species.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = species.unique_elements
 
         # Determine the maximum length of any array in mass_constraints_
         max_len: int = get_batch_size(mass_constraints_)
@@ -762,10 +713,7 @@ class FixedParameters(eqx.Module):
         species: Collection of species
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
-        stability_species_mask: Mask of species to solve for stability
-        gas_species_mask: Mask of gas species
         diatomic_oxygen_index: Index of diatomic oxygen
-        molar_masses: Molar masses of all species
     """
 
     species: SpeciesCollection
@@ -775,12 +723,8 @@ class FixedParameters(eqx.Module):
     # TODO: Currently breaks with "reactions species" because reaction_matrix might be empty.
     reaction_matrix: Float[Array, "..."]
     """Reaction matrix"""
-    gas_species_mask: Array
-    """Mask of gas species"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
-    molar_masses: Array
-    """Molar masses of all species"""
 
     def active_reactions(self) -> Bool[Array, " reactions"]:
         """Active reactions

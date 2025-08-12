@@ -330,17 +330,13 @@ class InteriorAtmosphere:
         """
         formula_matrix: NpInt = self.get_formula_matrix()
         reaction_matrix: NpFloat = self.get_reaction_matrix()
-        gas_species_mask: Array = self.species.get_gas_species_mask()
-        molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=jnp.asarray(formula_matrix),
             reaction_matrix=jnp.asarray(reaction_matrix),
-            gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
-            molar_masses=molar_masses,
         )
 
         return fixed_parameters
@@ -354,7 +350,7 @@ class InteriorAtmosphere:
         Returns:
             Formula matrix
         """
-        unique_elements: tuple[str, ...] = self.species.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self.species.unique_elements
         formula_matrix: NpInt = np.zeros(
             (len(unique_elements), self.species.number_species), dtype=np.int_
         )
@@ -394,7 +390,7 @@ class InteriorAtmosphere:
             Reactions as a dictionary
         """
         reaction_matrix: NpFloat = self.get_reaction_matrix()
-        species_names: tuple[str, ...] = self.species.get_species_names()
+        species_names: tuple[str, ...] = self.species.species_names
         reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         return reactions
