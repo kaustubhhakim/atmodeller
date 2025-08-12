@@ -355,10 +355,19 @@ def is_arraylike_batched(x: Any) -> Literal[0, None]:
     Returns:
         0 (axis) if batched, else None (not batched)
     """
-    if eqx.is_array(x) and x.ndim > 0:
-        return 0
-    else:
-        return None
+    if eqx.is_array(x):
+        # Vectorise over any 1-D array
+        if x.ndim == 1:
+            return 0
+        # Any 2-D array (i.e., log_abundance in MassConstraints) should be vectorised over the
+        # the first dimension if it is not unity
+        elif x.ndim == 2 and x.shape[0] > 1:
+            return 0
+
+    # Return None is implicit, and is applicable for anything that is:
+    # 1. Not an array
+    # 2. A scalar array
+    # 3. A 2-D array with only one row (relevant for log_abundance in MassConstraints)
 
 
 def vmap_axes_spec(x: Any) -> Any:

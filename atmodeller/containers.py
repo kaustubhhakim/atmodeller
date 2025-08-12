@@ -613,7 +613,7 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Float64[Array, "batch elements"]
+    log_abundance: Float64[Array, "dim elements"]
     elements: tuple[str, ...]
 
     @classmethod
@@ -621,7 +621,6 @@ class MassConstraints(eqx.Module):
         cls,
         species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        batch_size: int = 1,
     ) -> "MassConstraints":
         """Creates an instance
 
@@ -629,7 +628,6 @@ class MassConstraints(eqx.Module):
             species: Species
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
                 `None`.
-            batch_size: Total batch size, which is required for broadcasting. Defaults to `1`.
 
         Returns:
             An instance
@@ -659,7 +657,7 @@ class MassConstraints(eqx.Module):
         # Broadcast, which avoids JAX recompilation if mass constraints change since otherwise the
         # shape of self.log_abundance can vary between a 1-D and 2-D array which forces
         # recompilation of solve.
-        log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
+        # log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
         return cls(jnp.asarray(log_abundance), unique_elements)
@@ -682,15 +680,21 @@ class MassConstraints(eqx.Module):
     def active(self) -> Bool[Array, "batch elements"]:
         """Active mass constraints
 
+        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
+        unnecessary recompilations when `log_abundance` is sometimes batched and sometimes not.
+
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return ~jnp.isnan(self.log_abundance)
+        return ~jnp.isnan(self.log_abundance.squeeze())
 
     def log_number_density(
         self, log_atmosphere_volume: ArrayLike
     ) -> Float64[Array, "batch elements"]:
         """Log number density
+
+        The array is squeezed to ensure it is consistently 1-D when possible. This avoids
+        unnecessary recompilations when `log_abundance` is sometimes batched and sometimes not.
 
         Args:
             log_atmosphere_volume: Log volume of the atmosphere
@@ -699,7 +703,7 @@ class MassConstraints(eqx.Module):
             Log number density
         """
         log_number_density: Float64[Array, "batch elements"] = (
-            self.log_abundance - log_atmosphere_volume
+            self.log_abundance.squeeze() - log_atmosphere_volume
         )
 
         return log_number_density

@@ -103,9 +103,7 @@ class InteriorAtmosphere:
 
         # There are no constraints, but we must specify them nonetheless
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(self.species)
-        mass_constraints_: MassConstraints = MassConstraints.create(
-            self.species, batch_size=batch_size
-        )
+        mass_constraints_: MassConstraints = MassConstraints.create(self.species)
 
         traced_parameters_: TracedParameters = TracedParameters(
             planet, fugacity_constraints_, mass_constraints_
@@ -146,9 +144,7 @@ class InteriorAtmosphere:
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             self.species, fugacity_constraints
         )
-        mass_constraints_: MassConstraints = MassConstraints.create(
-            self.species, mass_constraints, batch_size
-        )
+        mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
 
         # Always broadcast tau because the repeat_solver is triggered if some cases fail
         broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
