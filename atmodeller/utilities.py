@@ -144,19 +144,6 @@ def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
     return jnp.asarray(x, dtype=jnp.float64)
 
 
-# TODO: Remove, no longer required
-# def as_j64_2d(x: ArrayLike | tuple) -> Float64[Array, "..."]:
-#     """Converts input to a 2-D JAX array of dtype float64.
-
-#     Args:
-#         x: Input to convert
-
-#     Returns:
-#         2-D JAX array of dtype float64
-#     """
-#     return jnp.atleast_2d(as_j64(x)).T
-
-
 def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
     """Recursively converts any structure to nested tuples of native floats.
 
@@ -397,7 +384,7 @@ def get_batch_size(x: Any) -> int:
     """
     max_size: int = 1
     for leaf in jax.tree_util.tree_leaves(x):
-        if eqx.is_array(leaf) and leaf.ndim == 2:
+        if eqx.is_array(leaf) and leaf.ndim > 0:
             max_size = max(max_size, leaf.shape[0])
 
     return max_size

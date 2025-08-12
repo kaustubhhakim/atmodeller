@@ -50,7 +50,6 @@ from atmodeller.utilities import (
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " sol_dim"],
-    active_indices: Integer[Array, " res_dim"],
     tau: Float[Array, ""],
     traced_parameters: TracedParameters,
     solver_parameters: SolverParameters,
@@ -61,7 +60,6 @@ def solve(
 
     Args:
         solution_array: Solution array
-        active_indices: Indices of the residual array that are active
         tau: Tau parameter for species' stability
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
@@ -77,7 +75,6 @@ def solve(
         solution_array,
         args={
             "traced_parameters": traced_parameters,
-            "active_indices": active_indices,
             "tau": tau,
             "fixed_parameters": fixed_parameters,
             "solver_parameters": solver_parameters,
@@ -131,9 +128,38 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
+def get_active_mask(
+    traced_parameters: TracedParameters, fixed_parameters: FixedParameters
+) -> Array:
+    """Gets the mask of active residual quantities.
+
+    Args:
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+
+    Returns:
+        Active mask
+    """
+    active_mask: Array = jnp.concatenate(
+        (
+            traced_parameters.fugacity_constraints.active(),
+            fixed_parameters.active_reactions(),
+            traced_parameters.mass_constraints.active(),
+            fixed_parameters.active_stability(),
+        )
+    )
+
+    jax.debug.print("fugacity active = {out}", out=traced_parameters.fugacity_constraints.active())
+    jax.debug.print("reactions active = {out}", out=fixed_parameters.active_reactions())
+    jax.debug.print("mass active = {out}", out=fixed_parameters.active_reactions())
+    jax.debug.print("stability active = {out}", out=fixed_parameters.active_stability())
+
+    return active_mask
+
+
 def objective_function(
-    solution: Float[Array, " sol_dim"], kwargs: dict
-) -> Float[Array, " res_dim"]:
+    solution: Float[Array, " solution"], kwargs: dict
+) -> Float[Array, " residual"]:
     """Objective function
 
     The order of the residual does make a difference to the solution process. More investigations
@@ -153,17 +179,19 @@ def objective_function(
     """
     # jax.debug.print("Starting new objective_function evaluation")
     tp: TracedParameters = kwargs["traced_parameters"]
-    active_indices: Integer[Array, " res_dim"] = kwargs["active_indices"]
     fp: FixedParameters = kwargs["fixed_parameters"]
     tau: Float[Array, ""] = kwargs["tau"]
     planet: Planet = tp.planet
     temperature: Float[Array, ""] = planet.temperature
 
+    active_mask: Array = get_active_mask(tp, fp)
+    jax.debug.print("active_mask = {out}", out=active_mask)
+
     log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    log_activity: Float[Array, " species_dim"] = get_log_activity(tp, fp, log_number_density)
+    log_activity: Float[Array, " species"] = get_log_activity(tp, fp, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Atmosphere
@@ -175,7 +203,7 @@ def objective_function(
     # Based on the definition of the reaction constant we need to convert gas activities
     # (fugacities) from bar to effective number density, whilst keeping condensate activities
     # unmodified.
-    log_activity_number_density: Float[Array, " species_dim"] = (
+    log_activity_number_density: Float[Array, " species"] = (
         get_log_number_density_from_log_pressure(log_activity, temperature)
     )
     log_activity_number_density = jnp.where(
@@ -214,7 +242,7 @@ def objective_function(
             fp, temperature
         )
         # jax.debug.print(
-        #     "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
+        #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
         # )
         reaction_residual: Array = (
             fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
@@ -247,26 +275,26 @@ def objective_function(
 
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
-    element_density: Float[Array, " el_dim"] = get_element_density(
+    element_density: Float[Array, " elements"] = get_element_density(
         fp.formula_matrix, log_number_density
     )
     # jax.debug.print("element_density = {out}", out=element_density)
-    element_melt_density: Float[Array, " el_dim"] = get_element_density_in_melt(
+    element_melt_density: Float[Array, " elements"] = get_element_density_in_melt(
         tp, fp, fp.formula_matrix, log_number_density, log_activity, log_volume
     )
     # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
     # Relative mass error, computed in log-space for numerical stability
-    element_density_total: Float[Array, " el_dim"] = element_density + element_melt_density
-    log_element_density_total: Float[Array, " el_dim"] = jnp.log(element_density_total)
+    element_density_total: Float[Array, " elements"] = element_density + element_melt_density
+    log_element_density_total: Float[Array, " elements"] = jnp.log(element_density_total)
     # jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
-    log_target_density: Float[Array, " el_dim"] = tp.mass_constraints.log_number_density(
+    log_target_density: Float[Array, " elements"] = tp.mass_constraints.log_number_density(
         log_volume
     )
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
 
     # Dimensionless (ratio error - 1)
-    mass_residual: Float[Array, " el_dim"] = (
+    mass_residual: Float[Array, " elements"] = (
         safe_exp(log_element_density_total - log_target_density) - 1
     )
     # Log-space residual can perform better when close to the solution
@@ -284,14 +312,14 @@ def objective_function(
     # )
 
     # Stability residual
-    log_min_number_density: Float[Array, " species_dim"] = (
+    log_min_number_density: Float[Array, " species"] = (
         get_min_log_elemental_abundance_per_species(fp.formula_matrix, tp.mass_constraints)
         - log_volume
         + jnp.log(tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
     # Dimensionless (log-ratio)
-    stability_residual: Float[Array, " species_dim"] = (
+    stability_residual: Float[Array, " species"] = (
         log_number_density + log_stability - log_min_number_density
     )
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
@@ -310,10 +338,27 @@ def objective_function(
     residual = jnp.concatenate(
         [fugacity_residual, reaction_residual, mass_residual, stability_residual]
     )
-    # jax.debug.print("residual (with nans) = {out}", out=residual)
+    jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    residual = jnp.take(residual, indices=active_indices)
-    # jax.debug.print("residual = {out}", out=residual)
+    # residual = residual * active_mask
+    # residual = jnp.nan_to_num(residual, nan=0.0)
+
+    # NOTE: Passing in a static size argument does allow this to use a JAX traced array. This
+    # can be known in advance based purely on the number of species
+    # FIXME: fill_value is just some arbitrary large value to trigger a fill during jnp.take
+    active_indices: Integer[Array, "..."] = jnp.where(active_mask, size=5)[0]
+    jax.debug.print("active_indices = {out}", out=active_indices)
+
+    residual = jnp.take(
+        residual, indices=active_indices, unique_indices=True, indices_are_sorted=True
+    )
+    jax.debug.print("residual = {out}", out=residual)
+
+    # Try reshaping to keep array size the same but give the option of only returning the non nan
+    # values
+    # reshaped = jnp.reshape(residual, (3, 5))
+    # jax.debug.print("reshaped = {out}", out=reshaped)
+    # residual: Array = reshaped[0]
 
     return residual
 
@@ -732,7 +777,6 @@ def get_species_ppmw_in_melt(
 # @eqx.debug.assert_max_traces(max_traces=1)
 def repeat_solver(
     solver_vmap_fn: Callable,
-    active_indices: Integer[Array, " res_dim"],
     tau: Float[Array, "..."],
     solution: Float[Array, "batch_dim sol_dim"],
     traced_parameters: TracedParameters,
@@ -748,7 +792,6 @@ def repeat_solver(
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        active_indices: Indices of the residual array that are active
         tau: Tau parameter for species' stability
         solution: Solution
         traced_parameters: Traced parameters
@@ -795,7 +838,7 @@ def repeat_solver(
         # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
         new_solution, new_status, new_steps = solver_vmap_fn(
-            new_initial_solution, active_indices, tau, traced_parameters, solver_parameters
+            new_initial_solution, tau, traced_parameters, solver_parameters
         )
 
         # Determine which entries to update: previously failed, now succeeded
@@ -841,7 +884,7 @@ def repeat_solver(
 
     # Try first solution
     first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
-        solution, active_indices, tau, traced_parameters, solver_parameters
+        solution, tau, traced_parameters, solver_parameters
     )
     # Failback solution
     solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
@@ -864,7 +907,6 @@ def repeat_solver(
 
 def make_solve_tau_step(
     solver_vmap_fn: Callable,
-    active_indices: Integer[Array, " res_dim"],
     traced_parameters: TracedParameters,
     solver_parameters: SolverParameters,
 ) -> Callable:
@@ -872,7 +914,6 @@ def make_solve_tau_step(
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        active_indices: Indices of the residual array that are active
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
 
@@ -888,7 +929,6 @@ def make_solve_tau_step(
 
         new_solution, new_status, new_steps, success_attempt = repeat_solver(
             solver_vmap_fn,
-            active_indices,
             tau,
             solution,
             traced_parameters,

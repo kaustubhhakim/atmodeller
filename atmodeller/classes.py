@@ -112,28 +112,12 @@ class InteriorAtmosphere:
         )
         fixed_parameters_: FixedParameters = self.get_fixed_parameters()
 
-        # NOTE: Determine active entries in the residual. Here, this will only return the reaction
-        # residual, as desired.
-        active: Bool[Array, " res_dim"] = jnp.concatenate(
-            (
-                fugacity_constraints_.active(),
-                fixed_parameters_.active_reactions(),
-                mass_constraints_.active(),
-                fixed_parameters_.active_stability(),
-            )
-        )
-        # jax.debug.print("active = {out}", out=active)
-        active_indices: Integer[Array, "..."] = jnp.where(active)[0]
-        # jax.debug.print("active_indices = {out}", out=active_indices)
-
         solution_array: Array = broadcast_initial_solution(
             log_number_density, None, self.species.number, batch_size
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
-        self._output = Output(
-            self.species, solution_array, active_indices, fixed_parameters_, traced_parameters_
-        )
+        self._output = Output(self.species, solution_array, fixed_parameters_, traced_parameters_)
 
     def solve(
         self,
@@ -160,7 +144,7 @@ class InteriorAtmosphere:
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            self.species, fugacity_constraints, batch_size
+            self.species, fugacity_constraints
         )
         mass_constraints_: MassConstraints = MassConstraints.create(
             self.species, mass_constraints, batch_size
@@ -173,7 +157,7 @@ class InteriorAtmosphere:
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
         )
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters(batch_size)
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
@@ -182,21 +166,6 @@ class InteriorAtmosphere:
             "upper": self.species.get_upper_bound(),
             "jac": solver_parameters_.jac,
         }
-
-        # NOTE: Determine active entries in the residual. This order must correspond to the order
-        # of entries in the residual.
-        active: Bool[Array, "batch residual"] = jnp.concatenate(
-            (
-                fugacity_constraints_.active(),
-                fixed_parameters_.active_reactions(),
-                mass_constraints_.active(),
-                fixed_parameters_.active_stability(),
-            ),
-            axis=1,
-        )
-        jax.debug.print("active = {out}", out=active)
-        active_indices: Integer[Array, "..."] = jnp.where(active)[0]
-        jax.debug.print("active_indices = {out}", out=active_indices)
 
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_density, initial_log_stability, self.species.number, batch_size
@@ -211,22 +180,20 @@ class InteriorAtmosphere:
 
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
-        # NOTE: now also vmapping over active indices
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, 0, 0, in_axes, None)))
+        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, 0, in_axes, None)))
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
         logger.info(f"Attempting to solve {batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(
             base_solution_array,
-            active_indices,
             broadcasted_tau,
             traced_parameters_,
             solver_parameters_,
         )
         # jax.debug.print("solver_status = {out}", out=solver_status)
         # jax.debug.print("solver_steps = {out}", out=solver_steps)
-        solver_attempts: Integer[Array, " batch_dim"] = solver_status.astype(int)
+        solver_attempts: Integer[Array, " batch"] = solver_status.astype(int)
         # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
 
         if jnp.any(~solver_status):
@@ -267,21 +234,19 @@ class InteriorAtmosphere:
                     TAU,
                     TAU_NUM,
                 )
-                varying_tau_row: Float[Array, " tau_dim"] = jnp.logspace(
+                varying_tau_row: Float[Array, " tau"] = jnp.logspace(
                     jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
                 )
-                constant_tau_row: Float[Array, " tau_dim"] = jnp.full((TAU_NUM,), TAU)
-                tau_templates: Float[Array, "tau_dim 2"] = jnp.stack(
+                constant_tau_row: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
+                tau_templates: Float[Array, "tau 2"] = jnp.stack(
                     [varying_tau_row, constant_tau_row], axis=1
                 )
-                tau_array: Float[Array, "tau_dim batch_dim"] = tau_templates[
-                    :, solver_status.astype(int)
-                ]
+                tau_array: Float[Array, "tau batch"] = tau_templates[:, solver_status.astype(int)]
                 # jax.debug.print("tau_array = {out}", out=tau_array)
 
                 initial_carry: tuple[Array, Array] = (subkey, solution)
                 solve_tau_step: Callable = make_solve_tau_step(
-                    self._solver, active_indices, traced_parameters_, solver_parameters_
+                    self._solver, traced_parameters_, solver_parameters_
                 )
                 _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
                 solution, solver_status_, solver_steps_, solver_attempts = results
@@ -319,7 +284,6 @@ class InteriorAtmosphere:
             else:
                 solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
                     self._solver,
-                    active_indices,
                     broadcasted_tau,
                     solution,
                     traced_parameters_,
@@ -334,10 +298,10 @@ class InteriorAtmosphere:
             logger.info("Multistart complete with %s total attempt(s)", max_attempts)
 
             # Restore statistics of cases that solved first time
-            solver_steps: Integer[Array, " batch_dim"] = jnp.where(
+            solver_steps: Integer[Array, " batch"] = jnp.where(
                 solver_status, solver_steps, solver_steps_
             )
-            solver_status: Bool[Array, " batch_dim"] = solver_status_  # Final status
+            solver_status: Bool[Array, " batch"] = solver_status_  # Final status
 
             # Count unique values and their frequencies
             unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
@@ -370,7 +334,6 @@ class InteriorAtmosphere:
         self._output = OutputSolution(
             self.species,
             solution,
-            active_indices,
             fixed_parameters_,
             traced_parameters_,
             solver_parameters_,
@@ -379,11 +342,8 @@ class InteriorAtmosphere:
             solver_attempts,
         )
 
-    def get_fixed_parameters(self, batch_size: int) -> FixedParameters:
+    def get_fixed_parameters(self) -> FixedParameters:
         """Gets fixed parameters.
-
-        Args:
-            batch_size: Batch size
 
         Returns:
             Fixed parameters
@@ -401,7 +361,6 @@ class InteriorAtmosphere:
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
-            batch_size=batch_size,
         )
 
         return fixed_parameters

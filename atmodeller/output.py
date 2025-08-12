@@ -81,14 +81,12 @@ class Output:
         self,
         species: SpeciesCollection,
         solution: Float[Array, " batch_dim sol_dim"],
-        active_indices: Integer[Array, " res_dim"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
         self._solution: NpFloat = np.asarray(solution)
-        self._active_indices: NpInt = np.asarray(active_indices)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
 
@@ -905,7 +903,6 @@ class OutputSolution(Output):
     Args:
         species: Species
         solution: Array output from solve
-        active_indices: Indices of the residual array that are active
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
@@ -918,7 +915,6 @@ class OutputSolution(Output):
         self,
         species: SpeciesCollection,
         solution: Float[Array, " batch_dim sol_dim"],
-        active_indices: Integer[Array, " res_dim"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
         solver_parameters: SolverParameters,
@@ -926,7 +922,7 @@ class OutputSolution(Output):
         solver_steps: Integer[Array, " batch_dim"],
         solver_attempts: Integer[Array, " batch_dim"],
     ):
-        super().__init__(species, solution, active_indices, fixed_parameters, traced_parameters)
+        super().__init__(species, solution, fixed_parameters, traced_parameters)
         self._solver_parameters: SolverParameters = solver_parameters
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
