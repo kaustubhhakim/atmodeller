@@ -203,8 +203,8 @@ class Output:
             self.number_solutions,
         )
 
-        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
-        out["disequilibrium"] = self.disequilibrium_asdict(gas_species_asdict, out["residual"])
+        out["residual"], residual = self.residual_asdict()  # type: ignore since keys are int
+        out["disequilibrium"] = self.disequilibrium_asdict(gas_species_asdict, residual)
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -378,7 +378,7 @@ class Output:
     def disequilibrium_asdict(
         self,
         gas_species_asdict: dict[str, dict[str, NpArray]],
-        residual_asdict: dict[int, NpArray],
+        residual: NpArray,
     ) -> dict[str, NpArray]:
         """Gets the reaction disequilibrium as a dictionary.
 
@@ -394,6 +394,15 @@ class Output:
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         print("reaction_indices = ", self.reaction_indices())
+
+        print("residual = ", residual)
+
+        reactions = self.reaction_indices() * residual
+
+        print("reactions = ", reactions)
+
+        # FIXME: Working here
+        sys.exit(0)
 
         # FIXME: Could break for condensates
         # To compute the limiting reactant/product in each reaction we need to know the volume
@@ -770,7 +779,7 @@ class Output:
 
         return raw_solution
 
-    def residual_asdict(self) -> dict[int, NpFloat]:
+    def residual_asdict(self) -> tuple[dict[int, NpFloat], NpArray]:
         """Gets the residual.
 
         Returns:
@@ -800,7 +809,7 @@ class Output:
         for ii in range(residual.shape[1]):
             out[ii] = np.asarray(residual[:, ii])
 
-        return out
+        return out, np.asarray(residual)
 
     def species_density_in_melt(self) -> NpFloat:
         """Gets species number density in the melt.

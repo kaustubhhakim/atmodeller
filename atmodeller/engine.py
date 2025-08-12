@@ -168,28 +168,19 @@ def get_reactions_only_mask(
         fixed_parameters: Fixed parameters
 
     Returns:
-        Reactions only mask
+        Reactions only mask for the residual array
     """
-    # Get all masks separately
+    # Create a full mask of False
+    size: int = fixed_parameters.species.number_solution
+    mask: Array = jnp.zeros(size, dtype=bool)
+
     fugacity_mask: Array = traced_parameters.fugacity_constraints.active()
     reactions_mask: Array = fixed_parameters.active_reactions()
-    mass_mask: Array = traced_parameters.mass_constraints.active()
-    stability_mask: Array = fixed_parameters.active_stability()
+    num_active_fugacity: Array = jnp.sum(fugacity_mask)
 
-    # Compute lengths
-    len_fugacity: int = fugacity_mask.shape[0]
-    len_reactions: int = reactions_mask.shape[0]
-    len_mass: int = mass_mask.shape[0]
-    len_stability: int = stability_mask.shape[0]
-
-    # Total length of concatenated mask
-    total_len: int = len_fugacity + len_reactions + len_mass + len_stability
-
-    # Create a full mask of False
-    mask: Array = jnp.zeros(total_len, dtype=bool)
-
-    # Set True only in the slice corresponding to reactions
-    mask = mask.at[len_fugacity : len_fugacity + len_reactions].set(reactions_mask)
+    # Place the reactions_mask at position num_active_fugacity dynamically.
+    # Use lax.dynamic_update_slice: (array_to_update, update, start_indices)
+    mask = lax.dynamic_update_slice(mask, reactions_mask, (num_active_fugacity,))
 
     return mask
 
