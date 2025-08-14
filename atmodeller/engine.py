@@ -360,7 +360,7 @@ def objective_function(
     # )
 
     # NOTE: Order must be identical to get_active_mask()
-    residual = jnp.concatenate(
+    residual: Float[Array, " residual"] = jnp.concatenate(
         [fugacity_residual, reaction_residual, mass_residual, stability_residual]
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)

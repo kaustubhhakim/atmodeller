@@ -22,11 +22,9 @@ must be vmapped to compute the output.
 
 import logging
 import pickle
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
-import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -46,23 +44,10 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import (
-    get_atmosphere_log_molar_mass,
-    get_atmosphere_log_volume,
-    get_element_density,
-    get_element_density_in_melt,
-    get_log_activity,
-    get_log_number_density_from_log_pressure,
-    get_pressure_from_log_number_density,
-    get_reactions_only_mask,
-    get_species_density_in_melt,
-    get_species_ppmw_in_melt,
-    get_total_pressure,
-    objective_function,
-)
+from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import unit_conversion, vmap_axes_spec
+from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -89,6 +74,7 @@ class Output:
         self._solution: NpFloat = np.asarray(solution)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
+        self._vmapf: VmappedFunctions = VmappedFunctions(traced_parameters)
 
         log_number_density, log_stability = np.split(self._solution, 2, axis=1)
         self._log_number_density: NpFloat = log_number_density
@@ -246,10 +232,7 @@ class Output:
         """
         out: dict[str, NpArray] = {}
 
-        log_number_density_from_log_pressure_func: Callable = eqx.filter_vmap(
-            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap_axes())
-        )
-        log_number_density: Array = log_number_density_from_log_pressure_func(
+        log_number_density: Array = self._vmapf.get_log_number_density_from_log_pressure(
             jnp.log(self.total_pressure()), jnp.asarray(self.temperature)
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
@@ -279,10 +262,7 @@ class Output:
         Returns:
             Log molar mass of the atmosphere
         """
-        atmosphere_log_molar_mass_func: Callable = eqx.filter_vmap(
-            get_atmosphere_log_molar_mass, in_axes=(None, 0)
-        )
-        atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
+        atmosphere_log_molar_mass: Array = self._vmapf.get_atmosphere_log_molar_mass(
             self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
@@ -302,15 +282,7 @@ class Output:
         Returns:
             Log volume of the atmosphere
         """
-        atmosphere_log_volume_func: Callable = eqx.filter_vmap(
-            get_atmosphere_log_volume,
-            in_axes=(
-                None,
-                0,
-                vmap_axes_spec(self._traced_parameters.planet),
-            ),
-        )
-        atmosphere_log_volume: Array = atmosphere_log_volume_func(
+        atmosphere_log_volume: Array = self._vmapf.get_atmosphere_log_volume(
             self._fixed_parameters,
             jnp.asarray(self.log_number_density),
             self.planet,
@@ -332,10 +304,7 @@ class Output:
         Returns:
             Total pressure
         """
-        total_pressure_func: Callable = eqx.filter_vmap(
-            get_total_pressure, in_axes=(None, 0, self.temperature_vmap_axes())
-        )
-        total_pressure: Array = total_pressure_func(
+        total_pressure: Array = self._vmapf.get_total_pressure(
             self._fixed_parameters,
             jnp.asarray(self.log_number_density),
             jnp.asarray(self.temperature),
@@ -514,8 +483,7 @@ class Output:
         Returns:
             Number density of elements in the condensed phase
         """
-        element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
-        element_density: Array = element_density_func(
+        element_density: Array = self._vmapf.get_element_density(
             jnp.asarray(self.formula_matrix),
             jnp.asarray(self.log_number_density * self.condensed_species_mask),
         )
@@ -531,11 +499,7 @@ class Output:
         Returns:
             Number density of elements dissolved in melt due to species solubility
         """
-        element_density_dissolved_func: Callable = eqx.filter_vmap(
-            get_element_density_in_melt,
-            in_axes=(self.traced_parameters_vmap_axes(), None, None, 0, 0, 0),
-        )
-        element_density_dissolved: Array = element_density_dissolved_func(
+        element_density_dissolved: Array = self._vmapf.get_element_density_in_melt(
             self._traced_parameters,
             self._fixed_parameters,
             jnp.asarray(self._fixed_parameters.formula_matrix),
@@ -555,8 +519,7 @@ class Output:
         Returns:
             Number density of elements in the gas phase
         """
-        element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
-        element_density: Array = element_density_func(
+        element_density: Array = self._vmapf.get_element_density(
             jnp.asarray(self.formula_matrix),
             jnp.asarray(self.log_number_density * self.gas_species_mask),
         )
@@ -689,11 +652,7 @@ class Output:
         Returns:
             Log activity without stability
         """
-        log_activity_func: Callable = eqx.filter_vmap(
-            get_log_activity,
-            in_axes=(self.traced_parameters_vmap_axes(), None, 0),
-        )
-        log_activity: Array = log_activity_func(
+        log_activity: Array = self._vmapf.get_log_activity(
             self._traced_parameters, self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
@@ -707,16 +666,14 @@ class Output:
         """
         return np.exp(self.log_number_density)
 
+    # TODO: Rename to reaction_mask?
     def reaction_indices(self) -> NpBool:
         """Gets the reaction indices of the residual array.
 
         Returns:
             Reaction indices of the residual array
         """
-        reaction_indices_func: Callable = eqx.filter_vmap(
-            get_reactions_only_mask, in_axes=(self.traced_parameters_vmap_axes(), None)
-        )
-        reaction_indices: Bool[Array, "..."] = reaction_indices_func(
+        reaction_indices: Bool[Array, "..."] = self._vmapf.get_reactions_only_mask(
             self._traced_parameters, self._fixed_parameters
         )
 
@@ -738,10 +695,7 @@ class Output:
         Returns:
             Pressure of species in bar
         """
-        pressure_func: Callable = eqx.filter_vmap(
-            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap_axes())
-        )
-        pressure: Array = pressure_func(
+        pressure: Array = self._vmapf.get_pressure_from_log_number_density(
             jnp.asarray(self.log_number_density), jnp.asarray(self.temperature)
         )
 
@@ -793,18 +747,7 @@ class Output:
         Returns:
             Dictionary of the residual
         """
-        residual_func: Callable = eqx.filter_vmap(
-            objective_function,
-            in_axes=(
-                0,
-                {
-                    "traced_parameters": self.traced_parameters_vmap_axes(),
-                    "tau": None,
-                    "fixed_parameters": None,
-                },
-            ),
-        )
-        residual: Array = residual_func(
+        residual: Array = self._vmapf.objective_function(
             self._solution,
             {
                 "traced_parameters": self._traced_parameters,
@@ -825,11 +768,7 @@ class Output:
         Returns:
             Species number density in the melt
         """
-        species_density_in_melt_func: Callable = eqx.filter_vmap(
-            get_species_density_in_melt,
-            in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0, 0),
-        )
-        species_density_in_melt: Array = species_density_in_melt_func(
+        species_density_in_melt: Array = self._vmapf.get_species_density_in_melt(
             self._traced_parameters,
             self._fixed_parameters,
             jnp.asarray(self.log_number_density),
@@ -845,10 +784,7 @@ class Output:
         Return:
             Species ppmw in the melt
         """
-        species_ppmw_in_melt_func: Callable = eqx.filter_vmap(
-            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0)
-        )
-        species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
+        species_ppmw_in_melt: Array = self._vmapf.get_species_ppmw_in_melt(
             self._traced_parameters,
             self._fixed_parameters,
             jnp.asarray(self.log_number_density),
@@ -864,22 +800,6 @@ class Output:
             Stability of relevant species
         """
         return np.exp(self.log_stability)
-
-    def temperature_vmap_axes(self) -> Literal[0, None]:
-        """Gets vmap axes for temperature.
-
-        Returns:
-            vmap axes for temperature
-        """
-        return vmap_axes_spec(self._traced_parameters.planet.temperature)
-
-    def traced_parameters_vmap_axes(self) -> TracedParameters:
-        """Gets vmap axes for traced parameters.
-
-        Returns:
-            vmap axes for traced parameters
-        """
-        return vmap_axes_spec(self._traced_parameters)
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
