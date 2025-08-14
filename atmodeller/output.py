@@ -393,58 +393,66 @@ class Output:
         species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
-        print("reaction_indices = ", self.reaction_indices())
+        reaction_indices: NpBool = self.reaction_indices()
 
-        print("residual = ", residual)
+        # Number of True entries per row (must be same for all rows)
+        n_cols: NpInt = reaction_indices.sum(axis=1)[0]  # or assert all equal
+        logger.debug("n_cols = %s", n_cols)
+        # Convert boolean mask to sorted column indices for each row
+        col_indices: NpInt = np.argsort(~reaction_indices, axis=1)[:, :n_cols]
+        logger.debug("col_indices = %s", col_indices)
+        # Gather the True entries in order
+        compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
+        logger.debug("compressed = %s", compressed)
 
-        reactions = self.reaction_indices() * residual
+        out: dict[str, NpArray] = {}
 
-        print("reactions = ", reactions)
+        for jj in range(n_cols):
+            per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
+            out[f"Reaction_{jj}"] = per_mole_of_reaction
 
         # FIXME: Working here
-        sys.exit(0)
+        # sys.exit(0)
 
         # FIXME: Could break for condensates
         # To compute the limiting reactant/product in each reaction we need to know the volume
         # mixing ratio of each species, ordered according to the species names
-        vmr_array: NpFloat = np.column_stack(
-            [
-                gas_species_asdict[species_name]["volume_mixing_ratio"]
-                for species_name in self._species.species_names
-            ]
-        )
+        # vmr_array: NpFloat = np.column_stack(
+        #     [
+        #         gas_species_asdict[species_name]["volume_mixing_ratio"]
+        #         for species_name in self._species.species_names
+        #     ]
+        # )
 
-        out: dict[str, NpArray] = {}
+        # for k, v in residual_asdict.items():
+        #     print(k, v)
+        #     reaction_index: int = int(k)
+        #     # reaction_str: str = reactions[reaction_index]
+        #     per_mole_of_reaction: NpFloat = v * GAS_CONSTANT * self.temperature
+        #     out[f"Reaction_{reaction_index}"] = per_mole_of_reaction
 
-        for k, v in residual_asdict.items():
-            print(k, v)
-            reaction_index: int = int(k)
-            # reaction_str: str = reactions[reaction_index]
-            per_mole_of_reaction: NpFloat = v * GAS_CONSTANT * self.temperature
-            out[f"Reaction_{reaction_index}"] = per_mole_of_reaction
+        #     # Get reaction stoichiometry
+        #     # reaction_stoich is shape (n_species,)
+        #     reaction_stoich: NpFloat = reaction_matrix[k]
+        #     logger.debug("reaction_stoich = %s", reaction_stoich)
+        #     # value is shape (batch, n_species)
+        #     value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
 
-            # Get reaction stoichiometry
-            # reaction_stoich is shape (n_species,)
-            reaction_stoich: NpFloat = reaction_matrix[k]
-            logger.debug("reaction_stoich = %s", reaction_stoich)
-            # value is shape (batch, n_species)
-            value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
+        #     limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
 
-            limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
+        #     # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
+        #     mask_back: NpBool = per_mole_of_reaction > 0
+        #     if np.any(mask_back):
+        #         limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
+        #     # Forward favoured -> reactants limit it -> stoich < 0
+        #     # NOTE: want largest negative number (closest to zero)
+        #     mask_fwd: NpBool = ~mask_back
+        #     if np.any(mask_fwd):
+        #         limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
 
-            # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
-            mask_back: NpBool = per_mole_of_reaction > 0
-            if np.any(mask_back):
-                limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
-            # Forward favoured -> reactants limit it -> stoich < 0
-            # NOTE: want largest negative number (closest to zero)
-            mask_fwd: NpBool = ~mask_back
-            if np.any(mask_fwd):
-                limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
+        #     energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
 
-            energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
-
-            out[f"Reaction_{reaction_index}_per_atmosphere"] = energy_per_mol_atmosphere
+        #     out[f"Reaction_{reaction_index}_per_atmosphere"] = energy_per_mol_atmosphere
 
         return out
 
@@ -699,7 +707,7 @@ class Output:
         """
         return np.exp(self.log_number_density)
 
-    def reaction_indices(self) -> NpInt:
+    def reaction_indices(self) -> NpBool:
         """Gets the reaction indices of the residual array.
 
         Returns:
@@ -708,11 +716,11 @@ class Output:
         reaction_indices_func: Callable = eqx.filter_vmap(
             get_reactions_only_mask, in_axes=(self.traced_parameters_vmap_axes(), None)
         )
-        reaction_indices: Array = reaction_indices_func(
+        reaction_indices: Bool[Array, "..."] = reaction_indices_func(
             self._traced_parameters, self._fixed_parameters
         )
 
-        return np.asarray(reaction_indices)
+        return np.asarray(reaction_indices, dtype=bool)
 
     def species_molar_mass_expanded(self) -> NpFloat:
         """Gets molar mass of all species in an expanded array.
