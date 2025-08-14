@@ -37,13 +37,7 @@ from scipy.constants import mega
 from atmodeller import TAU, override
 from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.constants import AVOGADRO, GAS_CONSTANT
-from atmodeller.containers import (
-    FixedParameters,
-    Planet,
-    SolverParameters,
-    SpeciesCollection,
-    TracedParameters,
-)
+from atmodeller.containers import Planet, SolverParameters, SpeciesCollection, TracedParameters
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
@@ -58,7 +52,6 @@ class Output:
     Args:
         species: Species
         solution: Array output from solve
-        fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
     """
 
@@ -66,13 +59,11 @@ class Output:
         self,
         species: SpeciesCollection,
         solution: Float[Array, " batch solution"],
-        fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
         self._solution: NpFloat = np.asarray(solution)
-        self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
         self._vmapf: VmappedFunctions = VmappedFunctions(traced_parameters)
 
@@ -80,7 +71,7 @@ class Output:
         self._log_number_density: NpFloat = log_number_density
         # Mask stabilities that are not solved
         self._log_stability: NpFloat = np.where(
-            fixed_parameters.active_stability(), log_stability, np.nan
+            traced_parameters.active_stability(), log_stability, np.nan
         )
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
@@ -89,17 +80,17 @@ class Output:
     @property
     def formula_matrix(self) -> NpInt:
         """Formula matrix"""
-        return np.asarray(self._fixed_parameters.formula_matrix)
+        return np.asarray(self._traced_parameters.formula_matrix)
 
     @property
     def condensed_species_mask(self) -> NpBool:
         """Mask of condensed species"""
-        return np.invert(self._fixed_parameters.species.gas_species_mask)
+        return np.invert(self._traced_parameters.species.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:
         """Mask of gas species"""
-        return np.asarray(self._fixed_parameters.species.gas_species_mask)
+        return np.asarray(self._traced_parameters.species.gas_species_mask)
 
     @property
     def log_number_density(self) -> NpFloat:
@@ -114,7 +105,7 @@ class Output:
     @property
     def molar_mass(self) -> NpFloat:
         """Molar mass of all species"""
-        return np.asarray(self._fixed_parameters.species.molar_masses)
+        return np.asarray(self._traced_parameters.species.molar_masses)
 
     @property
     def number_solutions(self) -> int:
@@ -263,7 +254,7 @@ class Output:
             Log molar mass of the atmosphere
         """
         atmosphere_log_molar_mass: Array = self._vmapf.get_atmosphere_log_molar_mass(
-            self._fixed_parameters, jnp.asarray(self.log_number_density)
+            self._traced_parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(atmosphere_log_molar_mass)
@@ -283,7 +274,7 @@ class Output:
             Log volume of the atmosphere
         """
         atmosphere_log_volume: Array = self._vmapf.get_atmosphere_log_volume(
-            self._fixed_parameters,
+            self._traced_parameters,
             jnp.asarray(self.log_number_density),
             self.planet,
         )
@@ -305,7 +296,7 @@ class Output:
             Total pressure
         """
         total_pressure: Array = self._vmapf.get_total_pressure(
-            self._fixed_parameters,
+            self._traced_parameters,
             jnp.asarray(self.log_number_density),
             jnp.asarray(self.temperature),
         )
@@ -358,7 +349,7 @@ class Output:
         Returns:
             Reaction disequilibrium as a dictionary
         """
-        reaction_matrix: NpFloat = np.array(self._fixed_parameters.reaction_matrix)
+        reaction_matrix: NpFloat = np.array(self._traced_parameters.reaction_matrix)
         species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
@@ -501,8 +492,7 @@ class Output:
         """
         element_density_dissolved: Array = self._vmapf.get_element_density_in_melt(
             self._traced_parameters,
-            self._fixed_parameters,
-            jnp.asarray(self._fixed_parameters.formula_matrix),
+            jnp.asarray(self._traced_parameters.formula_matrix),
             jnp.asarray(self.log_number_density),
             jnp.asarray(self.log_activity()),
             jnp.asarray(self.atmosphere_log_volume()),
@@ -634,7 +624,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self._fixed_parameters.active_stability(), log_activity_without_stability.shape
+            self._traced_parameters.active_stability(), log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
@@ -653,7 +643,7 @@ class Output:
             Log activity without stability
         """
         log_activity: Array = self._vmapf.get_log_activity(
-            self._traced_parameters, self._fixed_parameters, jnp.asarray(self.log_number_density)
+            self._traced_parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(log_activity)
@@ -674,7 +664,7 @@ class Output:
             Reaction indices of the residual array
         """
         reaction_indices: Bool[Array, "..."] = self._vmapf.get_reactions_only_mask(
-            self._traced_parameters, self._fixed_parameters
+            self._traced_parameters
         )
 
         return np.asarray(reaction_indices, dtype=bool)
@@ -752,7 +742,6 @@ class Output:
             {
                 "traced_parameters": self._traced_parameters,
                 "tau": jnp.asarray(TAU),
-                "fixed_parameters": self._fixed_parameters,
             },
         )
 
@@ -770,7 +759,6 @@ class Output:
         """
         species_density_in_melt: Array = self._vmapf.get_species_density_in_melt(
             self._traced_parameters,
-            self._fixed_parameters,
             jnp.asarray(self.log_number_density),
             jnp.asarray(self.log_activity()),
             jnp.asarray(self.atmosphere_log_volume()),
@@ -786,7 +774,6 @@ class Output:
         """
         species_ppmw_in_melt: Array = self._vmapf.get_species_ppmw_in_melt(
             self._traced_parameters,
-            self._fixed_parameters,
             jnp.asarray(self.log_number_density),
             jnp.asarray(self.log_activity()),
         )
@@ -856,7 +843,6 @@ class OutputSolution(Output):
     Args:
         species: Species
         solution: Array output from solve
-        fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
         solver_status: Solver status
@@ -868,14 +854,13 @@ class OutputSolution(Output):
         self,
         species: SpeciesCollection,
         solution: Float[Array, " batch solution"],
-        fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
         solver_parameters: SolverParameters,
         solver_status: Bool[Array, " batch"],
         solver_steps: Integer[Array, " batch"],
         solver_attempts: Integer[Array, " batch"],
     ):
-        super().__init__(species, solution, fixed_parameters, traced_parameters)
+        super().__init__(species, solution, traced_parameters)
         self._solver_parameters: SolverParameters = solver_parameters
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)

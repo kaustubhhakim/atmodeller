@@ -27,7 +27,7 @@ import lineax as lx
 import numpy as np
 import optimistix as optx
 from jax import lax
-from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
+from jaxtyping import Array, ArrayLike, Bool, Float, Float64
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
@@ -38,7 +38,7 @@ from atmodeller import (
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
 )
-from atmodeller._mytypes import NpArray, NpFloat, OptxSolver
+from atmodeller._mytypes import NpArray, NpFloat, NpInt, OptxSolver
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
@@ -52,7 +52,10 @@ from atmodeller.utilities import (
     as_j64,
     get_batch_size,
     get_log_number_density_from_log_pressure,
+    get_reaction_dictionary,
+    partial_rref,
     to_hashable,
+    to_native_floats,
     unit_conversion,
 )
 
@@ -657,21 +660,30 @@ class MassConstraints(eqx.Module):
 class TracedParameters(eqx.Module):
     """Traced parameters
 
-    These are parameters that should be traced, inasmuch as they may be updated by the user for
-    repeat calculations.
-
     Args:
+        species: Species
         planet: Planet
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
+        formula_matrix: Formula matrix
+        reaction_matrix: Reaction matrix
+        diatomic_oxygen_index: Index of diatomic oxygen
     """
 
+    species: SpeciesCollection
+    """Species"""
     planet: Planet
     """Planet"""
     fugacity_constraints: FugacityConstraints
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
+    formula_matrix: tuple[tuple[float, ...], ...]
+    """Formula matrix"""
+    reaction_matrix: tuple[tuple[float, ...], ...]
+    """Reaction matrix"""
+    diatomic_oxygen_index: int
+    """Index of diatomic oxygen"""
 
     @classmethod
     def create(
@@ -698,29 +710,67 @@ class TracedParameters(eqx.Module):
             species, fugacity_constraints
         )
         mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
+        formula_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
+            cls.get_formula_matrix(species)
+        )
+        reaction_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
+            cls.get_reaction_matrix(species)
+        )
+        diatomic_oxygen_index: int = species.get_diatomic_oxygen_index()
 
-        return cls(planet_, fugacity_constraints_, mass_constraints_)
+        return cls(
+            species,
+            planet_,
+            fugacity_constraints_,
+            mass_constraints_,
+            formula_matrix,
+            reaction_matrix,
+            diatomic_oxygen_index,
+        )
 
+    @classmethod
+    def get_formula_matrix(cls, species: SpeciesCollection) -> NpInt:
+        """Gets the formula matrix.
 
-class FixedParameters(eqx.Module):
-    """Parameters that are always fixed for a calculation
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
 
-    Args:
-        species: Collection of species
-        formula_matrix; Formula matrix
-        reaction_matrix: Reaction matrix
-        diatomic_oxygen_index: Index of diatomic oxygen
-    """
+        Returns:
+            Formula matrix
+        """
+        unique_elements: tuple[str, ...] = species.unique_elements
+        formula_matrix: NpInt = np.zeros(
+            (len(unique_elements), species.number_species), dtype=np.int_
+        )
 
-    species: SpeciesCollection
-    """Collection of species"""
-    formula_matrix: Integer[Array, "elements species"]
-    """Formula matrix"""
-    # TODO: Currently breaks with "reactions species" because reaction_matrix might be empty.
-    reaction_matrix: Float[Array, "..."]
-    """Reaction matrix"""
-    diatomic_oxygen_index: int
-    """Index of diatomic oxygen"""
+        for element_index, element in enumerate(unique_elements):
+            for species_index, species_ in enumerate(species):
+                count: int = 0
+                try:
+                    count = species_.data.composition[element][0]
+                except KeyError:
+                    count = 0
+                formula_matrix[element_index, species_index] = count
+
+        # logger.debug("formula_matrix = %s", formula_matrix)
+
+        return formula_matrix
+
+    @classmethod
+    def get_reaction_matrix(cls, species: SpeciesCollection) -> NpFloat:
+        """Gets the reaction matrix.
+
+        Returns:
+            A matrix of linearly independent reactions or an empty array if no reactions
+        """
+        if species.number_species == 1:
+            logger.debug("Only one species therefore no reactions")
+            return np.array([], dtype=np.float64)
+
+        transpose_formula_matrix: NpInt = cls.get_formula_matrix(species).T
+        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
+
+        return reaction_matrix
 
     def active_reactions(self) -> Bool[Array, " reactions"]:
         """Active reactions
@@ -728,7 +778,7 @@ class FixedParameters(eqx.Module):
         Returns:
             `True` for all reactions
         """
-        return jnp.ones(self.reaction_matrix.shape[0], dtype=bool)
+        return jnp.ones(len(self.reaction_matrix), dtype=bool)
 
     def active_stability(self) -> Bool[Array, " species"]:
         """Active species stability
@@ -737,6 +787,18 @@ class FixedParameters(eqx.Module):
             `True` for species stabilities that are to be solved for, otherwise `False`
         """
         return jnp.array(self.species.active_stability)
+
+    def get_reaction_dictionary(self) -> dict[int, str]:
+        """Gets reactions as a dictionary.
+
+        Returns:
+            Reactions as a dictionary
+        """
+        reaction_matrix: NpFloat = self.get_reaction_matrix(self.species)
+        species_names: tuple[str, ...] = self.species.species_names
+        reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
+
+        return reactions
 
 
 class SolverParameters(eqx.Module):

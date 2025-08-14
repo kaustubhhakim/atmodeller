@@ -49,11 +49,6 @@ class VmappedFunctions:
         self.traced_parameters: TracedParameters = traced_parameters
 
     @property
-    def fixed_parameters_vmap_axes(self) -> None:
-        """Vmap axes of the fixed parameters."""
-        return None  # By definition, fixed parameters do not have vmap axes.
-
-    @property
     def log_number_density_vmap_axes(self) -> int:
         """Vmap axes of the log number density."""
         return 0  # By definition, log number density has vmap axes of 0.
@@ -76,14 +71,14 @@ class VmappedFunctions:
     def get_atmosphere_log_molar_mass(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_atmosphere_log_molar_mass,
-            in_axes=(self.fixed_parameters_vmap_axes, self.log_number_density_vmap_axes),
+            in_axes=(self.traced_parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_atmosphere_log_volume(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_atmosphere_log_volume,
             in_axes=(
-                self.fixed_parameters_vmap_axes,
+                self.traced_parameters_vmap_axes,
                 self.log_number_density_vmap_axes,
                 self.planet_vmap_axes,
             ),
@@ -99,7 +94,6 @@ class VmappedFunctions:
             get_element_density_in_melt,
             in_axes=(
                 self.traced_parameters_vmap_axes,
-                self.fixed_parameters_vmap_axes,
                 None,
                 self.log_number_density_vmap_axes,
                 0,  # Log activity
@@ -112,7 +106,6 @@ class VmappedFunctions:
             get_log_activity,
             in_axes=(
                 self.traced_parameters_vmap_axes,
-                self.fixed_parameters_vmap_axes,
                 self.log_number_density_vmap_axes,
             ),
         )(*args, **kwargs)
@@ -132,7 +125,7 @@ class VmappedFunctions:
     def get_reactions_only_mask(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_reactions_only_mask,
-            in_axes=(self.traced_parameters_vmap_axes, self.fixed_parameters_vmap_axes),
+            in_axes=(self.traced_parameters_vmap_axes,),
         )(*args, **kwargs)
 
     def get_species_density_in_melt(self, *args, **kwargs) -> Array:
@@ -140,7 +133,6 @@ class VmappedFunctions:
             get_species_density_in_melt,
             in_axes=(
                 self.traced_parameters_vmap_axes,
-                self.fixed_parameters_vmap_axes,
                 self.log_number_density_vmap_axes,
                 0,  # Log activity
                 0,  # Log volume
@@ -152,7 +144,6 @@ class VmappedFunctions:
             get_species_ppmw_in_melt,
             in_axes=(
                 self.traced_parameters_vmap_axes,
-                self.fixed_parameters_vmap_axes,
                 self.log_number_density_vmap_axes,
                 0,  # Log activity
             ),
@@ -162,7 +153,7 @@ class VmappedFunctions:
         return eqx.filter_vmap(
             get_total_pressure,
             in_axes=(
-                self.fixed_parameters_vmap_axes,
+                self.traced_parameters_vmap_axes,
                 self.log_number_density_vmap_axes,
                 self.temperature_vmap_axes,
             ),
@@ -176,7 +167,6 @@ class VmappedFunctions:
                 {
                     "traced_parameters": self.traced_parameters_vmap_axes,
                     "tau": None,  # TODO: Check
-                    "fixed_parameters": self.fixed_parameters_vmap_axes,
                 },
             ),
         )(*args, **kwargs)

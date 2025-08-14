@@ -29,7 +29,6 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, Shap
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
-    FixedParameters,
     MassConstraints,
     Planet,
     SolverParameters,
@@ -53,7 +52,6 @@ def solve(
     tau: Float[Array, ""],
     traced_parameters: TracedParameters,
     solver_parameters: SolverParameters,
-    fixed_parameters: FixedParameters,
     options: dict[str, Any],
 ) -> tuple[Float[Array, " solution"], Bool[Array, ""], Integer[Array, ""]]:
     """Solves the system of non-linear equations
@@ -63,7 +61,6 @@ def solve(
         tau: Tau parameter for species' stability
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
-        fixed_parameters: Fixed parameters
         options: Options for root find
 
     Returns:
@@ -76,7 +73,6 @@ def solve(
         args={
             "traced_parameters": traced_parameters,
             "tau": tau,
-            "fixed_parameters": fixed_parameters,
             "solver_parameters": solver_parameters,
         },
         throw=solver_parameters.throw,
@@ -95,7 +91,7 @@ def solve(
 
 
 def get_min_log_elemental_abundance_per_species(
-    formula_matrix: Integer[Array, "elements species"], mass_constraints: MassConstraints
+    formula_matrix: Float[Array, "elements species"], mass_constraints: MassConstraints
 ) -> Float[Array, " species"]:
     """For each species, find the elemental mass constraint with the lowest abundance.
 
@@ -128,23 +124,20 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-def get_active_mask(
-    traced_parameters: TracedParameters, fixed_parameters: FixedParameters
-) -> Array:
+def get_active_mask(traced_parameters: TracedParameters) -> Array:
     """Gets the mask of active residual quantities.
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
 
     Returns:
         Active mask
     """
     # Get all masks separately
     fugacity_mask: Array = traced_parameters.fugacity_constraints.active()
-    reactions_mask: Array = fixed_parameters.active_reactions()
+    reactions_mask: Array = traced_parameters.active_reactions()
     mass_mask: Array = traced_parameters.mass_constraints.active()
-    stability_mask: Array = fixed_parameters.active_stability()
+    stability_mask: Array = traced_parameters.active_stability()
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -158,24 +151,21 @@ def get_active_mask(
     return active_mask
 
 
-def get_reactions_only_mask(
-    traced_parameters: TracedParameters, fixed_parameters: FixedParameters
-) -> Array:
+def get_reactions_only_mask(traced_parameters: TracedParameters) -> Array:
     """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
 
     Returns:
         Reactions only mask for the residual array
     """
     # Create a full mask of False
-    size: int = fixed_parameters.species.number_solution
+    size: int = traced_parameters.species.number_solution
     mask: Array = jnp.zeros(size, dtype=bool)
 
     fugacity_mask: Array = traced_parameters.fugacity_constraints.active()
-    reactions_mask: Array = fixed_parameters.active_reactions()
+    reactions_mask: Array = traced_parameters.active_reactions()
     num_active_fugacity: Array = jnp.sum(fugacity_mask)
 
     # Place the reactions_mask at position num_active_fugacity dynamically.
@@ -207,7 +197,6 @@ def objective_function(
     """
     # jax.debug.print("Starting new objective_function evaluation")
     tp: TracedParameters = kwargs["traced_parameters"]
-    fp: FixedParameters = kwargs["fixed_parameters"]
     tau: Float[Array, ""] = kwargs["tau"]
     planet: Planet = tp.planet
     temperature: Float[Array, ""] = planet.temperature
@@ -216,13 +205,13 @@ def objective_function(
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    log_activity: Float[Array, " species"] = get_log_activity(tp, fp, log_number_density)
+    log_activity: Float[Array, " species"] = get_log_activity(tp, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Atmosphere
-    total_pressure: Float[Array, ""] = get_total_pressure(fp, log_number_density, temperature)
+    total_pressure: Float[Array, ""] = get_total_pressure(tp, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
-    log_volume: Float[Array, ""] = get_atmosphere_log_volume(fp, log_number_density, planet)
+    log_volume: Float[Array, ""] = get_atmosphere_log_volume(tp, log_number_density, planet)
     # jax.debug.print("log_volume = {out}", out=log_volume)
 
     # Based on the definition of the reaction constant we need to convert gas activities
@@ -232,7 +221,7 @@ def objective_function(
         get_log_number_density_from_log_pressure(log_activity, temperature)
     )
     log_activity_number_density = jnp.where(
-        jnp.array(fp.species.gas_species_mask), log_activity_number_density, log_activity
+        jnp.array(tp.species.gas_species_mask), log_activity_number_density, log_activity
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
@@ -262,21 +251,24 @@ def objective_function(
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
-    if fp.reaction_matrix.size > 0:
+    if jnp.asarray(tp.reaction_matrix).size > 0:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-            fp, temperature
+            tp, temperature
         )
         # jax.debug.print(
         #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
         # )
         reaction_residual: Array = (
-            fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
+            jnp.asarray(tp.reaction_matrix).dot(log_activity_number_density)
+            - log_reaction_equilibrium_constant
         )
         # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
         reaction_stability_mask: Array = jnp.broadcast_to(
-            fp.active_stability(), fp.reaction_matrix.shape
+            tp.active_stability(), jnp.asarray(tp.reaction_matrix).shape
         )
-        reaction_stability_matrix: Array = fp.reaction_matrix * reaction_stability_mask
+        reaction_stability_matrix: Array = (
+            jnp.asarray(tp.reaction_matrix) * reaction_stability_mask
+        )
         # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
 
         # Dimensionless (log K residual)
@@ -301,11 +293,11 @@ def objective_function(
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
     element_density: Float[Array, " elements"] = get_element_density(
-        fp.formula_matrix, log_number_density
+        jnp.asarray(tp.formula_matrix), log_number_density
     )
     # jax.debug.print("element_density = {out}", out=element_density)
     element_melt_density: Float[Array, " elements"] = get_element_density_in_melt(
-        tp, fp, fp.formula_matrix, log_number_density, log_activity, log_volume
+        tp, jnp.asarray(tp.formula_matrix), log_number_density, log_activity, log_volume
     )
     # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
@@ -338,7 +330,9 @@ def objective_function(
 
     # Stability residual
     log_min_number_density: Float[Array, " species"] = (
-        get_min_log_elemental_abundance_per_species(fp.formula_matrix, tp.mass_constraints)
+        get_min_log_elemental_abundance_per_species(
+            jnp.asarray(tp.formula_matrix), tp.mass_constraints
+        )
         - log_volume
         + jnp.log(tau)
     )
@@ -365,9 +359,9 @@ def objective_function(
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    active_mask: Array = get_active_mask(tp, fp)
+    active_mask: Array = get_active_mask(tp)
     # jax.debug.print("active_mask = {out}", out=active_mask)
-    size: int = fp.species.number_solution
+    size: int = tp.species.number_solution
     # jax.debug.print("size = {out}", out=size)
 
     active_indices: Integer[Array, "..."] = jnp.where(active_mask, size=size)[0]
@@ -382,26 +376,26 @@ def objective_function(
 
 
 def get_atmosphere_log_molar_mass(
-    fixed_parameters: FixedParameters, log_number_density: Float[Array, " species"]
+    traced_parameters: TracedParameters, log_number_density: Float[Array, " species"]
 ) -> Float[Array, ""]:
     """Gets log molar mass of the atmosphere.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         log_number_density: Log number density
 
     Returns:
         Log molar mass of the atmosphere
     """
     gas_log_number_density: Float[Array, " species"] = get_gas_species_data(
-        fixed_parameters, log_number_density
+        traced_parameters, log_number_density
     )
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        fixed_parameters, jnp.array(fixed_parameters.species.molar_masses)
+        traced_parameters, jnp.array(traced_parameters.species.molar_masses)
     )
 
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
-        gas_log_number_density, b=jnp.array(fixed_parameters.species.gas_species_mask)
+        gas_log_number_density, b=jnp.array(traced_parameters.species.gas_species_mask)
     )
     # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
@@ -409,14 +403,14 @@ def get_atmosphere_log_molar_mass(
 
 
 def get_atmosphere_log_volume(
-    fixed_parameters: FixedParameters,
+    traced_parameters: TracedParameters,
     log_number_density: Float[Array, " species"],
     planet: Planet,
 ) -> Float[Array, ""]:
     """Gets log volume of the atmosphere.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         log_number_density: Log number density
         planet: Planet
 
@@ -426,7 +420,7 @@ def get_atmosphere_log_volume(
     log_volume: Float[Array, ""] = (
         jnp.log(GAS_CONSTANT)
         + jnp.log(planet.temperature)
-        - get_atmosphere_log_molar_mass(fixed_parameters, log_number_density)
+        - get_atmosphere_log_molar_mass(traced_parameters, log_number_density)
         + jnp.log(planet.surface_area)
         - jnp.log(planet.surface_gravity)
     )
@@ -435,14 +429,14 @@ def get_atmosphere_log_volume(
 
 
 def get_total_pressure(
-    fixed_parameters: FixedParameters,
+    traced_parameters: TracedParameters,
     log_number_density: Float[Array, " species"],
     temperature: Float[Array, ""],
 ) -> Float[Array, ""]:
     """Gets total pressure.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         log_number_density: Log number density
         temperature: Temperature
 
@@ -450,7 +444,7 @@ def get_total_pressure(
         Total pressure
     """
     gas_species_mask: Bool[Array, " species"] = jnp.array(
-        fixed_parameters.species.gas_species_mask
+        traced_parameters.species.gas_species_mask
     )
     pressure: Float[Array, " species"] = get_pressure_from_log_number_density(
         log_number_density, temperature
@@ -462,7 +456,7 @@ def get_total_pressure(
 
 
 def get_element_density(
-    formula_matrix: Integer[Array, "elements species"],
+    formula_matrix: Float[Array, "elements species"],
     log_number_density: Float[Array, " species"],
 ) -> Array:
     """Number density of elements in the gas or condensed phase
@@ -481,8 +475,7 @@ def get_element_density(
 
 def get_element_density_in_melt(
     traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
-    formula_matrix: Integer[Array, "elements species"],
+    formula_matrix: Float[Array, "elements species"],
     log_number_density: Float[Array, " species"],
     log_activity: Float[Array, " species"],
     log_volume: Float[Array, ""],
@@ -491,7 +484,6 @@ def get_element_density_in_melt(
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         formula_matrix: Formula matrix
         log_number_density: Log number density
         log_activity: Log activity
@@ -502,7 +494,6 @@ def get_element_density_in_melt(
     """
     species_melt_density: Float[Array, " species"] = get_species_density_in_melt(
         traced_parameters,
-        fixed_parameters,
         log_number_density,
         log_activity,
         log_volume,
@@ -513,34 +504,31 @@ def get_element_density_in_melt(
 
 
 def get_gas_species_data(
-    fixed_parameters: FixedParameters, some_array: ArrayLike
+    traced_parameters: TracedParameters, some_array: ArrayLike
 ) -> Shaped[Array, " species"]:
     """Masks the gas species data from an array.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         some_array: Some array to mask the gas species data from
 
     Returns:
         An array with gas species data from `some_array` and condensate entries zeroed
     """
     gas_data: Shaped[Array, " species"] = (
-        jnp.array(fixed_parameters.species.gas_species_mask) * some_array
+        jnp.array(traced_parameters.species.gas_species_mask) * some_array
     )
 
     return gas_data
 
 
 def get_log_activity(
-    traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
-    log_number_density: Float[Array, " species"],
+    traced_parameters: TracedParameters, log_number_density: Float[Array, " species"]
 ) -> Float[Array, " species"]:
     """Gets the log activity.
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         log_number_density: Log number density
 
     Returns:
@@ -548,9 +536,9 @@ def get_log_activity(
     """
     planet: Planet = traced_parameters.planet
     temperature: Float[Array, ""] = planet.temperature
-    species: SpeciesCollection = fixed_parameters.species
+    species: SpeciesCollection = traced_parameters.species
     total_pressure: Float[Array, ""] = get_total_pressure(
-        fixed_parameters, log_number_density, temperature
+        traced_parameters, log_number_density, temperature
     )
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
@@ -571,7 +559,7 @@ def get_log_activity(
     log_activity_pure_species: Float[Array, " species"] = vmap_activity(indices)
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
     log_activity: Float[Array, " species"] = get_log_activity_ideal_mixing(
-        fixed_parameters, log_number_density, log_activity_pure_species
+        traced_parameters, log_number_density, log_activity_pure_species
     )
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
@@ -579,14 +567,14 @@ def get_log_activity(
 
 
 def get_log_activity_ideal_mixing(
-    fixed_parameters: FixedParameters,
+    traced_parameters: TracedParameters,
     log_number_density: Float[Array, " species"],
     log_activity_pure_species: Float[Array, " species"],
 ) -> Float[Array, " species"]:
     """Gets the log activity of species in the atmosphere assuming an ideal mixture.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         log_number_density: Log number density
         log_activity_pure_species: Log activity of the pure species
 
@@ -594,7 +582,7 @@ def get_log_activity_ideal_mixing(
         Log activity of the species assuming ideal mixing in the atmosphere
     """
     gas_species_mask: Bool[Array, " species"] = jnp.array(
-        fixed_parameters.species.gas_species_mask
+        traced_parameters.species.gas_species_mask
     )
     number_density: Float[Array, " species"] = safe_exp(log_number_density)
     gas_species_number_density: Float[Array, " species"] = gas_species_mask * number_density
@@ -663,25 +651,25 @@ def get_log_Kp(
 
 
 def get_log_reaction_equilibrium_constant(
-    fixed_parameters: FixedParameters, temperature: Float[Array, ""]
+    traced_parameters: TracedParameters, temperature: Float[Array, ""]
 ) -> Float[Array, " reactions"]:
     """Gets the log equilibrium constant of the reactions.
 
     Args:
-        fixed_parameters: Fixed parameters
+        traced_parameters: Traced parameters
         temperature: Temperature
 
     Returns:
         Log equilibrium constant of the reactions, hidden unit base of molecules/m^3
     """
-    species: SpeciesCollection = fixed_parameters.species
+    species: SpeciesCollection = traced_parameters.species
     reaction_matrix: Float[Array, "reactions species"] = jnp.array(
-        fixed_parameters.reaction_matrix
+        traced_parameters.reaction_matrix
     )
     log_Kp: Float[Array, " reactions"] = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Float[Array, " reactions"] = jnp.sum(
-        reaction_matrix * jnp.array(fixed_parameters.species.gas_species_mask), axis=1
+        reaction_matrix * jnp.array(traced_parameters.species.gas_species_mask), axis=1
     )
     # jax.debug.print("delta_n = {out}", out=delta_n)
     log_Kc: Float[Array, " reactions"] = log_Kp - delta_n * (
@@ -709,7 +697,6 @@ def get_pressure_from_log_number_density(
 
 def get_species_density_in_melt(
     traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
     log_number_density: Float[Array, " species"],
     log_activity: Float[Array, " species"],
     log_volume: Float[Array, ""],
@@ -718,7 +705,6 @@ def get_species_density_in_melt(
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         log_number_density: Log number density
         log_activity: Log activity
         log_volume: Log volume of the atmosphere
@@ -726,11 +712,11 @@ def get_species_density_in_melt(
     Returns:
         Number density of species dissolved in melt
     """
-    molar_masses: Float[Array, " species"] = jnp.array(fixed_parameters.species.molar_masses)
+    molar_masses: Float[Array, " species"] = jnp.array(traced_parameters.species.molar_masses)
     melt_mass: Float[Array, ""] = traced_parameters.planet.melt_mass
 
     ppmw: Float[Array, " species"] = get_species_ppmw_in_melt(
-        traced_parameters, fixed_parameters, log_number_density, log_activity
+        traced_parameters, log_number_density, log_activity
     )
 
     species_melt_density: Float[Array, " species"] = (
@@ -747,7 +733,6 @@ def get_species_density_in_melt(
 
 def get_species_ppmw_in_melt(
     traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
     log_number_density: Float[Array, " species"],
     log_activity: Float[Array, " species"],
 ) -> Float[Array, " species"]:
@@ -755,20 +740,19 @@ def get_species_ppmw_in_melt(
 
     Args:
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         log_number_density: Log number density
         log_activity: Log activity
 
     Returns:
         ppmw of species dissolved in melt
     """
-    species: SpeciesCollection = fixed_parameters.species
-    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(fixed_parameters.diatomic_oxygen_index)
+    species: SpeciesCollection = traced_parameters.species
+    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(traced_parameters.diatomic_oxygen_index)
     temperature: Float[Array, ""] = traced_parameters.planet.temperature
 
     fugacity: Float[Array, " species"] = safe_exp(log_activity)
     total_pressure: Float[Array, ""] = get_total_pressure(
-        fixed_parameters, log_number_density, temperature
+        traced_parameters, log_number_density, temperature
     )
     diatomic_oxygen_fugacity: Float[Array, ""] = jnp.take(fugacity, diatomic_oxygen_index)
 

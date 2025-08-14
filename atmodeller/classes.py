@@ -17,7 +17,6 @@
 """Classes"""
 
 import logging
-import pprint
 from collections.abc import Callable, Mapping
 from typing import Any, Optional, cast
 
@@ -29,23 +28,12 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
-from atmodeller._mytypes import NpFloat, NpInt
-from atmodeller.containers import (
-    FixedParameters,
-    Planet,
-    SolverParameters,
-    SpeciesCollection,
-    TracedParameters,
-)
+from atmodeller._mytypes import NpFloat
+from atmodeller.containers import Planet, SolverParameters, SpeciesCollection, TracedParameters
 from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
-from atmodeller.utilities import (
-    get_batch_size,
-    get_reaction_dictionary,
-    partial_rref,
-    vmap_axes_spec,
-)
+from atmodeller.utilities import get_batch_size, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -68,7 +56,8 @@ class InteriorAtmosphere:
         self.species: SpeciesCollection = species
         self.tau: float = tau
         logger.info("species = %s", str(self.species))
-        logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
+        # FIXME: To reinstate
+        # logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
     def output(self) -> Output:
@@ -95,7 +84,6 @@ class InteriorAtmosphere:
             log_number_density: Log number density
         """
         traced_parameters: TracedParameters = TracedParameters.create(self.species, planet)
-        fixed_parameters: FixedParameters = self.get_fixed_parameters()
 
         batch_size: int = get_batch_size((planet, None, None))
         solution_array: Array = broadcast_initial_solution(
@@ -103,7 +91,7 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
-        self._output = Output(self.species, solution_array, fixed_parameters, traced_parameters)
+        self._output = Output(self.species, solution_array, traced_parameters)
 
     def solve(
         self,
@@ -128,7 +116,6 @@ class InteriorAtmosphere:
         traced_parameters: TracedParameters = TracedParameters.create(
             self.species, planet, fugacity_constraints, mass_constraints
         )
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
         # Always broadcast tau because the repeat_solver is triggered if some cases fail
@@ -153,9 +140,7 @@ class InteriorAtmosphere:
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
         # Pre-bind fixed configurations
-        solver_fn: Callable = eqx.Partial(
-            solve, fixed_parameters=fixed_parameters_, options=options
-        )
+        solver_fn: Callable = eqx.Partial(solve, options=options)
         in_axes: TracedParameters = vmap_axes_spec(traced_parameters)
 
         # Compile the solver, and this is re-used unless recompilation is triggered
@@ -207,7 +192,7 @@ class InteriorAtmosphere:
             # )
             # print(new_solver_params)
 
-            if jnp.any(fixed_parameters_.active_stability()):
+            if jnp.any(traced_parameters.active_stability()):
                 logger.info(
                     "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
                     TAU_MAX,
@@ -314,86 +299,12 @@ class InteriorAtmosphere:
         self._output = OutputSolution(
             self.species,
             solution,
-            fixed_parameters_,
             traced_parameters,
             solver_parameters_,
             solver_status,
             solver_steps,
             solver_attempts,
         )
-
-    def get_fixed_parameters(self) -> FixedParameters:
-        """Gets fixed parameters.
-
-        Returns:
-            Fixed parameters
-        """
-        formula_matrix: NpInt = self.get_formula_matrix()
-        reaction_matrix: NpFloat = self.get_reaction_matrix()
-        diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
-
-        fixed_parameters: FixedParameters = FixedParameters(
-            species=self.species,
-            formula_matrix=jnp.asarray(formula_matrix),
-            reaction_matrix=jnp.asarray(reaction_matrix),
-            diatomic_oxygen_index=diatomic_oxygen_index,
-        )
-
-        return fixed_parameters
-
-    def get_formula_matrix(self) -> NpInt:
-        """Gets the formula matrix.
-
-        Elements are given in rows and species in columns following the convention in
-        :cite:t:`LKS17`.
-
-        Returns:
-            Formula matrix
-        """
-        unique_elements: tuple[str, ...] = self.species.unique_elements
-        formula_matrix: NpInt = np.zeros(
-            (len(unique_elements), self.species.number_species), dtype=np.int_
-        )
-
-        for element_index, element in enumerate(unique_elements):
-            for species_index, species_ in enumerate(self.species):
-                count: int = 0
-                try:
-                    count = species_.data.composition[element][0]
-                except KeyError:
-                    count = 0
-                formula_matrix[element_index, species_index] = count
-
-        # logger.debug("formula_matrix = %s", formula_matrix)
-
-        return formula_matrix
-
-    def get_reaction_matrix(self) -> NpFloat:
-        """Gets the reaction matrix.
-
-        Returns:
-            A matrix of linearly independent reactions or an empty array if no reactions
-        """
-        if self.species.number_species == 1:
-            logger.debug("Only one species therefore no reactions")
-            return np.array([], dtype=np.float64)
-
-        transpose_formula_matrix: NpInt = self.get_formula_matrix().T
-        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
-
-        return reaction_matrix
-
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
-
-        Returns:
-            Reactions as a dictionary
-        """
-        reaction_matrix: NpFloat = self.get_reaction_matrix()
-        species_names: tuple[str, ...] = self.species.species_names
-        reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
-
-        return reactions
 
 
 def _broadcast_component(
