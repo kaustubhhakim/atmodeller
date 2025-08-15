@@ -657,8 +657,8 @@ class MassConstraints(eqx.Module):
         return log_number_density
 
 
-class TracedParameters(eqx.Module):
-    """Traced parameters
+class Parameters(eqx.Module):
+    """Parameters
 
     Args:
         species: Species
