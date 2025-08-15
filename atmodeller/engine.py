@@ -498,7 +498,7 @@ def get_total_pressure(
 
 
 def objective_function(
-    solution: Float[Array, " solution"], kwargs: dict
+    solution: Float[Array, " solution"], parameters: Parameters
 ) -> Float[Array, " residual"]:
     """Objective function
 
@@ -512,16 +512,13 @@ def objective_function(
 
     Args:
         solution: Solution array for all species i.e. log number density and log stability
-        kwargs: Dictionary of pytrees required to compute the residual
+        parameters: Parameters
 
     Returns:
         Residual
     """
     # jax.debug.print("Starting new objective_function evaluation")
-    parameters: Parameters = kwargs["parameters"]
-    tau: Float[Array, ""] = kwargs["tau"]
-    planet: Planet = parameters.planet
-    temperature: Float[Array, ""] = planet.temperature
+    temperature: Float[Array, ""] = parameters.planet.temperature
 
     log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
@@ -653,7 +650,9 @@ def objective_function(
 
     # Stability residual
     log_min_number_density: Float[Array, " species"] = (
-        get_min_log_elemental_abundance_per_species(parameters) - log_volume + jnp.log(tau)
+        get_min_log_elemental_abundance_per_species(parameters)
+        - log_volume
+        + jnp.log(parameters.tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
     # Dimensionless (log-ratio)
@@ -700,7 +699,6 @@ def objective_function(
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " solution"],
-    tau: Float[Array, ""],
     parameters: Parameters,
     solver_parameters: SolverParameters,
     options: dict[str, Any],
@@ -709,7 +707,6 @@ def solve(
 
     Args:
         solution_array: Solution array
-        tau: Tau parameter for species' stability
         parameters: Parameters
         solver_parameters: Solver parameters
         options: Options for root find
@@ -721,11 +718,7 @@ def solve(
         objective_function,
         solver_parameters.get_solver_instance(),
         solution_array,
-        args={
-            "parameters": parameters,
-            "tau": tau,
-            "solver_parameters": solver_parameters,
-        },
+        args=parameters,
         throw=solver_parameters.throw,
         max_steps=solver_parameters.max_steps,
         options=options,

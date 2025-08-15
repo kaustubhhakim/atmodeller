@@ -37,6 +37,7 @@ from atmodeller import (
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
+    TAU,
 )
 from atmodeller._mytypes import NpArray, NpFloat, NpInt, OptxSolver
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
@@ -665,6 +666,7 @@ class Parameters(eqx.Module):
         planet: Planet
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
+        tau: Tau factor for species stability
         formula_matrix: Formula matrix
         reaction_matrix: Reaction matrix
         diatomic_oxygen_index: Index of diatomic oxygen
@@ -678,6 +680,8 @@ class Parameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
+    tau: Float[Array, "..."]
+    """Tau factor for species stability"""
     formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
     reaction_matrix: tuple[tuple[float, ...], ...]
@@ -692,15 +696,18 @@ class Parameters(eqx.Module):
         planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        tau: ArrayLike = TAU,
     ):
         """Creates an instance
 
         Args:
             species: Species
+            planet: Planet. Defaults to a new instance of `Planet`.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
-                `None`.
+                a new instance of `FugacityConstraints`.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
-                `None`.
+                a new instance of `MassConstraints`.
+            tau: Tau factor for species stability. Defaults to `TAU`.
 
         Returns:
             An instance
@@ -723,6 +730,7 @@ class Parameters(eqx.Module):
             planet_,
             fugacity_constraints_,
             mass_constraints_,
+            as_j64(tau),  # NOTE: Want tau to be traced so must be an array
             formula_matrix,
             reaction_matrix,
             diatomic_oxygen_index,

@@ -114,11 +114,14 @@ class InteriorAtmosphere:
             solver_parameters: Solver parameters. Defaults to None.
         """
         parameters: Parameters = Parameters.create(
-            self.species, planet, fugacity_constraints, mass_constraints
+            self.species, planet, fugacity_constraints, mass_constraints, self.tau
         )
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
+
+        # TODO: Can we let tau be autobroadcasted when required?
         # Always broadcast tau because the repeat_solver is triggered if some cases fail
+        # Only kept to avoid type errors at present with repeat_solver
         broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
         # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
 
@@ -143,16 +146,17 @@ class InteriorAtmosphere:
         solver_fn: Callable = eqx.Partial(solve, options=options)
         in_axes: Parameters = vmap_axes_spec(parameters)
 
+        # TODO: Rather than jitting the solver, can we instead just jit the objective function?
+        # objective_function: Callable = VmappedFunctions(parameters).objective_function
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, 0, in_axes, None)))
+        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, in_axes, None)))
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
         logger.info(f"Attempting to solve {batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(
             base_solution_array,
-            broadcasted_tau,
             parameters,
             solver_parameters_,
         )

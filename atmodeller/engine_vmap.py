@@ -131,11 +131,5 @@ class VmappedFunctions:
     def objective_function(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             objective_function,
-            in_axes=(
-                self.log_number_density_vmap_axes,
-                {
-                    "parameters": self.parameters_vmap_axes,
-                    "tau": None,  # TODO: Check
-                },
-            ),
+            in_axes=(self.log_number_density_vmap_axes, self.parameters_vmap_axes),
         )(*args, **kwargs)
