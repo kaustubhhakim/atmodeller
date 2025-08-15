@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""`Vmap`ped engine for Atmodeller.`"""
+"""`Vmapped engine for Atmodeller.`"""
 
 from typing import Literal
 
 import equinox as eqx
 from jaxtyping import Array
 
-from atmodeller.containers import Parameters, Planet
+from atmodeller.containers import Parameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
@@ -42,7 +42,7 @@ class VmappedFunctions:
     """Container for vmapped functions.
 
     Args:
-        parameters: The parameters to use for vmapping.
+        parameters: Parameters
     """
 
     def __init__(self, parameters: Parameters):
@@ -50,23 +50,18 @@ class VmappedFunctions:
 
     @property
     def log_number_density_vmap_axes(self) -> int:
-        """Vmap axes of the log number density."""
-        return 0  # By definition, log number density has vmap axes of 0.
-
-    @property
-    def planet_vmap_axes(self) -> Planet:
-        """Vmap axes of the planet."""
-        return vmap_axes_spec(self.parameters.planet)
-
-    @property
-    def temperature_vmap_axes(self) -> Literal[0, None]:
-        """Vmap axes of the temperature."""
-        return vmap_axes_spec(self.parameters.planet.temperature)
+        """Vmap axes of the log number density"""
+        return 0
 
     @property
     def parameters_vmap_axes(self) -> Parameters:
         """Vmap axes of the parameters."""
         return vmap_axes_spec(self.parameters)
+
+    @property
+    def temperature_vmap_axes(self) -> Literal[0, None]:
+        """Vmap axes of the temperature."""
+        return vmap_axes_spec(self.parameters.planet.temperature)
 
     def get_atmosphere_log_molar_mass(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
@@ -77,37 +72,25 @@ class VmappedFunctions:
     def get_atmosphere_log_volume(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_atmosphere_log_volume,
-            in_axes=(
-                self.parameters_vmap_axes,
-                self.log_number_density_vmap_axes,
-                self.planet_vmap_axes,
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_element_density(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
-            get_element_density, in_axes=(None, self.log_number_density_vmap_axes)
+            get_element_density,
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_element_density_in_melt(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_element_density_in_melt,
-            in_axes=(
-                self.parameters_vmap_axes,
-                None,
-                self.log_number_density_vmap_axes,
-                0,  # Log activity
-                0,  # Log volume
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_log_activity(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_log_activity,
-            in_axes=(
-                self.parameters_vmap_axes,
-                self.log_number_density_vmap_axes,
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_log_number_density_from_log_pressure(self, *args, **kwargs) -> Array:
@@ -119,44 +102,30 @@ class VmappedFunctions:
     def get_pressure_from_log_number_density(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_pressure_from_log_number_density,
-            in_axes=(self.log_number_density_vmap_axes, self.temperature_vmap_axes),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_reactions_only_mask(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_reactions_only_mask,
-            in_axes=(self.parameters_vmap_axes,),
-        )(*args, **kwargs)
+        return eqx.filter_vmap(get_reactions_only_mask, in_axes=(self.parameters_vmap_axes,))(
+            *args, **kwargs
+        )
 
     def get_species_density_in_melt(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_species_density_in_melt,
-            in_axes=(
-                self.parameters_vmap_axes,
-                self.log_number_density_vmap_axes,
-                0,  # Log activity
-                0,  # Log volume
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_species_ppmw_in_melt(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_species_ppmw_in_melt,
-            in_axes=(
-                self.parameters_vmap_axes,
-                self.log_number_density_vmap_axes,
-                0,  # Log activity
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def get_total_pressure(self, *args, **kwargs) -> Array:
         return eqx.filter_vmap(
             get_total_pressure,
-            in_axes=(
-                self.parameters_vmap_axes,
-                self.log_number_density_vmap_axes,
-                self.temperature_vmap_axes,
-            ),
+            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
         )(*args, **kwargs)
 
     def objective_function(self, *args, **kwargs) -> Array:

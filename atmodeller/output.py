@@ -274,9 +274,7 @@ class Output:
             Log volume of the atmosphere
         """
         atmosphere_log_volume: Array = self._vmapf.get_atmosphere_log_volume(
-            self._parameters,
-            jnp.asarray(self.log_number_density),
-            self.planet,
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(atmosphere_log_volume)
@@ -296,9 +294,7 @@ class Output:
             Total pressure
         """
         total_pressure: Array = self._vmapf.get_total_pressure(
-            self._parameters,
-            jnp.asarray(self.log_number_density),
-            jnp.asarray(self.temperature),
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(total_pressure)
@@ -475,8 +471,7 @@ class Output:
             Number density of elements in the condensed phase
         """
         element_density: Array = self._vmapf.get_element_density(
-            jnp.asarray(self.formula_matrix),
-            jnp.asarray(self.log_number_density * self.condensed_species_mask),
+            self._parameters, jnp.asarray(self.log_number_density * self.condensed_species_mask)
         )
 
         return np.asarray(element_density)
@@ -491,11 +486,7 @@ class Output:
             Number density of elements dissolved in melt due to species solubility
         """
         element_density_dissolved: Array = self._vmapf.get_element_density_in_melt(
-            self._parameters,
-            jnp.asarray(self._parameters.formula_matrix),
-            jnp.asarray(self.log_number_density),
-            jnp.asarray(self.log_activity()),
-            jnp.asarray(self.atmosphere_log_volume()),
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(element_density_dissolved)
@@ -510,7 +501,7 @@ class Output:
             Number density of elements in the gas phase
         """
         element_density: Array = self._vmapf.get_element_density(
-            jnp.asarray(self.formula_matrix),
+            self._parameters,
             jnp.asarray(self.log_number_density * self.gas_species_mask),
         )
 
@@ -686,7 +677,7 @@ class Output:
             Pressure of species in bar
         """
         pressure: Array = self._vmapf.get_pressure_from_log_number_density(
-            jnp.asarray(self.log_number_density), jnp.asarray(self.temperature)
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(pressure)
@@ -758,10 +749,7 @@ class Output:
             Species number density in the melt
         """
         species_density_in_melt: Array = self._vmapf.get_species_density_in_melt(
-            self._parameters,
-            jnp.asarray(self.log_number_density),
-            jnp.asarray(self.log_activity()),
-            jnp.asarray(self.atmosphere_log_volume()),
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(species_density_in_melt)
@@ -773,9 +761,7 @@ class Output:
             Species ppmw in the melt
         """
         species_ppmw_in_melt: Array = self._vmapf.get_species_ppmw_in_melt(
-            self._parameters,
-            jnp.asarray(self.log_number_density),
-            jnp.asarray(self.log_activity()),
+            self._parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(species_ppmw_in_melt)
