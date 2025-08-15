@@ -158,7 +158,8 @@ class InteriorAtmosphere:
                 "But don't panic! This can happen when starting from a poor initial guess."
             )
             logger.warning(
-                "Launching multistart (maximum %d attempts)", solver_parameters_.multistart
+                "Launching multistart (maximum %d attempts)",
+                parameters.solver_parameters.multistart,
             )
             logger.warning(
                 "Attempting to solve the %d models(s) that initially failed", num_failed
@@ -200,9 +201,7 @@ class InteriorAtmosphere:
                 # jax.debug.print("tau_array = {out}", out=tau_array)
 
                 initial_carry: tuple[Array, Array] = (subkey, solution)
-                solve_tau_step: Callable = make_solve_tau_step(
-                    self._solver, parameters, solver_parameters_
-                )
+                solve_tau_step: Callable = make_solve_tau_step(self._solver, parameters)
                 _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
                 solution, solver_status_, solver_steps_, solver_attempts = results
 
@@ -238,12 +237,7 @@ class InteriorAtmosphere:
 
             else:
                 solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
-                    self._solver,
-                    broadcasted_tau,
-                    solution,
-                    parameters,
-                    solver_parameters_,
-                    subkey,
+                    self._solver, solution, parameters, subkey
                 )
                 max_attempts = jnp.max(solver_attempts).item()
                 # Since tau is unaltered, the first multistart just repeats the first calculation,

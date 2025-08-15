@@ -26,7 +26,7 @@ import optimistix as optx
 from jax import lax, random
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller.containers import Parameters, SolverParameters
+from atmodeller.containers import Parameters
 from atmodeller.engine import objective_function
 from atmodeller.utilities import vmap_axes_spec
 
@@ -153,10 +153,8 @@ def get_solver_batch(parameters: Parameters, options: dict[str, Any]) -> Callabl
 # @eqx.debug.assert_max_traces(max_traces=1)
 def repeat_solver(
     solver_vmap_fn: Callable,
-    tau: Float[Array, "..."],
     solution: Float[Array, "batch solution"],
     parameters: Parameters,
-    solver_parameters: SolverParameters,
     key: PRNGKeyArray,
 ) -> tuple[
     Float[Array, "batch solution"],
@@ -168,10 +166,8 @@ def repeat_solver(
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        tau: Tau parameter for species' stability
         solution: Solution
         parameters: Parameters
-        solver_paramters: Solver parameters
         key: Random key
 
     Returns:
@@ -194,6 +190,7 @@ def repeat_solver(
             Updated state tuple
         """
         i, key, solution, status, steps, success_attempt = state
+        # jax.debug.print("Iteration: {out}", out=i)
 
         failed_mask: Bool[Array, " batch"] = ~status
         key, subkey = random.split(key)
@@ -207,15 +204,13 @@ def repeat_solver(
         )
         perturbations: Float[Array, "batch solution"] = jnp.where(
             failed_mask[:, None],
-            solver_parameters.multistart_perturbation * raw_perturb,
+            parameters.solver_parameters.multistart_perturbation * raw_perturb,
             jnp.zeros_like(solution),
         )
         new_initial_solution: Float[Array, "batch solution"] = solution + perturbations
         # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
-        new_solution, new_status, new_steps = solver_vmap_fn(
-            new_initial_solution, tau, parameters, solver_parameters
-        )
+        new_solution, new_status, new_steps = solver_vmap_fn(new_initial_solution, parameters)
 
         # Determine which entries to update: previously failed, now succeeded
         update_mask: Bool[Array, " batch"] = failed_mask & new_status
@@ -256,14 +251,20 @@ def repeat_solver(
         """
         i, _, _, status, _, _ = state
 
-        return jnp.logical_and(i < solver_parameters.multistart, jnp.any(~status))
+        # For debugging to force the loop to run to the maximum allowable value
+        # return jnp.logical_and(i < parameters.solver_parameters.multistart, True)
+
+        return jnp.logical_and(i < parameters.solver_parameters.multistart, jnp.any(~status))
 
     # Try first solution
-    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
-        solution, tau, parameters, solver_parameters
-    )
+    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(solution, parameters)
+    # jax.debug.print("first_solution = {out}", out=first_solution)
+    # jax.debug.print("first_solver_status = {out}", out=first_solver_status)
+    # jax.debug.print("first_solver_steps = {out}", out=first_solver_steps)
+
     # Failback solution
     solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
+    # jax.debug.print("solution = {out}", out=solution)
 
     initial_state: tuple[Array, ...] = (
         jnp.array(1),  # First attempt of the repeat_solver
