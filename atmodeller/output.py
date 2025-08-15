@@ -34,10 +34,10 @@ from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
-from atmodeller import TAU, override
+from atmodeller import override
 from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.constants import AVOGADRO, GAS_CONSTANT
-from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
+from atmodeller.containers import Parameters, Planet, SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
@@ -254,7 +254,7 @@ class Output:
             Log molar mass of the atmosphere
         """
         atmosphere_log_molar_mass: Array = self._vmapf.get_atmosphere_log_molar_mass(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(atmosphere_log_molar_mass)
@@ -274,7 +274,7 @@ class Output:
             Log volume of the atmosphere
         """
         atmosphere_log_volume: Array = self._vmapf.get_atmosphere_log_volume(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(atmosphere_log_volume)
@@ -294,7 +294,7 @@ class Output:
             Total pressure
         """
         total_pressure: Array = self._vmapf.get_total_pressure(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(total_pressure)
@@ -471,7 +471,7 @@ class Output:
             Number density of elements in the condensed phase
         """
         element_density: Array = self._vmapf.get_element_density(
-            self._parameters, jnp.asarray(self.log_number_density * self.condensed_species_mask)
+            jnp.asarray(self.log_number_density * self.condensed_species_mask)
         )
 
         return np.asarray(element_density)
@@ -486,7 +486,7 @@ class Output:
             Number density of elements dissolved in melt due to species solubility
         """
         element_density_dissolved: Array = self._vmapf.get_element_density_in_melt(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(element_density_dissolved)
@@ -501,7 +501,6 @@ class Output:
             Number density of elements in the gas phase
         """
         element_density: Array = self._vmapf.get_element_density(
-            self._parameters,
             jnp.asarray(self.log_number_density * self.gas_species_mask),
         )
 
@@ -633,9 +632,7 @@ class Output:
         Returns:
             Log activity without stability
         """
-        log_activity: Array = self._vmapf.get_log_activity(
-            self._parameters, jnp.asarray(self.log_number_density)
-        )
+        log_activity: Array = self._vmapf.get_log_activity(jnp.asarray(self.log_number_density))
 
         return np.asarray(log_activity)
 
@@ -654,9 +651,7 @@ class Output:
         Returns:
             Reaction indices of the residual array
         """
-        reaction_indices: Bool[Array, "..."] = self._vmapf.get_reactions_only_mask(
-            self._parameters
-        )
+        reaction_indices: Bool[Array, "..."] = self._vmapf.get_reactions_only_mask()
 
         return np.asarray(reaction_indices, dtype=bool)
 
@@ -677,7 +672,7 @@ class Output:
             Pressure of species in bar
         """
         pressure: Array = self._vmapf.get_pressure_from_log_number_density(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(pressure)
@@ -728,13 +723,7 @@ class Output:
         Returns:
             Dictionary of the residual
         """
-        residual: Array = self._vmapf.objective_function(
-            self._solution,
-            {
-                "parameters": self._parameters,
-                "tau": jnp.asarray(TAU),
-            },
-        )
+        residual: Array = self._vmapf.objective_function(jnp.asarray(self._solution))
 
         out: dict[int, NpArray] = {}
         for ii in range(residual.shape[1]):
@@ -749,7 +738,7 @@ class Output:
             Species number density in the melt
         """
         species_density_in_melt: Array = self._vmapf.get_species_density_in_melt(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(species_density_in_melt)
@@ -761,7 +750,7 @@ class Output:
             Species ppmw in the melt
         """
         species_ppmw_in_melt: Array = self._vmapf.get_species_ppmw_in_melt(
-            self._parameters, jnp.asarray(self.log_number_density)
+            jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(species_ppmw_in_melt)
@@ -830,7 +819,6 @@ class OutputSolution(Output):
         species: Species
         solution: Array output from solve
         parameters: Parameters
-        solver_parameters: Solver parameters
         solver_status: Solver status
         solver_steps: Number of solver steps
         solver_attempts: Number of solver attempts (multistart)
@@ -841,13 +829,11 @@ class OutputSolution(Output):
         species: SpeciesCollection,
         solution: Float[Array, " batch solution"],
         parameters: Parameters,
-        solver_parameters: SolverParameters,
-        solver_status: Bool[Array, " batch"],
-        solver_steps: Integer[Array, " batch"],
-        solver_attempts: Integer[Array, " batch"],
+        solver_status: Bool[Array, "..."],
+        solver_steps: Integer[Array, "..."],
+        solver_attempts: Integer[Array, "..."],
     ):
         super().__init__(species, solution, parameters)
-        self._solver_parameters: SolverParameters = solver_parameters
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
         self._solver_attempts: NpInt = np.asarray(solver_attempts)

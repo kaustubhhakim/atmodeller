@@ -14,15 +14,32 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""JAX-related functionality for solving the system of equations"""
+"""JAX-based model functions for atmospheric and chemical equilibrium calculations.
+
+This module defines the core set of **single-instance** model functions (e.g., thermodynamic
+property calculations, equation-of-state relations, reaction masks) that operate on a single set of
+inputs, without any implicit batching.
+
+These functions form the building blocks for solving the coupled system of equations governing the
+model (e.g., mass balance, fugacity constraints, phase stability), and are intended to be:
+
+    1. **Pure**: No side effects, deterministic outputs for given inputs.
+    2. **JAX-compatible**: Written with `jax.numpy` and compatible with transformations such as
+        `jit`, `grad`, and `vmap`.
+    3. **Shape-consistent**: Accept and return arrays with predictable shapes, enabling easy
+        vectorization.
+
+In practice, these functions are rarely called directly in production code. Instead, they are
+wrapped with `eqx.filter_vmap` in :class:`VmappedFunctions` to enable efficient batched evaluation
+over multiple scenarios or parameter sets.
+"""
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import optimistix as optx
 from jax import lax, random
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, Shaped
@@ -652,7 +669,7 @@ def objective_function(
     log_min_number_density: Float[Array, " species"] = (
         get_min_log_elemental_abundance_per_species(parameters)
         - log_volume
-        + jnp.log(parameters.tau)
+        + jnp.log(parameters.solver_parameters.tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
     # Dimensionless (log-ratio)
@@ -693,45 +710,46 @@ def objective_function(
     return residual
 
 
+# TODO: Moved to engine_vmap. Can be removed in the future.
 # Since this is the core driver function for the solve it remains useful for debugging to see how
 # many times recompilation is triggered
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
-def solve(
-    solution_array: Float[Array, " solution"],
-    parameters: Parameters,
-    solver_parameters: SolverParameters,
-    options: dict[str, Any],
-) -> tuple[Float[Array, " solution"], Bool[Array, ""], Integer[Array, ""]]:
-    """Solves the system of non-linear equations
+# def solve(
+#     solution_array: Float[Array, " solution"],
+#     parameters: Parameters,
+#     solver_parameters: SolverParameters,
+#     options: dict[str, Any],
+# ) -> tuple[Float[Array, " solution"], Bool[Array, ""], Integer[Array, ""]]:
+#     """Solves the system of non-linear equations
 
-    Args:
-        solution_array: Solution array
-        parameters: Parameters
-        solver_parameters: Solver parameters
-        options: Options for root find
+#     Args:
+#         solution_array: Solution array
+#         parameters: Parameters
+#         solver_parameters: Solver parameters
+#         options: Options for root find
 
-    Returns:
-        The solution array, the status of the solver, number of steps
-    """
-    sol: optx.Solution = optx.root_find(
-        objective_function,
-        solver_parameters.get_solver_instance(),
-        solution_array,
-        args=parameters,
-        throw=solver_parameters.throw,
-        max_steps=solver_parameters.max_steps,
-        options=options,
-    )
+#     Returns:
+#         The solution array, the status of the solver, number of steps
+#     """
+#     sol: optx.Solution = optx.root_find(
+#         objective_function,
+#         solver_parameters.get_solver_instance(),
+#         solution_array,
+#         args=parameters,
+#         throw=solver_parameters.throw,
+#         max_steps=solver_parameters.max_steps,
+#         options=options,
+#     )
 
-    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-    solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+#     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+#     solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
 
-    # TODO: sol.results contains more information about the solution process, but it's wrapped up
-    # in an enum-like object
-    solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
+#     # TODO: sol.results contains more information about the solution process, but it's wrapped up
+#     # in an enum-like object
+#     solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
 
-    return sol.value, solver_status, solver_steps
+#     return sol.value, solver_status, solver_steps
 
 
 @eqx.filter_jit

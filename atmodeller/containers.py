@@ -658,6 +658,61 @@ class MassConstraints(eqx.Module):
         return log_number_density
 
 
+class SolverParameters(eqx.Module):
+    """Solver parameters
+
+    Args:
+        solver: Solver. Defaults to `optx.Newton`
+        atol: Absolute tolerance. Defaults to `1.0e-6`.
+        rtol: Relative tolerance. Defaults to `1.0e-6`.
+        linear_solver: Linear solver. Defaults to `AutoLinearSolver(well_posed=False)`.
+        norm: Norm. Defaults to `optx.rms_norm`.
+        throw: How to report any failures. Defaults to `False`.
+        max_steps: The maximum number of steps the solver can take. Defaults to `256`
+        jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
+            Can be either `fwd` or `bwd`. Defaults to `fwd`.
+        multistart: Number of multistarts. Defaults to `10`.
+        multistart_perturbation: Perturbation for multistart. Defaults to `30`.
+        tau: Tau factor for species stability. Defaults to `TAU`.
+    """
+
+    solver: type[OptxSolver] = optx.Newton
+    """Solver"""
+    atol: float = 1.0e-6
+    """Absolute tolerance"""
+    rtol: float = 1.0e-6
+    """Relative tolerance"""
+    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
+    """Linear solver
+    
+    https://docs.kidger.site/lineax/api/solvers/   
+    """
+    norm: Callable = optx.max_norm
+    """Norm""" ""
+    throw: bool = False
+    """How to report any failures"""
+    max_steps: int = 512
+    """Maximum number of steps the solver can take"""
+    jac: Literal["fwd", "bwd"] = "fwd"
+    """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
+    multistart: int = 10
+    """Number of multistarts"""
+    multistart_perturbation: float = 30.0
+    """Perturbation for multistart"""
+    tau: Array = eqx.field(converter=as_j64, default=TAU)  # NOTE: array to trace tau
+    """Tau factor for species stability"""
+
+    def get_solver_instance(self) -> OptxSolver:
+        return self.solver(
+            rtol=self.rtol,
+            atol=self.atol,
+            norm=self.norm,
+            linear_solver=self.linear_solver,  # type: ignore because there is a parameter
+            # For debugging LM solver. Not valid for all solvers (e.g. Newton)
+            # verbose=frozenset({"step_size", "y", "loss", "accepted"}),
+        )
+
+
 class Parameters(eqx.Module):
     """Parameters
 
@@ -666,7 +721,7 @@ class Parameters(eqx.Module):
         planet: Planet
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
-        tau: Tau factor for species stability
+        solver_parameters: Solver parameters
         formula_matrix: Formula matrix
         reaction_matrix: Reaction matrix
         diatomic_oxygen_index: Index of diatomic oxygen
@@ -680,8 +735,8 @@ class Parameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-    tau: Float[Array, "..."]
-    """Tau factor for species stability"""
+    solver_parameters: SolverParameters
+    """Solver parameters"""
     formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
     reaction_matrix: tuple[tuple[float, ...], ...]
@@ -696,7 +751,7 @@ class Parameters(eqx.Module):
         planet: Optional[Planet] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        tau: ArrayLike = TAU,
+        solver_parameters: Optional[SolverParameters] = None,
     ):
         """Creates an instance
 
@@ -707,7 +762,7 @@ class Parameters(eqx.Module):
                 a new instance of `FugacityConstraints`.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
                 a new instance of `MassConstraints`.
-            tau: Tau factor for species stability. Defaults to `TAU`.
+            solver_parameters: Solver parameters. Defaults to a new instance of `SolverParameters`.
 
         Returns:
             An instance
@@ -717,6 +772,9 @@ class Parameters(eqx.Module):
             species, fugacity_constraints
         )
         mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
+        solver_parameters_: SolverParameters = (
+            SolverParameters() if solver_parameters is None else solver_parameters
+        )
         formula_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
             cls.get_formula_matrix(species)
         )
@@ -730,7 +788,7 @@ class Parameters(eqx.Module):
             planet_,
             fugacity_constraints_,
             mass_constraints_,
-            as_j64(tau),  # NOTE: Want tau to be traced so must be an array
+            solver_parameters_,
             formula_matrix,
             reaction_matrix,
             diatomic_oxygen_index,
@@ -807,55 +865,3 @@ class Parameters(eqx.Module):
         reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         return reactions
-
-
-class SolverParameters(eqx.Module):
-    """Solver parameters
-
-    Args:
-        solver: Solver. Defaults to `optx.Newton`
-        atol: Absolute tolerance. Defaults to `1.0e-6`.
-        rtol: Relative tolerance. Defaults to `1.0e-6`.
-        linear_solver: Linear solver. Defaults to `AutoLinearSolver(well_posed=False)`.
-        norm: Norm. Defaults to `optx.rms_norm`.
-        throw: How to report any failures. Defaults to `False`.
-        max_steps: The maximum number of steps the solver can take. Defaults to `256`
-        jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
-            Can be either `fwd` or `bwd`. Defaults to `fwd`.
-        multistart: Number of multistarts. Defaults to `10`.
-        multistart_perturbation: Perturbation for multistart. Defaults to `30`.
-    """
-
-    solver: type[OptxSolver] = optx.Newton
-    """Solver"""
-    atol: float = 1.0e-6
-    """Absolute tolerance"""
-    rtol: float = 1.0e-6
-    """Relative tolerance"""
-    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
-    """Linear solver
-    
-    https://docs.kidger.site/lineax/api/solvers/   
-    """
-    norm: Callable = optx.max_norm
-    """Norm""" ""
-    throw: bool = False
-    """How to report any failures"""
-    max_steps: int = 512
-    """Maximum number of steps the solver can take"""
-    jac: Literal["fwd", "bwd"] = "fwd"
-    """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 10
-    """Number of multistarts"""
-    multistart_perturbation: float = 30.0
-    """Perturbation for multistart"""
-
-    def get_solver_instance(self) -> OptxSolver:
-        return self.solver(
-            rtol=self.rtol,
-            atol=self.atol,
-            norm=self.norm,
-            linear_solver=self.linear_solver,  # type: ignore because there is a parameter
-            # For debugging LM solver. Not valid for all solvers (e.g. Newton)
-            # verbose=frozenset({"step_size", "y", "loss", "accepted"}),
-        )

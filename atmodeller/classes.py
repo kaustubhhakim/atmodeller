@@ -20,7 +20,6 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import Any, Optional, cast
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as random
@@ -30,10 +29,11 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
 from atmodeller._mytypes import NpFloat
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
-from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
+from atmodeller.engine import make_solve_tau_step, repeat_solver
+from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
-from atmodeller.utilities import get_batch_size, vmap_axes_spec
+from atmodeller.utilities import get_batch_size
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -46,15 +46,13 @@ class InteriorAtmosphere:
 
     Args:
         species: Collection of species
-        tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    _solver: Optional[Callable] = None
+    _solver: Optional[VmappedFunctions] = None
     _output: Optional[Output] = None
 
-    def __init__(self, species: SpeciesCollection, tau: float = TAU):
+    def __init__(self, species: SpeciesCollection):
         self.species: SpeciesCollection = species
-        self.tau: float = tau
         logger.info("species = %s", str(self.species))
         # FIXME: To reinstate
         # logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
@@ -106,15 +104,15 @@ class InteriorAtmosphere:
         """Solves the system and initialises an Output instance for processing the result
 
         Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-            solver_parameters: Solver parameters. Defaults to None.
+            planet: Planet. Defaults to `None`.
+            initial_log_number_density: Initial log number density. Defaults to `None`.
+            initial_log_stability: Initial log stability. Defaults to `None`.
+            fugacity_constraints: Fugacity constraints. Defaults to `None`.
+            mass_constraints: Mass constraints. Defaults to `None`.
+            solver_parameters: Solver parameters. Defaults to `None`.
         """
         parameters: Parameters = Parameters.create(
-            self.species, planet, fugacity_constraints, mass_constraints, self.tau
+            self.species, planet, fugacity_constraints, mass_constraints, solver_parameters
         )
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
@@ -125,13 +123,10 @@ class InteriorAtmosphere:
         broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
         # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
 
-        solver_parameters_: SolverParameters = (
-            SolverParameters() if solver_parameters is None else solver_parameters
-        )
         options: dict[str, Any] = {
             "lower": self.species.get_lower_bound(),
             "upper": self.species.get_upper_bound(),
-            "jac": solver_parameters_.jac,
+            "jac": parameters.solver_parameters.jac,
         }
 
         base_solution_array: Array = broadcast_initial_solution(
@@ -142,28 +137,56 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
-        # Pre-bind fixed configurations
-        solver_fn: Callable = eqx.Partial(solve, options=options)
-        in_axes: Parameters = vmap_axes_spec(parameters)
+        self._solver = VmappedFunctions(parameters)
+
+        solution, solver_status, solver_steps = self._solver.solve_batch(
+            base_solution_array,
+            options,
+        )
+
+        jax.debug.print("solution = {out}", out=solution)
+        jax.debug.print("solver_status = {out}", out=solver_status)
 
         # TODO: Rather than jitting the solver, can we instead just jit the objective function?
-        # objective_function: Callable = VmappedFunctions(parameters).objective_function
+        # objective_function: Callable = eqx.filter_jit(
+        #    VmappedFunctions(parameters).objective_function
+        # )
+
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, in_axes, None)))
+        # self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, in_axes, None)))
+
+        # sol: optx.Solution = optx.root_find(
+        #    objective_function,
+        #    solver_parameters_.get_solver_instance(),
+        #    base_solution_array,
+        #    args=parameters,
+        #    throw=solver_parameters_.throw,
+        #    max_steps=solver_parameters_.max_steps,
+        #    options=options,
+        # )
+
+        # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+        # solver_steps: Integer[Array, "..."] = sol.stats["num_steps"]
+
+        # TODO: sol.results contains more information about the solution process, but it's wrapped up
+        # in an enum-like object
+        # solver_status: Bool[Array, "..."] = sol.result == optx.RESULTS.successful
+
+        # solution = sol.value
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
-        logger.info(f"Attempting to solve {batch_size} model(s)")
-        solution, solver_status, solver_steps = self._solver(
-            base_solution_array,
-            parameters,
-            solver_parameters_,
-        )
+        # logger.info(f"Attempting to solve {batch_size} model(s)")
+        # solution, solver_status, solver_steps = self._solver(
+        #    base_solution_array,
+        #    parameters,
+        #    solver_parameters_,
+        # )
         # jax.debug.print("solver_status = {out}", out=solver_status)
         # jax.debug.print("solver_steps = {out}", out=solver_steps)
-        solver_attempts: Integer[Array, " batch"] = solver_status.astype(int)
-        # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+        solver_attempts: Integer[Array, "..."] = solver_status.astype(int)
+        jax.debug.print("solver_attempts = {out}", out=solver_attempts)
 
         if jnp.any(~solver_status):
             num_failed: int = jnp.sum(~solver_status).item()
@@ -304,7 +327,6 @@ class InteriorAtmosphere:
             self.species,
             solution,
             parameters,
-            solver_parameters_,
             solver_status,
             solver_steps,
             solver_attempts,

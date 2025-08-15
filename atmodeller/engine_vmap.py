@@ -14,12 +14,14 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""`Vmapped engine for Atmodeller.`"""
+"""Vmapped engine"""
 
-from typing import Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import equinox as eqx
-from jaxtyping import Array
+import optimistix as optx
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.containers import Parameters
 from atmodeller.engine import (
@@ -38,98 +40,203 @@ from atmodeller.engine import (
 from atmodeller.utilities import get_log_number_density_from_log_pressure, vmap_axes_spec
 
 
-class VmappedFunctions:
-    """Container for vmapped functions.
+class VmappedFunctions(eqx.Module):
+    """Container for precompiled `vmap`ped model functions.
+
+    This class wraps a set of model functions (e.g., thermodynamic property calculations, reaction
+    masks, etc.) with `eqx.filter_vmap` so they can be evaluated efficiently over batched inputs.
+
+    The primary assumption is that ``log_number_density`` inputs are **already batched** along axis
+    0. The `in_axes` specifications for all `vmap` calls are precomputed at initialization from the
+    provided `parameters` object, ensuring consistent vectorization behavior across all functions.
+
+    Each wrapped function is stored as a bound method (e.g., ``get_atmosphere_log_molar_mass``),
+    and internally calls a preconstructed `vmap` object. This minimizes tracing overhead and
+    avoids recomputing `in_axes` specs for each call.
+
+    In addition, the ``objective_function`` is precompiled with both `vmap` and `jit` for use
+    inside iterative solvers, ensuring minimal Python dispatch cost during repeated evaluations.
 
     Args:
         parameters: Parameters
     """
 
+    parameters: Parameters
+
+    # Precompiled vmapped functions
+    _get_atmosphere_log_molar_mass: Callable
+    _get_atmosphere_log_volume: Callable
+    _get_element_density: Callable
+    _get_element_density_in_melt: Callable
+    _get_log_activity: Callable
+    _get_log_number_density_from_log_pressure: Callable
+    _get_pressure_from_log_number_density: Callable
+    _get_reactions_only_mask: Callable
+    _get_species_density_in_melt: Callable
+    _get_species_ppmw_in_melt: Callable
+    _get_total_pressure: Callable
+    _objective_function_vmap: Callable
+
     def __init__(self, parameters: Parameters):
-        self.parameters: Parameters = parameters
+        self.parameters = parameters
 
-    @property
-    def log_number_density_vmap_axes(self) -> int:
-        """Vmap axes of the log number density"""
-        return 0
+        # Compute axes specs once
+        parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
+        log_number_density_vmap_axes: int = 0
+        temperature_vmap_axes: Literal[0, None] = vmap_axes_spec(parameters.planet.temperature)
 
-    @property
-    def parameters_vmap_axes(self) -> Parameters:
-        """Vmap axes of the parameters."""
-        return vmap_axes_spec(self.parameters)
-
-    @property
-    def temperature_vmap_axes(self) -> Literal[0, None]:
-        """Vmap axes of the temperature."""
-        return vmap_axes_spec(self.parameters.planet.temperature)
-
-    def get_atmosphere_log_molar_mass(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
+        # Pre-build vmap wrappers
+        self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
             get_atmosphere_log_molar_mass,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_atmosphere_log_volume(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_atmosphere_log_volume,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_element_density(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_element_density,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_element_density_in_melt(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_element_density_in_melt,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_log_activity(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_log_activity,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_log_number_density_from_log_pressure(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_log_number_density_from_log_pressure,
-            in_axes=(self.log_number_density_vmap_axes, self.temperature_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_pressure_from_log_number_density(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            get_pressure_from_log_number_density,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
-
-    def get_reactions_only_mask(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(get_reactions_only_mask, in_axes=(self.parameters_vmap_axes,))(
-            *args, **kwargs
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
         )
 
-    def get_species_density_in_melt(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
+        self._get_atmosphere_log_volume = eqx.filter_vmap(
+            get_atmosphere_log_volume,
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
+
+        self._get_element_density = eqx.filter_vmap(
+            get_element_density,
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
+
+        self._get_element_density_in_melt = eqx.filter_vmap(
+            get_element_density_in_melt,
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
+
+        self._get_log_activity = eqx.filter_vmap(
+            get_log_activity,
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
+
+        self._get_log_number_density_from_log_pressure = eqx.filter_vmap(
+            get_log_number_density_from_log_pressure,
+            in_axes=(log_number_density_vmap_axes, temperature_vmap_axes),
+        )
+
+        self._get_pressure_from_log_number_density = eqx.filter_vmap(
+            get_pressure_from_log_number_density,
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
+
+        self._get_reactions_only_mask = eqx.filter_vmap(
+            get_reactions_only_mask,
+            in_axes=(parameters_vmap_axes,),
+        )
+
+        self._get_species_density_in_melt = eqx.filter_vmap(
             get_species_density_in_melt,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
 
-    def get_species_ppmw_in_melt(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
+        self._get_species_ppmw_in_melt = eqx.filter_vmap(
             get_species_ppmw_in_melt,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
 
-    def get_total_pressure(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
+        self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,
-            in_axes=(self.parameters_vmap_axes, self.log_number_density_vmap_axes),
-        )(*args, **kwargs)
+            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+        )
 
-    def objective_function(self, *args, **kwargs) -> Array:
-        return eqx.filter_vmap(
-            objective_function,
-            in_axes=(self.log_number_density_vmap_axes, self.parameters_vmap_axes),
-        )(*args, **kwargs)
+        # Precompile jit+vmap for objective_function
+        self._objective_function_vmap = eqx.filter_jit(
+            eqx.filter_vmap(
+                objective_function,
+                in_axes=(log_number_density_vmap_axes, parameters_vmap_axes),
+            )
+        )
+
+    def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:
+        return self._get_atmosphere_log_molar_mass(self.parameters, log_number_density)
+
+    def get_atmosphere_log_volume(self, log_number_density: Array) -> Array:
+        return self._get_atmosphere_log_volume(self.parameters, log_number_density)
+
+    def get_element_density(self, log_number_density: Array) -> Array:
+        return self._get_element_density(self.parameters, log_number_density)
+
+    def get_element_density_in_melt(self, log_number_density: Array) -> Array:
+        return self._get_element_density_in_melt(self.parameters, log_number_density)
+
+    def get_log_activity(self, log_number_density: Array) -> Array:
+        return self._get_log_activity(self.parameters, log_number_density)
+
+    def get_log_number_density_from_log_pressure(
+        self, log_pressure: ArrayLike, temperature: ArrayLike
+    ) -> Array:
+        return self._get_log_number_density_from_log_pressure(log_pressure, temperature)
+
+    def get_pressure_from_log_number_density(self, log_number_density: Array) -> Array:
+        return self._get_pressure_from_log_number_density(self.parameters, log_number_density)
+
+    def get_reactions_only_mask(self) -> Array:
+        return self._get_reactions_only_mask(self.parameters)
+
+    def get_species_density_in_melt(self, log_number_density: Array) -> Array:
+        return self._get_species_density_in_melt(self.parameters, log_number_density)
+
+    def get_species_ppmw_in_melt(self, log_number_density: Array) -> Array:
+        return self._get_species_ppmw_in_melt(self.parameters, log_number_density)
+
+    def get_total_pressure(self, log_number_density: Array) -> Array:
+        return self._get_total_pressure(self.parameters, log_number_density)
+
+    def objective_function(self, solution: Array) -> Array:
+        return self._objective_function_vmap(solution, self.parameters)
+
+    def solve_batch(
+        self, solution: Float[Array, "..."], options: dict[str, Any]
+    ) -> tuple[Float[Array, "..."], Bool[Array, ""], Integer[Array, ""]]:
+        """Solves a batch of nonlinear systems using a single root-finding call.
+
+        This method treats the input `solution` as a batch of initial guesses for multiple systems,
+        but the root solver (`optx.root_find`) is called **once** on the entire batch via the
+        vectorized objective function `_objective_function_vmap`. As a result:
+
+        - Only **one set of solver statistics** is returned (`solver_steps` and `solver_status`).
+        - The `solver_status` reflects the **success or failure of the batch as a whole**:
+            all systems are considered successful only if the solver converges for the batch trace.
+        - Individual per-system convergence information (e.g., steps per system) is
+            **not available**.
+
+        Note:
+            - The objective function is vectorized (`vmap`), so residuals are computed in parallel.
+            - Because the solver is called once for the entire batch, convergence statistics and
+                success are reported **globally**, not per individual system.
+            - For per-system diagnostics, consider solving systems individually or using a `vmap`
+                over the root solver itself.
+
+        Args:
+            solution: Initial guess for the solution for each system in the batch. Shape should
+                include the batch dimension first (axis 0) if multiple systems are provided.
+            options: Additional options to pass to the solver.
+
+        Returns:
+            sol.value: The computed solutions for all systems in the batch. Shape matches the
+                input.
+            solver_status: Boolean indicating whether the **entire batch** converged successfully.
+            solver_steps: Number of iterations taken by the solver for the batch as a whole.
+        """
+        sol: optx.Solution = optx.root_find(
+            self._objective_function_vmap,
+            self.parameters.solver_parameters.get_solver_instance(),
+            solution,
+            args=self.parameters,
+            throw=self.parameters.solver_parameters.throw,
+            max_steps=self.parameters.solver_parameters.max_steps,
+            options=options,
+        )
+
+        # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+
+        solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
+        solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+
+        # jax.debug.print("sol.value = {out}", out=sol.value)
+        # jax.debug.print("solver_steps = {out}", out=solver_steps)
+        # jax.debug.print("solver_status = {out}", out=solver_status)
+
+        return sol.value, solver_status, solver_steps
