@@ -29,10 +29,9 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
 from atmodeller._mytypes import NpFloat
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
-from atmodeller.engine import make_solve_tau_step, repeat_solver
-from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
+from atmodeller.solvers import get_solver_individual, make_solve_tau_step, repeat_solver
 from atmodeller.utilities import get_batch_size
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -48,7 +47,7 @@ class InteriorAtmosphere:
         species: Collection of species
     """
 
-    _solver: Optional[VmappedFunctions] = None
+    _solver: Optional[Callable] = None
     _output: Optional[Output] = None
 
     def __init__(self, species: SpeciesCollection):
@@ -137,54 +136,18 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
-        self._solver = VmappedFunctions(parameters)
-
-        solution, solver_status, solver_steps = self._solver.solve_batch(
-            base_solution_array,
-            options,
-        )
-
-        jax.debug.print("solution = {out}", out=solution)
-        jax.debug.print("solver_status = {out}", out=solver_status)
-
-        # TODO: Rather than jitting the solver, can we instead just jit the objective function?
-        # objective_function: Callable = eqx.filter_jit(
-        #    VmappedFunctions(parameters).objective_function
-        # )
-
-        # Compile the solver, and this is re-used unless recompilation is triggered
-        # Initial solution and tau must be broadcast since they are always batched
-        # self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, in_axes, None)))
-
-        # sol: optx.Solution = optx.root_find(
-        #    objective_function,
-        #    solver_parameters_.get_solver_instance(),
-        #    base_solution_array,
-        #    args=parameters,
-        #    throw=solver_parameters_.throw,
-        #    max_steps=solver_parameters_.max_steps,
-        #    options=options,
-        # )
-
-        # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-        # solver_steps: Integer[Array, "..."] = sol.stats["num_steps"]
-
-        # TODO: sol.results contains more information about the solution process, but it's wrapped up
-        # in an enum-like object
-        # solver_status: Bool[Array, "..."] = sol.result == optx.RESULTS.successful
-
-        # solution = sol.value
+        self._solver = get_solver_individual(parameters, options)
+        # Another option to solve the batch with a single root find
+        # self._solver = get_solver_batch(parameters, options)
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
-        # logger.info(f"Attempting to solve {batch_size} model(s)")
-        # solution, solver_status, solver_steps = self._solver(
-        #    base_solution_array,
-        #    parameters,
-        #    solver_parameters_,
-        # )
-        # jax.debug.print("solver_status = {out}", out=solver_status)
-        # jax.debug.print("solver_steps = {out}", out=solver_steps)
+        logger.info(f"Attempting to solve {batch_size} model(s)")
+        solution, solver_status, solver_steps = self._solver(base_solution_array, parameters)
+        jax.debug.print("solution = {out}", out=solution)
+        jax.debug.print("solver_status = {out}", out=solver_status)
+        jax.debug.print("solver_steps = {out}", out=solver_steps)
+
         solver_attempts: Integer[Array, "..."] = solver_status.astype(int)
         jax.debug.print("solver_attempts = {out}", out=solver_attempts)
 

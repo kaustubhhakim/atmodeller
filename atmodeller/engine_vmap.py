@@ -17,11 +17,10 @@
 """Vmapped engine"""
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Literal
 
 import equinox as eqx
-import optimistix as optx
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.containers import Parameters
 from atmodeller.engine import (
@@ -38,6 +37,10 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.utilities import get_log_number_density_from_log_pressure, vmap_axes_spec
+
+# FIXME: In practice, this is probably mostly a convenient wrapper for computing output, and won't
+# be used for the actual numerical solution, which seems cleaner and easy to do using functional
+# programming.
 
 
 class VmappedFunctions(eqx.Module):
@@ -141,12 +144,9 @@ class VmappedFunctions(eqx.Module):
             in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
         )
 
-        # Precompile jit+vmap for objective_function
-        self._objective_function_vmap = eqx.filter_jit(
-            eqx.filter_vmap(
-                objective_function,
-                in_axes=(log_number_density_vmap_axes, parameters_vmap_axes),
-            )
+        self._objective_function_vmap = eqx.filter_vmap(
+            objective_function,
+            in_axes=(log_number_density_vmap_axes, parameters_vmap_axes),
         )
 
     def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:
@@ -186,57 +186,3 @@ class VmappedFunctions(eqx.Module):
 
     def objective_function(self, solution: Array) -> Array:
         return self._objective_function_vmap(solution, self.parameters)
-
-    def solve_batch(
-        self, solution: Float[Array, "..."], options: dict[str, Any]
-    ) -> tuple[Float[Array, "..."], Bool[Array, ""], Integer[Array, ""]]:
-        """Solves a batch of nonlinear systems using a single root-finding call.
-
-        This method treats the input `solution` as a batch of initial guesses for multiple systems,
-        but the root solver (`optx.root_find`) is called **once** on the entire batch via the
-        vectorized objective function `_objective_function_vmap`. As a result:
-
-        - Only **one set of solver statistics** is returned (`solver_steps` and `solver_status`).
-        - The `solver_status` reflects the **success or failure of the batch as a whole**:
-            all systems are considered successful only if the solver converges for the batch trace.
-        - Individual per-system convergence information (e.g., steps per system) is
-            **not available**.
-
-        Note:
-            - The objective function is vectorized (`vmap`), so residuals are computed in parallel.
-            - Because the solver is called once for the entire batch, convergence statistics and
-                success are reported **globally**, not per individual system.
-            - For per-system diagnostics, consider solving systems individually or using a `vmap`
-                over the root solver itself.
-
-        Args:
-            solution: Initial guess for the solution for each system in the batch. Shape should
-                include the batch dimension first (axis 0) if multiple systems are provided.
-            options: Additional options to pass to the solver.
-
-        Returns:
-            sol.value: The computed solutions for all systems in the batch. Shape matches the
-                input.
-            solver_status: Boolean indicating whether the **entire batch** converged successfully.
-            solver_steps: Number of iterations taken by the solver for the batch as a whole.
-        """
-        sol: optx.Solution = optx.root_find(
-            self._objective_function_vmap,
-            self.parameters.solver_parameters.get_solver_instance(),
-            solution,
-            args=self.parameters,
-            throw=self.parameters.solver_parameters.throw,
-            max_steps=self.parameters.solver_parameters.max_steps,
-            options=options,
-        )
-
-        # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-
-        solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
-        solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
-
-        # jax.debug.print("sol.value = {out}", out=sol.value)
-        # jax.debug.print("solver_steps = {out}", out=solver_steps)
-        # jax.debug.print("solver_status = {out}", out=solver_status)
-
-        return sol.value, solver_status, solver_steps

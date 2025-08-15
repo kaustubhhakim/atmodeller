@@ -16,39 +16,36 @@
 #
 """JAX-based model functions for atmospheric and chemical equilibrium calculations.
 
-This module defines the core set of **single-instance** model functions (e.g., thermodynamic
-property calculations, equation-of-state relations, reaction masks) that operate on a single set of
-inputs, without any implicit batching.
+This module defines the core set of single-instance model functions (e.g., thermodynamic property
+calculations, equation-of-state relations, reaction masks) that operate on a single set of inputs,
+without any implicit batching.
 
 These functions form the building blocks for solving the coupled system of equations governing the
 model (e.g., mass balance, fugacity constraints, phase stability), and are intended to be:
 
-    1. **Pure**: No side effects, deterministic outputs for given inputs.
-    2. **JAX-compatible**: Written with `jax.numpy` and compatible with transformations such as
+    1. Pure: No side effects, deterministic outputs for given inputs.
+    2. JAX-compatible: Written with `jax.numpy` and compatible with transformations such as
         `jit`, `grad`, and `vmap`.
-    3. **Shape-consistent**: Accept and return arrays with predictable shapes, enabling easy
+    3. Shape-consistent: Accept and return arrays with predictable shapes, enabling easy
         vectorization.
 
 In practice, these functions are rarely called directly in production code. Instead, they are
-wrapped with `eqx.filter_vmap` in :class:`VmappedFunctions` to enable efficient batched evaluation
-over multiple scenarios or parameter sets.
+wrapped with `eqx.filter_vmap` to enable efficient batched evaluation over multiple scenarios or
+parameter sets.
 """
 
 from collections.abc import Callable
-from typing import cast
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
-from jax import lax, random
+from jax import lax
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, Shaped
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
     Parameters,
     Planet,
-    SolverParameters,
     SpeciesCollection,
 )
 from atmodeller.utilities import (
@@ -59,7 +56,7 @@ from atmodeller.utilities import (
 )
 
 
-def get_active_mask(parameters: Parameters) -> Array:
+def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """Gets the mask of active residual quantities.
 
     Args:
@@ -708,219 +705,3 @@ def objective_function(
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual
-
-
-# TODO: Moved to engine_vmap. Can be removed in the future.
-# Since this is the core driver function for the solve it remains useful for debugging to see how
-# many times recompilation is triggered
-# @eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=1)
-# def solve(
-#     solution_array: Float[Array, " solution"],
-#     parameters: Parameters,
-#     solver_parameters: SolverParameters,
-#     options: dict[str, Any],
-# ) -> tuple[Float[Array, " solution"], Bool[Array, ""], Integer[Array, ""]]:
-#     """Solves the system of non-linear equations
-
-#     Args:
-#         solution_array: Solution array
-#         parameters: Parameters
-#         solver_parameters: Solver parameters
-#         options: Options for root find
-
-#     Returns:
-#         The solution array, the status of the solver, number of steps
-#     """
-#     sol: optx.Solution = optx.root_find(
-#         objective_function,
-#         solver_parameters.get_solver_instance(),
-#         solution_array,
-#         args=parameters,
-#         throw=solver_parameters.throw,
-#         max_steps=solver_parameters.max_steps,
-#         options=options,
-#     )
-
-#     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-#     solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
-
-#     # TODO: sol.results contains more information about the solution process, but it's wrapped up
-#     # in an enum-like object
-#     solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
-
-#     return sol.value, solver_status, solver_steps
-
-
-@eqx.filter_jit
-# Useful for optimising how many times JAX compiles the solve function
-# @eqx.debug.assert_max_traces(max_traces=1)
-def repeat_solver(
-    solver_vmap_fn: Callable,
-    tau: Float[Array, "..."],
-    solution: Float[Array, "batch solution"],
-    parameters: Parameters,
-    solver_parameters: SolverParameters,
-    key: PRNGKeyArray,
-) -> tuple[
-    Float[Array, "batch solution"],
-    Bool[Array, " batch"],
-    Integer[Array, " batch"],
-    Integer[Array, " batch"],
-]:
-    """Repeat solver that perturbs the initial solution for cases that fail and tries again
-
-    Args:
-        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        tau: Tau parameter for species' stability
-        solution: Solution
-        parameters: Parameters
-        solver_paramters: Solver parameters
-        key: Random key
-
-    Returns:
-        A tuple with the state: (solution, solver_status, solver_steps, solver_attempts)
-    """
-
-    def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
-        """Perform one iteration of the solver retry loop
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                key: PRNG key for random number generation
-                solution: Current solution array
-                status: Boolean array indicating successful solutions
-                steps: Step count
-                success_attempt: Integer array recording iteration of success for each entry
-
-        Returns:
-            Updated state tuple
-        """
-        i, key, solution, status, steps, success_attempt = state
-
-        failed_mask: Bool[Array, " batch"] = ~status
-        key, subkey = random.split(key)
-
-        # Perturb the (initial) solution for cases that failed. Something more sophisticated could
-        # be implemented, such as a regressor or neural network to inform failed cases based on
-        # successful solves.
-        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
-        raw_perturb: Float[Array, "batch solution"] = random.uniform(
-            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
-        )
-        perturbations: Float[Array, "batch solution"] = jnp.where(
-            failed_mask[:, None],
-            solver_parameters.multistart_perturbation * raw_perturb,
-            jnp.zeros_like(solution),
-        )
-        new_initial_solution: Float[Array, "batch solution"] = solution + perturbations
-        # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
-
-        new_solution, new_status, new_steps = solver_vmap_fn(
-            new_initial_solution, tau, parameters, solver_parameters
-        )
-
-        # Determine which entries to update: previously failed, now succeeded
-        update_mask: Bool[Array, " batch"] = failed_mask & new_status
-        updated_i: Integer[Array, "..."] = i + 1
-        updated_solution: Float[Array, "batch solution"] = cast(
-            Array, jnp.where(update_mask[:, None], new_solution, solution)
-        )
-        updated_status: Bool[Array, " batch"] = status | new_status
-        updated_steps: Integer[Array, " batch"] = cast(
-            Array, jnp.where(update_mask, new_steps, steps)
-        )
-        updated_success_attempt: Array = jnp.where(update_mask, updated_i, success_attempt)
-
-        return (
-            updated_i,
-            key,
-            updated_solution,
-            updated_status,
-            updated_steps,
-            updated_success_attempt,
-        )
-
-    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, "..."]:
-        """Check if the solver should continue retrying
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                _: Unused (PRNG key)
-                _: Unused (solution)
-                status: Boolean array indicating success of each solution
-                _: Unused (steps)
-                _: Unused (success_attempt)
-
-        Returns:
-            A boolean array indicating whether retries should continue (True if any solution
-            failed and attempts are still available)
-        """
-        i, _, _, status, _, _ = state
-
-        return jnp.logical_and(i < solver_parameters.multistart, jnp.any(~status))
-
-    # Try first solution
-    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
-        solution, tau, parameters, solver_parameters
-    )
-    # Failback solution
-    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
-
-    initial_state: tuple[Array, ...] = (
-        jnp.array(1),  # First attempt of the repeat_solver
-        key,
-        solution,
-        first_solver_status,
-        first_solver_steps,
-        first_solver_status.astype(int),  # 1 for solved, otherwise 0
-    )
-
-    _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
-        cond_fn, body_fn, initial_state
-    )
-
-    return final_solution, final_status, final_steps, final_success_attempt
-
-
-def make_solve_tau_step(
-    solver_vmap_fn: Callable,
-    parameters: Parameters,
-    solver_parameters: SolverParameters,
-) -> Callable:
-    """Wraps the repeat solver to call it for different tau values
-
-    Args:
-        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        parameters: Parameters
-        solver_parameters: Solver parameters
-
-    Returns:
-        Wrapped solver for a single tau value
-    """
-
-    @eqx.filter_jit
-    # @eqx.debug.assert_max_traces(max_traces=1)
-    def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
-        (key, solution) = carry
-        key, subkey = jax.random.split(key)
-
-        new_solution, new_status, new_steps, success_attempt = repeat_solver(
-            solver_vmap_fn,
-            tau,
-            solution,
-            parameters,
-            solver_parameters,
-            subkey,
-        )
-
-        new_carry: tuple[PRNGKeyArray, Float[Array, "batch solution"]] = (key, new_solution)
-
-        # Output current solution etc for this tau step
-        out: tuple[Array, ...] = (new_solution, new_status, new_steps, success_attempt)
-
-        return new_carry, out
-
-    return solve_tau_step

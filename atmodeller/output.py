@@ -827,7 +827,7 @@ class OutputSolution(Output):
     def __init__(
         self,
         species: SpeciesCollection,
-        solution: Float[Array, " batch solution"],
+        solution: Float[Array, "batch solution"],
         parameters: Parameters,
         solver_status: Bool[Array, "..."],
         solver_steps: Integer[Array, "..."],
