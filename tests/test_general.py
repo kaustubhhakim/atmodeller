@@ -31,7 +31,7 @@ logger.setLevel(logging.WARNING)
 def test_scalar_no_tuple() -> None:
     """Tests scalar"""
     test_value: int = 1
-    out = to_native_floats(test_value, force_tuple=False)
+    out = to_native_floats(test_value)
     target_value: float = float(test_value)
 
     assert out == target_value
@@ -39,9 +39,9 @@ def test_scalar_no_tuple() -> None:
 
 def test_scalar() -> None:
     """Tests scalar that returns a single tuple"""
-    test_value: int = 1
+    test_value: tuple[int] = (1,)
     out = to_native_floats(test_value)
-    target_value: tuple[float] = (float(test_value),)
+    target_value: tuple[float] = (1.0,)
 
     assert out == target_value
 

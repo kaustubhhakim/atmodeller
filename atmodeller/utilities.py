@@ -144,36 +144,35 @@ def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
     return jnp.asarray(x, dtype=jnp.float64)
 
 
-def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
+def to_native_floats(value: Any) -> Any:
     """Recursively converts any structure to nested tuples of native floats.
 
     Args:
         value: A scalar, list/tuple/array of floats, or nested thereof.
-        force_tuple: If True, scalars are returned as (float,). Defaults to True.
 
     Returns:
         A float or nested tuple of floats.
     """
-    try:
-        if isinstance(value, pd.Series) and len(value) == 1:
-            val = float(value.iloc[0])
-        else:
-            val = float(value)  # type: ignore
+    # Scalars (covers Python, NumPy, JAX scalars)
+    if jnp.isscalar(value):
+        return float(value)
 
-        return (val,) if force_tuple else val
-    except (TypeError, ValueError):
-        pass
-
-    # Special case for DataFrame: convert to list of rows
+    # Pandas DataFrame: convert to list of rows (as tuples)
     if isinstance(value, pd.DataFrame):
         iterable: Iterable = value.itertuples(index=False, name=None)
-    else:
-        try:
-            iterable = list(value)
-        except Exception:
-            raise TypeError(f"Cannot convert to float or iterate over type {type(value)}")
+        return tuple(to_native_floats(row) for row in iterable)
 
-    return tuple(to_native_floats(item, force_tuple=False) for item in iterable)
+    # Array-like (NumPy, JAX)
+    if hasattr(value, "ndim"):
+        return tuple(to_native_floats(sub) for sub in value.tolist())
+
+    # Generic iterables (lists, tuples, etc.)
+    try:
+        iterable = list(value)
+    except Exception:
+        raise TypeError(f"Cannot convert to float or iterate over type {type(value)}")
+
+    return tuple(to_native_floats(item) for item in iterable)
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
