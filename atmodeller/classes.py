@@ -18,7 +18,7 @@
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import Any, Optional, cast
+from typing import Optional, cast
 
 import jax
 import jax.numpy as jnp
@@ -74,15 +74,14 @@ class InteriorAtmosphere:
         This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
         relative to equilibrium, based on the current state of the system. A value of zero
         indicates a reaction at equilibrium, while positive or negative values indicate departures
-        from equilibrium in terms of energetic favorability.
+        from equilibrium in terms of energetic favourability.
 
         Args:
             planet: Planet
             log_number_density: Log number density
         """
         parameters: Parameters = Parameters.create(self.species, planet)
-
-        batch_size: int = get_batch_size((planet, None, None))
+        batch_size: int = get_batch_size(planet)
         solution_array: Array = broadcast_initial_solution(
             log_number_density, None, self.species.number_species, batch_size
         )
@@ -115,19 +114,6 @@ class InteriorAtmosphere:
         )
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
-
-        # TODO: Can we let tau be autobroadcasted when required?
-        # Always broadcast tau because the repeat_solver is triggered if some cases fail
-        # Only kept to avoid type errors at present with repeat_solver
-        broadcasted_tau: Float[Array, " batch"] = jnp.full((batch_size,), TAU)
-        # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
-
-        options: dict[str, Any] = {
-            "lower": self.species.get_lower_bound(),
-            "upper": self.species.get_upper_bound(),
-            "jac": parameters.solver_parameters.jac,
-        }
-
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
@@ -136,9 +122,9 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
-        self._solver = get_solver_individual(parameters, options)
+        self._solver = get_solver_individual(parameters)
         # Another option to solve the batch with a single root find
-        # self._solver = get_solver_batch(parameters, options)
+        # self._solver = get_solver_batch(parameters)
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
@@ -281,12 +267,7 @@ class InteriorAtmosphere:
         logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
 
         self._output = OutputSolution(
-            self.species,
-            solution,
-            parameters,
-            solver_status,
-            solver_steps,
-            solver_attempts,
+            self.species, solution, parameters, solver_status, solver_steps, solver_attempts
         )
 
 

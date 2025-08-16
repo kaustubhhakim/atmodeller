@@ -895,7 +895,7 @@ class OutputSolution(Output):
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
         # Convenient to highlight rows where the solver failed to find a solution for follow-up
-        # analysis. Define a fill color for highlighting rows (e.g., yellow)
+        # analysis. Define a fill colour for highlighting rows (e.g., yellow)
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False

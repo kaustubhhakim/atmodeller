@@ -19,7 +19,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -246,43 +246,6 @@ class SpeciesCollection(eqx.Module):
         # all the solubility laws chosen by the user are checked to see if they depend on fO2. And
         # if so, and fO2 is not included in the model, an error is raised.
         return 0
-
-    def get_lower_bound(self) -> Float[Array, " dim"]:
-        """Gets the lower bound for truncating the solution during the solve
-
-        Returns:
-            Lower bound for truncating the solution during the solve
-        """
-        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
-
-    def get_upper_bound(self) -> Float[Array, " dim"]:
-        """Gets the upper bound for truncating the solution during the solve
-
-        Returns:
-            Upper bound for truncating the solution during the solve
-        """
-        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
-
-    def _get_hypercube_bound(
-        self, log_number_density_bound: float, stability_bound: float
-    ) -> Float[Array, " dim"]:
-        """Gets the bound on the hypercube
-
-        Args:
-            log_number_density_bound: Bound on the log number density
-            stability_bound: Bound on the stability
-
-        Returns:
-            Bound on the hypercube which contains the root
-        """
-        bound: Array = jnp.concatenate(
-            (
-                log_number_density_bound * jnp.ones(self.number_species),
-                stability_bound * jnp.ones(self.number_species),
-            )
-        )
-
-        return bound
 
     def __getitem__(self, index: int) -> Species:
         return self.data[index]
@@ -691,7 +654,7 @@ class SolverParameters(eqx.Module):
     """Norm""" ""
     throw: bool = False
     """How to report any failures"""
-    max_steps: int = 512
+    max_steps: int = 256
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
@@ -711,6 +674,71 @@ class SolverParameters(eqx.Module):
             # For debugging LM solver. Not valid for all solvers (e.g. Newton)
             # verbose=frozenset({"step_size", "y", "loss", "accepted"}),
         )
+
+    def get_options(self, number_species: int) -> dict[str, Any]:
+        """Gets the solver options.
+
+        Args:
+            number_species: Number of species
+
+        Returns:
+            Solver options
+        """
+        options: dict[str, Any] = {
+            "lower": self._get_lower_bound(number_species),
+            "upper": self._get_upper_bound(number_species),
+            "jac": self.jac,
+        }
+
+        return options
+
+    def _get_lower_bound(self, number_species: int) -> Float[Array, " dim"]:
+        """Gets the lower bound for truncating the solution during the solve.
+
+        Args:
+            number_species: Number of species
+
+        Returns:
+            Lower bound for truncating the solution during the solve
+        """
+        return self._get_hypercube_bound(
+            number_species, LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER
+        )
+
+    def _get_upper_bound(self, number_species: int) -> Float[Array, " dim"]:
+        """Gets the upper bound for truncating the solution during the solve.
+
+        Args:
+            number_species: Number of species
+
+        Returns:
+            Upper bound for truncating the solution during the solve
+        """
+        return self._get_hypercube_bound(
+            number_species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
+        )
+
+    def _get_hypercube_bound(
+        self, number_species: int, log_number_density_bound: float, stability_bound: float
+    ) -> Float[Array, " dim"]:
+        """Gets the bound on the hypercube.
+
+        Args:
+            number_species: Number of species
+            log_number_density_bound: Bound on the log number density
+            stability_bound: Bound on the stability
+
+        Returns:
+            Bound on the hypercube that contains the root
+        """
+        bound: Array = jnp.concatenate(
+            (
+                log_number_density_bound * jnp.ones(number_species),
+                stability_bound * jnp.ones(number_species),
+            )
+        )
+
+        return bound
 
 
 class Parameters(eqx.Module):
@@ -772,9 +800,19 @@ class Parameters(eqx.Module):
             species, fugacity_constraints
         )
         mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
+
+        batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
+        # Always broadcast tau so we can apply vmap to the solver once, even if some calculations
+        # need to be repeated due to failures.
+        tau_broadcasted: Float[Array, " batch"] = jnp.broadcast_to(
+            solver_parameters_.tau, (batch_size,)
+        )
+        get_leaf: Callable = lambda t: t.tau  # noqa: E731
+        solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
+
         formula_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
             cls.get_formula_matrix(species)
         )

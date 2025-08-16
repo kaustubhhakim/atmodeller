@@ -17,7 +17,7 @@
 """Solvers"""
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 
 import equinox as eqx
 import jax
@@ -36,10 +36,7 @@ LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_single(
-    solution: Float[Array, "..."],
-    parameters: Parameters,
-    objective_function: Callable,
-    options: dict[str, Any],
+    solution: Float[Array, "..."], parameters: Parameters, objective_function: Callable
 ) -> tuple[Float[Array, "..."], Bool[Array, ""], Integer[Array, ""]]:
     """Solves a single system of non-linear equations.
 
@@ -47,7 +44,6 @@ def solver_single(
         solution: Initial guess for the solution array
         parameters: Model parameters required by the objective function and solver
         objective_function: Callable returning residuals for the system
-        options: Additional options to pass to the solver
 
     Returns:
         - solver_value: Array of computed solution values
@@ -61,7 +57,7 @@ def solver_single(
         args=parameters,
         throw=parameters.solver_parameters.throw,
         max_steps=parameters.solver_parameters.max_steps,
-        options=options,
+        options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
 
     solver_value: Float[Array, "..."] = sol.value
@@ -75,7 +71,7 @@ def solver_single(
     return solver_value, solver_status, solver_steps
 
 
-def get_solver_individual(parameters: Parameters, options: dict[str, Any]) -> Callable:
+def get_solver_individual(parameters: Parameters) -> Callable:
     """Gets a vmapped, JIT-compiled solver for independent batch systems.
 
     Wraps `solver_single` with `equinox.filter_vmap` and `filter_jit` so that it can solve multiple
@@ -84,16 +80,13 @@ def get_solver_individual(parameters: Parameters, options: dict[str, Any]) -> Ca
 
     Args:
         parameters: Model parameters used for all systems in the batch.
-        options: Additional solver options to pass to each call of `solver_single`.
 
     Returns:
         Callable that takes:
             - solution: Array of initial guesses for each batch element
             - parameters: Model parameters
     """
-    solver_fn: Callable = eqx.Partial(
-        solver_single, objective_function=objective_function, options=options
-    )
+    solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_function)
 
     return eqx.filter_jit(
         eqx.filter_vmap(
@@ -102,7 +95,7 @@ def get_solver_individual(parameters: Parameters, options: dict[str, Any]) -> Ca
     )
 
 
-def get_solver_batch(parameters: Parameters, options: dict[str, Any]) -> Callable:
+def get_solver_batch(parameters: Parameters) -> Callable:
     """Gets a JIT-compiled solver for batched systems treated as a single problem.
 
     In this mode, the objective function is already vmapped across the batch dimension, so
@@ -111,7 +104,6 @@ def get_solver_batch(parameters: Parameters, options: dict[str, Any]) -> Callabl
 
     Args:
         parameters: Model parameters used for the batch
-        options: Additional options to pass to `solver_single`
 
     Returns:
         Callable that takes:
@@ -123,9 +115,7 @@ def get_solver_batch(parameters: Parameters, options: dict[str, Any]) -> Callabl
         in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters)),
     )
 
-    solver_fn: Callable = eqx.Partial(
-        solver_single, objective_function=objective_vmap, options=options
-    )
+    solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_vmap)
 
     @eqx.filter_jit
     def solver(
