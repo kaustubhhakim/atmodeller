@@ -30,7 +30,7 @@ from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
-from atmodeller._mytypes import NpArray, NpFloat, Scalar
+from atmodeller._mytypes import NpArray, NpFloat, NpInt, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -184,38 +184,53 @@ def partial_rref(matrix: NpArray) -> NpArray:
     nrows, ncols = matrix.shape
 
     augmented_matrix: NpArray = np.hstack((matrix, np.eye(nrows)))
-    # debug("augmented_matrix = \n%s", augmented_matrix)
+    logger.debug("augmented_matrix = \n%s", augmented_matrix)
     # Permutation matrix
     # P: NpArray = np.eye(nrows)
 
     # Forward elimination with partial pivoting
-    for i in range(ncols):
-        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
-        if augmented_matrix[i, i] == 0:
-            nonzero_row: np.int64 = np.nonzero(augmented_matrix[i:, i])[0][0] + i
-            augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
+    for i in range(min(nrows, ncols)):
+        # Pivot selection with check
+        nonzero: NpInt = np.flatnonzero(augmented_matrix[i:, i])
+        logger.debug("nonzero = %s", nonzero)
+        if nonzero.size == 0:
+            logger.debug("i: %d. No pivot in this column.", i)
+            continue  # no pivot in this column
+        # Absolute row index of first non-zero index
+        pivot_row: np.int_ = nonzero[0] + i
+        # Swap if pivot row is not already in place
+        if pivot_row != i:
+            augmented_matrix[[i, pivot_row], :] = augmented_matrix[[pivot_row, i], :]
             # P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
+
         # Perform row operations to eliminate values below the pivot.
-        for j in range(i + 1, nrows):
-            ratio: np.float64 = augmented_matrix[j, i] / augmented_matrix[i, i]
-            augmented_matrix[j] -= ratio * augmented_matrix[i]
-    # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
+        pivot_value: np.float64 = augmented_matrix[i, i]
+        if i + 1 < nrows:
+            factors = augmented_matrix[i + 1 :, i : i + 1] / pivot_value  # shape (nrows-i-1, 1)
+            augmented_matrix[i + 1 :] -= factors * augmented_matrix[i]
+
+    logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
     # Backward substitution
-    for i in range(ncols - 1, -1, -1):
+    for i in range(min(nrows, ncols) - 1, -1, -1):
+        pivot_value = augmented_matrix[i, i]
+        if pivot_value == 0:
+            logger.debug("i: %d. Pivot is zero, skipping backward elimination.", i)
+            continue  # skip columns with no pivot
         # Normalize the pivot row.
         augmented_matrix[i] /= augmented_matrix[i, i]
-        # Eliminate values above the pivot.
-        for j in range(i - 1, -1, -1):
-            if augmented_matrix[j, i] != 0:
-                ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-                augmented_matrix[j] -= ratio * augmented_matrix[i]
-    # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
+
+        # Eliminate entries above the pivot
+        if i > 0:
+            factors = augmented_matrix[:i, i : i + 1] / pivot_value  # shape (i, 1)
+            augmented_matrix[:i] -= factors * augmented_matrix[i]
+
+    logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
     # reduced_matrix: NpArray = augmented_matrix[:, :ncols]
-    component_matrix: NpArray = augmented_matrix[ncols:, ncols:]
+    component_matrix: NpArray = augmented_matrix[min(ncols, nrows) :, ncols:]
     # logger.debug("reduced_matrix = \n%s", reduced_matrix)
-    # logger.debug("component_matrix = \n%s", component_matrix)
+    logger.debug("component_matrix = \n%s", component_matrix)
     # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix

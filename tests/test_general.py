@@ -20,12 +20,14 @@ import logging
 
 import numpy as np
 import pandas as pd
+from numpy.testing import assert_array_equal
 
 from atmodeller import debug_logger
-from atmodeller.utilities import to_native_floats
+from atmodeller._mytypes import NpFloat
+from atmodeller.utilities import partial_rref, to_native_floats
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 
 def test_scalar_no_tuple() -> None:
@@ -116,3 +118,36 @@ def test_pandas_dataframe() -> None:
     target_value: tuple[tuple[float, ...], ...] = ((0.0, 1.0, 2.0), (3.0, 4.0, 5.0))
 
     assert out == target_value
+
+
+def test_partial_rref() -> None:
+    """Tests Gaussian elimination for a system with one reaction"""
+    # E.g., H, O in rows, H2O, H2, O2 in columns
+    test_value: NpFloat = np.array([[2, 2, 0], [1, 0, 2]])
+    logger.debug("test_value = %s", test_value)
+    out = partial_rref(test_value.T)
+    target_value: NpFloat = np.array([[-2, 2, 1]])
+
+    assert_array_equal(out, target_value)
+
+
+def test_partial_rref_pivot() -> None:
+    """Tests Gaussian elimination for a system with one reaction"""
+    # E.g., H, O in rows, H2O, H2, O2 in columns
+    test_value: NpFloat = np.array([[0, 2, 2], [2, 1, 0]])
+    logger.debug("test_value = %s", test_value)
+    out = partial_rref(test_value.T)
+    target_value: NpFloat = np.array([[0.5, -1, 1]])
+
+    assert_array_equal(out, target_value)
+
+
+def test_partial_rref_no_reactions() -> None:
+    """Tests Gaussian elimination for a system with no reactions"""
+    # E.g., H, O in rows, H2O, O2 in columns
+    test_value: NpFloat = np.array([[2, 0], [1, 2]])
+    logger.debug("test_value = %s", test_value)
+    out = partial_rref(test_value.T)
+    target_shape: tuple[int, int] = (0, 2)
+
+    assert out.shape == target_shape
