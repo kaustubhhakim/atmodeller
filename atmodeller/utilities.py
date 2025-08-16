@@ -122,7 +122,11 @@ def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
         A float or nested tuple of floats.
     """
     try:
-        val = float(value)
+        if isinstance(value, pd.Series) and len(value) == 1:
+            val = float(value.iloc[0])
+        else:
+            val = float(value)
+
         return (val,) if force_tuple else val
     except (TypeError, ValueError):
         pass
