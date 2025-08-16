@@ -867,14 +867,19 @@ class Parameters(eqx.Module):
         Returns:
             A matrix of linearly independent reactions or an empty array if no reactions
         """
-        if species.number_species == 1:
-            logger.debug("Only one species therefore no reactions")
-            return np.array([], dtype=np.float64)
-
         transpose_formula_matrix: NpInt = cls.get_formula_matrix(species).T
         reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
+        # logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
+
+    def get_reaction_matrix_array(self) -> Array:
+        """Gets the reaction matrix as an array
+
+        Return:
+            Reaction matrix as a 2-D array
+        """
+        return jnp.asarray(self.reaction_matrix).reshape(-1, self.species.number_species)
 
     def active_reactions(self) -> Bool[Array, " reactions"]:
         """Active reactions

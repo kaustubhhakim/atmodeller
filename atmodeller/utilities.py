@@ -97,6 +97,11 @@ def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
 
 
+def is_jax_array(element: Any) -> bool:
+    """Returns `True` if `element` is a JAX array."""
+    return isinstance(element, jax.Array)
+
+
 def to_hashable(x: Any) -> Callable:
     """Wraps a callable in `equinox.Partial` to make it hashable for JAX transformations.
 
@@ -369,7 +374,7 @@ def is_arraylike_batched(x: Any) -> Literal[0, None]:
     Returns:
         0 (axis) if batched, else None (not batched)
     """
-    if eqx.is_array(x):
+    if is_jax_array(x):
         # Vectorise over any 1-D array
         if x.ndim == 1:
             return 0
@@ -421,11 +426,11 @@ def pytree_debug(pytree: Any, name: str) -> None:
         pytree: Pytree to print
         name: Name for the debug print
     """
-    arrays, static = eqx.partition(pytree, eqx.is_array)
+    arrays, static = eqx.partition(pytree, is_jax_array)
     arrays_tree = tree_map(
         lambda x: (
             type(x),
-            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
+            "True" if is_jax_array(x) else ("False" if x is not None else "None"),
         ),
         arrays,
     )
@@ -434,7 +439,7 @@ def pytree_debug(pytree: Any, name: str) -> None:
     static_tree = tree_map(
         lambda x: (
             type(x),
-            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
+            "True" if is_jax_array(x) else ("False" if x is not None else "None"),
         ),
         static,
     )

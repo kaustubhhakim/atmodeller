@@ -286,7 +286,7 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
     gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.planet.temperature)
     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-    reaction_matrix: Float[Array, "reactions species"] = jnp.array(parameters.reaction_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
     return jnp.ravel(log_Kp)
@@ -322,7 +322,7 @@ def get_log_reaction_equilibrium_constant(parameters: Parameters) -> Float[Array
     Returns:
         Log equilibrium constant of each reaction, hidden unit base of molecules/m^3
     """
-    reaction_matrix: Float[Array, "reactions species"] = jnp.array(parameters.reaction_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
     log_Kp: Float[Array, " reactions"] = get_log_Kp(parameters)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Float[Array, " reactions"] = jnp.sum(
@@ -558,14 +558,6 @@ def objective_function(
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
-    # Here would be where fugacity constraints could be imposed as hard constraints. Although this
-    # would reduce the degrees of freedom, previous preliminary testing identified two challenges:
-    #   1. The solver performance appears to degrade rather than improve. This could be because
-    #       soft constraints are better behaved with gradient-based solution approaches(?)
-    #   2. Imposing fugacity/activity would require back-computing pressure/number density, which
-    #       would involve solving non-linear real gas EOS, potentially increasing the solve
-    #       complexity and time.
-
     # Fugacity constraints residual (dimensionless, log-ratio of number densities)
     fugacity_residual = (
         log_activity_number_density
@@ -584,45 +576,35 @@ def objective_function(
     # )
 
     # Reaction network residual
-    # TODO: Is it possible to remove this if statement?
-    if jnp.asarray(parameters.reaction_matrix).size > 0:
-        log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-            parameters
-        )
-        # jax.debug.print(
-        #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
-        # )
-        reaction_residual: Array = (
-            jnp.asarray(parameters.reaction_matrix).dot(log_activity_number_density)
-            - log_reaction_equilibrium_constant
-        )
-        # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
-        reaction_stability_mask: Array = jnp.broadcast_to(
-            parameters.active_stability(), jnp.asarray(parameters.reaction_matrix).shape
-        )
-        reaction_stability_matrix: Array = (
-            jnp.asarray(parameters.reaction_matrix) * reaction_stability_mask
-        )
-        # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
 
-        # Dimensionless (log K residual)
-        reaction_residual = reaction_residual - reaction_stability_matrix.dot(
-            safe_exp(log_stability)
-        )
-        # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
-        # jax.debug.print(
-        #     "reaction_residual min/max: {out}/{out2}",
-        #     out=jnp.nanmin(reaction_residual),
-        #     out2=jnp.nanmax(reaction_residual),
-        # )
-        # jax.debug.print(
-        #     "reaction_residual mean/std: {out}/{out2}",
-        #     out=jnp.nanmean(reaction_residual),
-        #     out2=jnp.nanstd(reaction_residual),
-        # )
+    log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(parameters)
+    # jax.debug.print(
+    #     "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant.shape
+    # )
+    reaction_residual: Array = (
+        reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
+    )
+    # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
+    reaction_stability_mask: Array = jnp.broadcast_to(
+        parameters.active_stability(), reaction_matrix.shape
+    )
+    reaction_stability_matrix: Array = reaction_matrix * reaction_stability_mask
+    # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)
 
-    else:
-        reaction_residual = jnp.atleast_1d(jnp.array([]))
+    # Dimensionless (log K residual)
+    reaction_residual = reaction_residual - reaction_stability_matrix.dot(safe_exp(log_stability))
+    # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual.shape)
+    # jax.debug.print(
+    #     "reaction_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(reaction_residual),
+    #     out2=jnp.nanmax(reaction_residual),
+    # )
+    # jax.debug.print(
+    #     "reaction_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(reaction_residual),
+    #     out2=jnp.nanstd(reaction_residual),
+    # )
 
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
