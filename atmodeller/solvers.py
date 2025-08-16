@@ -33,8 +33,6 @@ from atmodeller.utilities import vmap_axes_spec
 LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
 
 
-# Since this is the core driver function for the solver it remains useful for debugging to see how
-# many times recompilation is triggered
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_single(
@@ -145,14 +143,10 @@ def get_solver_batch(parameters: Parameters, options: dict[str, Any]) -> Callabl
     return solver
 
 
-# TODO: Below need refreshing
-
-
 @eqx.filter_jit
-# Useful for optimising how many times JAX compiles the solve function
 # @eqx.debug.assert_max_traces(max_traces=1)
 def repeat_solver(
-    solver_vmap_fn: Callable,
+    solver_fn: Callable,
     solution: Float[Array, "batch solution"],
     parameters: Parameters,
     key: PRNGKeyArray,
@@ -162,13 +156,21 @@ def repeat_solver(
     Integer[Array, " batch"],
     Integer[Array, " batch"],
 ]:
-    """Repeat solver that perturbs the initial solution for cases that fail and tries again
+    """Repeatable multistart solver with perturbations for failed entries.
+
+    This function attempts to solve a system of equations for a batch of initial solutions. If
+    some entries fail to converge, it perturbs only the failing solutions and retries, up to a
+    maximum number of attempts specified in `parameters.solver_parameters.multistart`.
+
+    The perturbation is applied proportionally to
+    `parameters.solver_parameters.multistart_perturbation`. Successful solutions are kept as-is,
+    and the function tracks the iteration when each entry first succeeded.
 
     Args:
-        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        solution: Solution
+        solver_fn: Solver function
+        solution: Initial batch of solutions to be solved
         parameters: Parameters
-        key: Random key
+        key: A JAX random key for generating perturbations
 
     Returns:
         A tuple with the state: (solution, solver_status, solver_steps, solver_attempts)
@@ -210,7 +212,7 @@ def repeat_solver(
         new_initial_solution: Float[Array, "batch solution"] = solution + perturbations
         # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
-        new_solution, new_status, new_steps = solver_vmap_fn(new_initial_solution, parameters)
+        new_solution, new_status, new_steps = solver_fn(new_initial_solution, parameters)
 
         # Determine which entries to update: previously failed, now succeeded
         update_mask: Bool[Array, " batch"] = failed_mask & new_status
@@ -257,7 +259,7 @@ def repeat_solver(
         return jnp.logical_and(i < parameters.solver_parameters.multistart, jnp.any(~status))
 
     # Try first solution
-    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(solution, parameters)
+    first_solution, first_solver_status, first_solver_steps = solver_fn(solution, parameters)
     # jax.debug.print("first_solution = {out}", out=first_solution)
     # jax.debug.print("first_solver_status = {out}", out=first_solver_status)
     # jax.debug.print("first_solver_steps = {out}", out=first_solver_steps)
@@ -282,40 +284,53 @@ def repeat_solver(
     return final_solution, final_status, final_steps, final_success_attempt
 
 
-def make_solve_tau_step(
-    solver_vmap_fn: Callable,
-    parameters: Parameters,
-    solver_parameters: SolverParameters,
-) -> Callable:
-    """Wraps the repeat solver to call it for different tau values
+def make_solve_tau_step(solver_fn: Callable, parameters: Parameters) -> Callable:
+    """Factory function that creates a JIT-compiled solver step for a sequence of tau values.
+
+    This wraps a repeatable, vmapped solver function (`solver_vmap_fn`) to update the `tau`
+    parameter dynamically at each step. The returned function is suitable for use in `jax.lax.scan`
+    to efficiently sweep over multiple tau values in a single compiled loop.
 
     Args:
-        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        parameters: Parameters
-        solver_parameters: Solver parameters
+        solver_fn: Solver function
+        parameters: Template `Parameters` object containing the full solver configuration. The
+            `tau` leaf inside `solver_parameters` will be replaced at each step.
 
     Returns:
-        Wrapped solver for a single tau value
+        A JIT-compiled function
     """
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
     def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
+        """Perform a single solver step for a given batch of tau values.
+
+        This function is intended to be used inside `jax.lax.scan` to iterate over multiple tau
+        values efficiently. It updates the `tau` leaf in the parameters, calls the `repeat_solver`
+        for the current batch, and returns the updated carry and results.
+
+        Args:
+            carry: Tuple of carry values
+            tau: Array of tau values for the current step in the scan.
+
+        Returns:
+            new carry tuple, output tuple
+        """
         (key, solution) = carry
         key, subkey = jax.random.split(key)
 
+        # Get new parameters with tau value
+        get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
+        new_parameters: Parameters = eqx.tree_at(get_leaf, parameters, tau)
+        jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
+
         new_solution, new_status, new_steps, success_attempt = repeat_solver(
-            solver_vmap_fn,
-            tau,
-            solution,
-            parameters,
-            solver_parameters,
-            subkey,
+            solver_fn, solution, new_parameters, subkey
         )
 
         new_carry: tuple[PRNGKeyArray, Float[Array, "batch solution"]] = (key, new_solution)
 
-        # Output current solution etc for this tau step
+        # Output current solution for this tau step
         out: tuple[Array, ...] = (new_solution, new_status, new_steps, success_attempt)
 
         return new_carry, out
