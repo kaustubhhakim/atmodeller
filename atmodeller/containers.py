@@ -167,6 +167,8 @@ class SpeciesCollection(eqx.Module):
     """Molar masses"""
     unique_elements: tuple[str, ...]
     """Unique elements in species in alphabetical order"""
+    number_reactions: int
+    """Number of reactions"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
@@ -187,6 +189,8 @@ class SpeciesCollection(eqx.Module):
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         self.unique_elements = tuple(sorted(unique_elements))
+
+        self.number_reactions = max(0, self.number_species - len(self.unique_elements))
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -767,7 +771,7 @@ class Parameters(eqx.Module):
     """Solver parameters"""
     formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
-    reaction_matrix: tuple[tuple[float, ...], ...]
+    reaction_matrix: NpFloat
     """Reaction matrix"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
@@ -816,9 +820,8 @@ class Parameters(eqx.Module):
         formula_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
             cls.get_formula_matrix(species)
         )
-        reaction_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
-            cls.get_reaction_matrix(species)
-        )
+        reaction_matrix: NpFloat = cls.get_reaction_matrix(species)
+
         diatomic_oxygen_index: int = species.get_diatomic_oxygen_index()
 
         return cls(
@@ -873,21 +876,13 @@ class Parameters(eqx.Module):
 
         return reaction_matrix
 
-    def get_reaction_matrix_array(self) -> Array:
-        """Gets the reaction matrix as an array
-
-        Return:
-            Reaction matrix as a 2-D array
-        """
-        return jnp.asarray(self.reaction_matrix).reshape(-1, self.species.number_species)
-
     def active_reactions(self) -> Bool[Array, " reactions"]:
         """Active reactions
 
         Returns:
             `True` for all reactions
         """
-        return jnp.ones(len(self.reaction_matrix), dtype=bool)
+        return jnp.ones(self.species.number_reactions, dtype=bool)
 
     def active_stability(self) -> Bool[Array, " species"]:
         """Active species stability

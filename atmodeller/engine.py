@@ -286,7 +286,7 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
     gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.planet.temperature)
     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
     return jnp.ravel(log_Kp)
@@ -322,7 +322,7 @@ def get_log_reaction_equilibrium_constant(parameters: Parameters) -> Float[Array
     Returns:
         Log equilibrium constant of each reaction, hidden unit base of molecules/m^3
     """
-    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
     log_Kp: Float[Array, " reactions"] = get_log_Kp(parameters)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Float[Array, " reactions"] = jnp.sum(
@@ -576,7 +576,7 @@ def objective_function(
     # )
 
     # Reaction network residual
-    reaction_matrix: Float[Array, "reactions species"] = parameters.get_reaction_matrix_array()
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
 
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(parameters)
     # jax.debug.print(
