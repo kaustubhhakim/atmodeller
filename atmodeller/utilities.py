@@ -26,20 +26,93 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from jax.tree_util import Partial
-from jaxtyping import Array, ArrayLike, Bool, Float64
+from jaxtyping import Array, ArrayLike, Float64
 from scipy.constants import kilo, mega
 
-from atmodeller import max_exp_input
+from atmodeller import MAX_EXP_INPUT
 from atmodeller._mytypes import NpArray, NpInt, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+class ExperimentalCalibration(eqx.Module):
+    """Experimental calibration
+
+    Args:
+        temperature_min: Minimum calibrated temperature. Defaults to ``None``.
+        temperature_max: Maximum calibrated temperature. Defaults to ``None``.
+        pressure_min: Minimum calibrated pressure. Defaults to ``None``.
+        pressure_max: Maximum calibrated pressure. Defaults to ``None``.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to ``None``.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to ``None``.
+    """
+
+    temperature_min: Optional[float] = None
+    """Minimum calibrated temperature"""
+    temperature_max: Optional[float] = None
+    """Maximum calibrated temperature"""
+    pressure_min: Optional[float] = None
+    """Minimum calibrated pressure"""
+    pressure_max: Optional[float] = None
+    """Maximum calibrated pressure"""
+    log10_fO2_min: Optional[float] = None
+    """Minimum calibrated log10 fO2"""
+    log10_fO2_max: Optional[float] = None
+    """Maximum calibrated log10 fO2"""
+
+    def __init__(
+        self,
+        temperature_min: Optional[Scalar] = None,
+        temperature_max: Optional[Scalar] = None,
+        pressure_min: Optional[Scalar] = None,
+        pressure_max: Optional[Scalar] = None,
+        log10_fO2_min: Optional[Scalar] = None,
+        log10_fO2_max: Optional[Scalar] = None,
+    ):
+        if temperature_min is not None:
+            self.temperature_min = float(temperature_min)
+        if temperature_max is not None:
+            self.temperature_max = float(temperature_max)
+        if pressure_min is not None:
+            self.pressure_min = float(pressure_min)
+        if pressure_max is not None:
+            self.pressure_max = float(pressure_max)
+        if log10_fO2_min is not None:
+            self.log10_fO2_min = float(log10_fO2_min)
+        if log10_fO2_max is not None:
+            self.log10_fO2_max = float(log10_fO2_max)
+
+
+class UnitConversion(eqx.Module):
+    """Unit conversions"""
+
+    atmosphere_to_bar: float = ATMOSPHERE
+    bar_to_Pa: float = 1.0e5
+    bar_to_MPa: float = 1.0e-1
+    bar_to_GPa: float = 1.0e-4
+    Pa_to_bar: float = 1.0e-5
+    MPa_to_bar: float = 1.0e1
+    GPa_to_bar: float = 1.0e4
+    fraction_to_ppm: float = mega
+    g_to_kg: float = 1 / kilo
+    ppm_to_fraction: float = 1 / mega
+    ppm_to_percent: float = 100 / mega
+    percent_to_ppm: float = 1.0e4
+    cm3_to_m3: float = 1.0e-6
+    m3_to_cm3: float = 1.0e6
+    m3_bar_to_J: float = 1.0e5
+    J_to_m3_bar: float = 1.0e-5
+    litre_to_m3: float = 1.0e-3
+
+
+unit_conversion: UnitConversion = UnitConversion()
+
+
 def get_log_number_density_from_log_pressure(
     log_pressure: ArrayLike, temperature: ArrayLike
 ) -> Array:
-    """Gets log number density from log pressure
+    """Gets log number density from log pressure.
 
     Args:
         log_pressure: Log pressure
@@ -55,20 +128,28 @@ def get_log_number_density_from_log_pressure(
     return log_number_density
 
 
-def all_not_nan(x: ArrayLike) -> Bool[Array, "..."]:
-    """Returns True if all entries or columns are not nan, otherwise False"""
-    return ~jnp.any(jnp.isnan(jnp.atleast_1d(x)), axis=0)
-
-
 def safe_exp(x: ArrayLike) -> Array:
-    return jnp.exp(jnp.clip(x, max=max_exp_input))
+    """Computes the elementwise exponential of ``x`` with input clipping to prevent overflow.
+
+    This function clips the input ``x`` to a maximum value defined by
+    :const:`~atmodeller.MAX_EXP_INPUT` before applying :func:`jax.numpy.exp`, ensuring numerical
+    stability for large values.
+
+    Args:
+        x: Array-like input. Can be a scalar, 1-D, or multi-dimensional array
+
+    Returns:
+        Array of the same shape as ``x``, where each element is the exponential of the clipped
+        input
+    """
+    return jnp.exp(jnp.clip(x, max=MAX_EXP_INPUT))
 
 
 def to_hashable(x: Any) -> Callable:
-    """Wraps a callable in `equinox.Partial` to make it hashable for JAX transformations.
+    """Wraps a callable in :func:`equinox.Partial` to make it hashable for JAX transformations.
 
     This is useful when passing callables with fixed arguments to JAX transformations
-    (e.g., `jax.vmap`, `jax.grad`, `jax.jit`) that require all static arguments
+    (e.g., :func:`jax.vmap`, :func:`jax.grad`, :func:`jax.jit`) that require all static arguments
     (including function references) to be hashable.
 
     See discussion: https://github.com/patrick-kidger/equinox/issues/1011
@@ -77,7 +158,7 @@ def to_hashable(x: Any) -> Callable:
         x: A callable to wrap
 
     Returns:
-        An `equinox.Partial` object wrapping the input callable, making it hashable
+        An :func:`equinox.Partial` object wrapping the input callable, making it hashable
     """
     return Partial(x)
 
@@ -86,10 +167,10 @@ def is_hashable(something: Any) -> None:
     """Checks whether an object is hashable and print the result.
 
     Args:
-        something: Any Python object to test.
+        something: Any Python object to test
 
     Prints:
-        A message indicating whether the object is hashable.
+        A message indicating whether the object is hashable
     """
     try:
         hash(something)
@@ -115,10 +196,10 @@ def to_native_floats(value: Any) -> Any:
     """Recursively converts any structure to nested tuples of native floats.
 
     Args:
-        value: A scalar, list/tuple/array of floats, or nested thereof.
+        value: A scalar, list/tuple/array of floats, or nested thereof
 
     Returns:
-        A float or nested tuple of floats.
+        A float or nested tuple of floats
     """
     # Scalars (covers Python, NumPy, JAX scalars)
     if jnp.isscalar(value):
@@ -143,7 +224,7 @@ def to_native_floats(value: Any) -> Any:
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
-    """Computes the partial reduced row echelon form to determine linear components
+    """Computes the partial reduced row echelon form to determine linear components.
 
     Returns:
         A matrix of linear components
@@ -203,37 +284,14 @@ def partial_rref(matrix: NpArray) -> NpArray:
     return component_matrix
 
 
-class UnitConversion(eqx.Module):
-    """Unit conversions"""
-
-    atmosphere_to_bar: float = ATMOSPHERE
-    bar_to_Pa: float = 1.0e5
-    bar_to_MPa: float = 1.0e-1
-    bar_to_GPa: float = 1.0e-4
-    Pa_to_bar: float = 1.0e-5
-    MPa_to_bar: float = 1.0e1
-    GPa_to_bar: float = 1.0e4
-    fraction_to_ppm: float = mega
-    g_to_kg: float = 1 / kilo
-    ppm_to_fraction: float = 1 / mega
-    ppm_to_percent: float = 100 / mega
-    percent_to_ppm: float = 1.0e4
-    cm3_to_m3: float = 1.0e-6
-    m3_to_cm3: float = 1.0e6
-    m3_bar_to_J: float = 1.0e5
-    J_to_m3_bar: float = 1.0e-5
-    litre_to_m3: float = 1.0e-3
-
-
-unit_conversion: UnitConversion = UnitConversion()
-
-
 def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
-    """Bulk silicate Earth element masses in kg.
+    """Bulk silicate Earth element masses in kg
 
-    Hydrogen, carbon, and nitrogen from :cite:t:`SKG21`
-    Sulfur from :cite:t:`H16`
-    Chlorine from :cite:t:`KHK17`
+    Hydrogen, carbon, and nitrogen from :cite:t:`SKG21`, sulfur from :cite:t:`H16`, and chlorine
+    from :cite:t:`KHK17`
+
+    Returns:
+        A dictionary of Earth BSE element masses in kg
     """
     earth_bse: dict[str, dict[str, float]] = {
         "H": {"min": 1.852e20, "max": 1.894e21},
@@ -250,65 +308,17 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
 
 
 def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> ArrayLike:
-    """Converts Earth oceans to hydrogen mass
+    """Converts Earth oceans to hydrogen mass.
 
     Args:
-        number_of_earth_oceans: Number of Earth oceans. Defaults to 1.
+        number_of_earth_oceans: Number of Earth oceans. Defaults to ``1`` kg.
 
     Returns:
-        Hydrogen mass
+        Hydrogen mass in kg
     """
     h_kg: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
 
     return h_kg
-
-
-class ExperimentalCalibration(eqx.Module):
-    """Experimental calibration
-
-    Args:
-        temperature_min: Minimum calibrated temperature. Defaults to None.
-        temperature_max: Maximum calibrated temperature. Defaults to None.
-        pressure_min: Minimum calibrated pressure. Defaults to None.
-        pressure_max: Maximum calibrated pressure. Defaults to None.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
-    """
-
-    temperature_min: Optional[float] = None
-    """Minimum calibrated temperature"""
-    temperature_max: Optional[float] = None
-    """Maximum calibrated temperature"""
-    pressure_min: Optional[float] = None
-    """Minimum calibrated pressure"""
-    pressure_max: Optional[float] = None
-    """Maximum calibrated pressure"""
-    log10_fO2_min: Optional[float] = None
-    """Minimum calibrated log10 fO2"""
-    log10_fO2_max: Optional[float] = None
-    """Maximum calibrated log10 fO2"""
-
-    def __init__(
-        self,
-        temperature_min: Optional[Scalar] = None,
-        temperature_max: Optional[Scalar] = None,
-        pressure_min: Optional[Scalar] = None,
-        pressure_max: Optional[Scalar] = None,
-        log10_fO2_min: Optional[Scalar] = None,
-        log10_fO2_max: Optional[Scalar] = None,
-    ):
-        if temperature_min is not None:
-            self.temperature_min = float(temperature_min)
-        if temperature_max is not None:
-            self.temperature_max = float(temperature_max)
-        if pressure_min is not None:
-            self.pressure_min = float(pressure_min)
-        if pressure_max is not None:
-            self.pressure_max = float(pressure_max)
-        if log10_fO2_min is not None:
-            self.log10_fO2_min = float(log10_fO2_min)
-        if log10_fO2_max is not None:
-            self.log10_fO2_max = float(log10_fO2_max)
 
 
 def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
