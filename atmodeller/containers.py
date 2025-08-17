@@ -153,7 +153,7 @@ class SpeciesCollection(eqx.Module):
     """Species data"""
     active_stability: tuple[bool, ...]
     """Active stability mask"""
-    gas_species_mask: tuple[bool, ...]
+    gas_species_mask: NpBool
     """Gas species mask"""
     species_names: tuple[str, ...]
     """Unique names of all species"""
@@ -175,11 +175,15 @@ class SpeciesCollection(eqx.Module):
     """Reaction matrix"""
     active_reactions: NpBool
     """Active reactions"""
+    number_stability: int
+    """Number of stability to solve for"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
         self.active_stability = tuple([species.solve_for_stability for species in self.data])
-        self.gas_species_mask = tuple([species.data.state == GAS_STATE for species in self.data])
+        self.gas_species_mask = np.array(
+            [species.data.state == GAS_STATE for species in self.data], dtype=bool
+        )
         self.species_names = tuple([species_.name for species_ in self.data])
         self.gas_species_names = tuple(
             [species.name for species in self.data if species.data.state == GAS_STATE]
@@ -203,6 +207,7 @@ class SpeciesCollection(eqx.Module):
         self.formula_matrix = self.get_formula_matrix()
         self.reaction_matrix = self.get_reaction_matrix()
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
+        self.number_stability = sum(self.active_stability)
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -236,13 +241,11 @@ class SpeciesCollection(eqx.Module):
         return len(self.data)
 
     @property
-    def number_stability(self) -> int:
-        """Number of stability to solve for"""
-        return sum(self.active_stability)
-
-    @property
     def number_solution(self) -> int:
-        """Number of solution quantities"""
+        """Number of solution quantities
+
+        This must be static.
+        """
         return self.number_species + self.number_stability
 
     def active_stability_array(self) -> Bool[Array, " species"]:

@@ -105,7 +105,7 @@ def get_atmosphere_log_molar_mass(
     )
 
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
-        gas_log_number_density, b=jnp.array(parameters.species.gas_species_mask)
+        gas_log_number_density, b=parameters.species.gas_species_mask
     )
     # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
@@ -192,7 +192,7 @@ def get_gas_species_data(
         An array with gas species data from `some_array` and condensate entries zeroed
     """
     gas_data: Shaped[Array, " species"] = (
-        jnp.array(parameters.species.gas_species_mask) * some_array
+        jnp.asarray(some_array) * parameters.species.gas_species_mask
     )
 
     return gas_data
@@ -335,7 +335,7 @@ def get_log_reaction_equilibrium_constant(parameters: Parameters) -> Float[Array
     log_Kp: Float[Array, " reactions"] = get_log_Kp(parameters)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Float[Array, " reactions"] = jnp.sum(
-        reaction_matrix * jnp.array(parameters.species.gas_species_mask), axis=1
+        reaction_matrix * parameters.species.gas_species_mask, axis=1
     )
     # jax.debug.print("delta_n = {out}", out=delta_n)
     log_Kc: Float[Array, " reactions"] = log_Kp - delta_n * (
@@ -512,11 +512,10 @@ def get_total_pressure(
     Returns:
         Total pressure
     """
-    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
     pressure: Float[Array, " species"] = get_pressure_from_log_number_density(
         parameters, log_number_density
     )
-    gas_pressure: Float[Array, " species"] = pressure * gas_species_mask
+    gas_pressure: Float[Array, " species"] = pressure * parameters.species.gas_species_mask
     # jax.debug.print("gas_pressure = {out}", out=gas_pressure)
 
     return jnp.sum(gas_pressure)
@@ -565,7 +564,7 @@ def objective_function(
         get_log_number_density_from_log_pressure(log_activity, temperature)
     )
     log_activity_number_density = jnp.where(
-        jnp.array(parameters.species.gas_species_mask), log_activity_number_density, log_activity
+        parameters.species.gas_species_mask, log_activity_number_density, log_activity
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 

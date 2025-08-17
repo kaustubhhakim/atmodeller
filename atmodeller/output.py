@@ -90,7 +90,7 @@ class Output:
     @property
     def gas_species_mask(self) -> NpBool:
         """Mask of gas species"""
-        return np.asarray(self._parameters.species.gas_species_mask)
+        return self._parameters.species.gas_species_mask
 
     @property
     def log_number_density(self) -> NpFloat:
