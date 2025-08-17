@@ -245,6 +245,14 @@ class SpeciesCollection(eqx.Module):
         """Number of solution quantities"""
         return self.number_species + self.number_stability
 
+    def active_stability_array(self) -> Bool[Array, " species"]:
+        """Active species stability
+
+        Returns:
+            `True` for species stabilities that are to be solved for, otherwise `False`
+        """
+        return jnp.array(self.active_stability)
+
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
@@ -889,11 +897,3 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(species, planet_, fugacity_constraints_, mass_constraints_, solver_parameters_)
-
-    def active_stability(self) -> Bool[Array, " species"]:
-        """Active species stability
-
-        Returns:
-            `True` for species stabilities that are to be solved for, otherwise `False`
-        """
-        return jnp.array(self.species.active_stability)
