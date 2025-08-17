@@ -11,6 +11,9 @@ It is recommended to install *Atmodeller* in a virtual environment, whether you 
 
 For more information, see the `Python documentation on venv <https://docs.python.org/3/library/venv.html>`_.
 
+We recommend using a modern dependency manager such as `uv <https://docs.astral.sh/uv>`_, which offers fast installs and reproducible environments by default (See section '2b. Install *Atmodeller*' below).
+
+
 1. Quick install
 ----------------
 
@@ -54,6 +57,8 @@ Replace ``<your-account>`` with your actual **GitHub username or organisation na
 
 To keep your fork in sync with the original repository---or to submit changes via pull requests---you can follow the instructions in the `GitHub documentation <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/configuring-a-remote-repository-for-a-fork>`_ on configuring a remote upstream. This setup allows you to fetch updates from the main repository and integrate them into your fork.
 
+To reduce the complexity of future merges, it is **strongly recommended to keep your fork's main branch closely aligned with the upstream repository**. Avoid letting your fork diverge significantly. Submit bug fix pull requests as soon as possible. New features can be submitted at any time, as long as they are self-contained and do not break any existing infrastructure. This strategy helps ensure a smoother integration process and minimizes maintenance burdens.
+
 .. note::
 
     You can also clone the main repository directly without forking, but this approach provides less flexibility and does not allow you to submit pull requests unless you have write access to the main repository.
@@ -92,6 +97,13 @@ Optional extras:
 - To install everything (core + dev + docs)::
 
       uv sync --extra docs
+
+.. note::
+
+    If you're using VS Code, you may need to restart the editor for the virtual environment to be detected automatically. In some cases, additional configuration may be required---see the official guidance here:
+    https://code.visualstudio.com/docs/python/environments
+
+    As a fallback, prefixing any command with ``uv`` will ensure it runs in the local (uv-created) environment, even if the virtual environment is not activated manually.
 
 Option 2: pip
 ^^^^^^^^^^^^^

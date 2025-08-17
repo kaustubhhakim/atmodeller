@@ -19,7 +19,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Literal
+from typing import Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -476,7 +476,7 @@ class FugacityConstraints(eqx.Module):
     def create(
         cls,
         species: SpeciesCollection,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
     ) -> "FugacityConstraints":
         """Creates an instance
 
@@ -558,7 +558,7 @@ class FugacityConstraints(eqx.Module):
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
-        temperature = jnp.asarray(temperature, dtype=jnp.float64)
+        temperature = as_j64(temperature)
 
         def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
@@ -640,7 +640,7 @@ class MassConstraints(eqx.Module):
     def create(
         cls,
         species: SpeciesCollection,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         batch_size: int = 1,
     ) -> "MassConstraints":
         """Creates an instance

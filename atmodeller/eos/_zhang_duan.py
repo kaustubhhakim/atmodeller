@@ -24,17 +24,13 @@ import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import ExperimentalCalibration, safe_exp, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
+from atmodeller.utilities import ExperimentalCalibration, as_j64, safe_exp, unit_conversion
 
 
 class ZhangDuan(RealGas):
@@ -64,9 +60,9 @@ class ZhangDuan(RealGas):
     )
     """Coefficients"""
 
-    epsilon: float
+    epsilon: float = eqx.field(converter=float)
     """Lenard-Jones parameter (epsilon/kB) in K"""
-    sigma: float
+    sigma: float = eqx.field(converter=float)
     r"""Lenard-Jones parameter in :math:`10^{-10}` m"""
 
     @eqx.filter_jit
@@ -95,7 +91,7 @@ class ZhangDuan(RealGas):
         Returns:
             Scaled temperature
         """
-        scaled_temperature: ArrayLike = 154.0 * temperature / self.epsilon
+        scaled_temperature: ArrayLike = 154 * temperature / self.epsilon
         # jax.debug.print("scaled_temperature = {out}", out=scaled_temperature)
 
         return scaled_temperature
@@ -112,7 +108,7 @@ class ZhangDuan(RealGas):
         """
         volume_cm3: ArrayLike = volume * unit_conversion.m3_to_cm3
         sigma_term: Array = jnp.power(self.sigma / 3.691, 3)
-        scaled_volume: Array = volume_cm3 / 1000.0 / sigma_term  # type:ignore
+        scaled_volume: Array = volume_cm3 / 1000 / sigma_term  # type: ignore
         # jax.debug.print("scaled_volume = {out}", out=scaled_volume)
 
         return scaled_volume
@@ -204,8 +200,8 @@ class ZhangDuan(RealGas):
         # jax.debug.print("e = {e}", e=e)
 
         term1: Array = (
-            jnp.asarray(1)
-            + b / jnp.asarray(Vm)
+            as_j64(1)
+            + b / as_j64(Vm)
             + c / jnp.power(Vm, 2)
             + d / jnp.power(Vm, 4)
             + e / jnp.power(Vm, 5)
@@ -343,7 +339,7 @@ class ZhangDuan(RealGas):
         return volume_integral
 
 
-CH4_zhang09: RealGas = ZhangDuan(154.0, 3.691)
+CH4_zhang09: RealGas = ZhangDuan(154, 3.691)
 """CH4 unbounded :cite:p:`ZD09`"""
 CH4_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=273,
@@ -357,7 +353,7 @@ CH4_zhang09_bounded: RealGas = CombinedRealGas.create(
 )
 """CH4 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-H2O_zhang09: RealGas = ZhangDuan(510.0, 2.88)
+H2O_zhang09: RealGas = ZhangDuan(510, 2.88)
 """H2O unbounded :cite:p:`ZD09`"""
 H2O_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=673,
@@ -371,7 +367,7 @@ H2O_zhang09_bounded: RealGas = CombinedRealGas.create(
 )
 """H2O bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-CO2_zhang09: RealGas = ZhangDuan(235.0, 3.79)
+CO2_zhang09: RealGas = ZhangDuan(235, 3.79)
 """CO2 unbounded :cite:p:`ZD09`"""
 CO2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=473,

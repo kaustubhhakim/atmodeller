@@ -18,15 +18,13 @@
 
 import importlib.resources
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from importlib.abc import Traversable
 from pathlib import Path
 from typing import cast
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
 import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
@@ -34,7 +32,7 @@ from xmmutablemap import ImmutableMap
 
 from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
-from atmodeller.utilities import as_j64, unit_conversion
+from atmodeller.utilities import as_j64, to_native_floats, unit_conversion
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory"""
@@ -51,7 +49,7 @@ class CondensateActivity(eqx.Module):
         activity: Activity. Defaults to 1.
     """
 
-    activity: Array = eqx.field(converter=as_j64, default=1.0)
+    activity: float = eqx.field(converter=float, default=1)
     """Activity"""
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, ""]:
@@ -83,15 +81,15 @@ class ThermodynamicCoefficients(eqx.Module):
         T_max: Maximum temperature(s) in K in the range
     """
 
-    b1: tuple[float, ...]
+    b1: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Enthalpy constant(s) of integration"""
-    b2: tuple[float, ...]
+    b2: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float, ...], ...]
+    cp_coeffs: tuple[tuple[float, ...], ...] = eqx.field(converter=to_native_floats)
     """Heat capacity coefficients"""
-    T_min: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
+    T_min: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Minimum temperature(s) in K in the range"""
-    T_max: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
+    T_max: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Maximum temperature(s) in K in the range"""
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
@@ -107,10 +105,12 @@ class ThermodynamicCoefficients(eqx.Module):
             Index of the temperature range
         """
         temperature = jnp.atleast_1d(as_j64(temperature))
+        T_max: Array = as_j64(self.T_max)
+        T_min: Array = as_j64(self.T_min)
 
         # Reshape for broadcasting
-        bool_mask: Bool[Array, "N T"] = (self.T_min[:, None] <= temperature[None, :]) & (
-            temperature[None, :] <= self.T_max[:, None]
+        bool_mask: Bool[Array, "N T"] = (T_min[:, None] <= temperature[None, :]) & (
+            temperature[None, :] <= T_max[:, None]
         )
         index: Integer[Array, " T"] = jnp.argmax(bool_mask, axis=0)
 
@@ -118,7 +118,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _cp_over_R(
         self, cp_coefficients: Float[Array, "T 7"], temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -150,7 +150,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _S_over_R(
         self, cp_coefficients: Float[Array, "T 7"], b2: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -183,7 +183,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _H_over_RT(
         self, cp_coefficients: Float[Array, "T 7"], b1: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         r"""Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
 
@@ -230,7 +230,7 @@ class ThermodynamicCoefficients(eqx.Module):
             cp_coefficients: Heat capacity coefficients as an array
             b1: Enthalpy integration constant
             b2: Entropy integration constant
-            temperature: Temperature
+            temperature: Temperature in K
 
         Returns:
             Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
@@ -401,10 +401,10 @@ class ThermodynamicCoefficients(eqx.Module):
 class ThermodynamicDataSource:
     """Thermodynamic data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Thermodynamic data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(THERMODYNAMIC_DATA_SOURCE)  # type: ignore
         )
@@ -461,16 +461,10 @@ class ThermodynamicDataSource:
                     & (self.data[self.state_column] == state)
                 ],
             )
-
-            # Process and store the thermodynamic coefficients
-            T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
-            T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
-            b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
-            b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
-            cp_coeffs: tuple[tuple[np.float64, ...], ...] = tuple(
-                map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
+            cp_coeffs: pd.DataFrame | pd.Series = df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]]
+            coefficient_dict[name] = ThermodynamicCoefficients(
+                df["b1"], df["b2"], cp_coeffs, df["T_min"], df["T_max"]
             )
-            coefficient_dict[name] = ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
         return coefficient_dict
 
@@ -483,9 +477,9 @@ class CriticalData(eqx.Module):
         pressure: Critical pressure in bar
     """
 
-    temperature: float = 1.0
+    temperature: float = eqx.field(converter=float, default=1)
     """Critical temperature in K"""
-    pressure: float = 1.0
+    pressure: float = eqx.field(converter=float, default=1)
     """Critical pressure in bar"""
 
 
@@ -493,10 +487,10 @@ class CriticalData(eqx.Module):
 class CriticalDataSource:
     """Critical data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Critical data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(CRITICAL_DATA_SOURCE)  # type: ignore
         )
@@ -536,9 +530,7 @@ class CriticalDataSource:
         return critical_dict
 
 
-# Although it might be tempting to create objects on-the-fly when required, this might not play
-# nice with JAX, which requires purely functional programming (and no side effects). So instead
-# we create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
+# Create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
 # It should also be net faster to create these data once and then access (potentially many times).
 # These are also set to private to avoid sphinx (autodoc) from printing long strings.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
@@ -577,19 +569,18 @@ class IndividualSpeciesData(eqx.Module):
     """Formula"""
     state: str
     """State of aggregation"""
-    thermo: ThermodynamicCoefficients = eqx.field(init=False)
+    thermo: ThermodynamicCoefficients
     """Thermodynamic coefficient and methods"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
-    hill_formula: str = eqx.field(init=False)
+    hill_formula: str
     """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
+    molar_mass: float = eqx.field(converter=float)
     """Molar mass"""
 
-    def __post_init__(self):
-        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
-        # though the arguments would allow it. Previous tests resulted in an infinite compilation
-        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+    def __init__(self, formula: str, state: str):
+        self.formula = formula
+        self.state = state
         mformula: Formula = Formula(self.formula)
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula

@@ -4,10 +4,12 @@
 
 # Atmodeller
 
-[![Release 0.8.2](https://img.shields.io/badge/Release-0.8.2-blue.svg)](https://github.com/ExPlanetology/atmodeller/releases/tag/v0.8.2)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![Release 0.9.1](https://img.shields.io/badge/Release-0.9.1-blue.svg)](https://github.com/ExPlanetology/atmodeller/releases/tag/v0.9.1)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python package](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml)
+[![CI](https://github.com/ExPlanetology/atmodeller/actions/workflows/ci.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/ci.yml)
+[![Checked with pyright](https://microsoft.github.io/pyright/img/pyright_badge.svg)](https://microsoft.github.io/pyright/)
+[![bear-ified](https://raw.githubusercontent.com/beartype/beartype-assets/main/badge/bear-ified.svg)](https://beartype.readthedocs.io)
 [![Test coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/ExPlanetology/atmodeller)
 
 ## About
@@ -37,7 +39,7 @@ The data from the above study are also available for download at https://doi.org
 
 ## Basic usage
 
-Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to integrate Atmodeller into time-dependent simulations. A simple example of how to use Atmodeller is provided below:
+Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to perform iterative updates with changing constraints. A simple example of how to use Atmodeller is provided below:
 
 ```
 from atmodeller import (

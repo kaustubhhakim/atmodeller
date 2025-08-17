@@ -20,19 +20,16 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 from abc import abstractmethod
+from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import power_law
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 
 class Solubility(eqx.Module):
@@ -47,9 +44,9 @@ class Solubility(eqx.Module):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike | None = None,
-        pressure: ArrayLike | None = None,
-        fO2: ArrayLike | None = None,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
     ) -> Array:
         """Concentration in ppmw
 
@@ -88,10 +85,10 @@ class NoSolubility(Solubility):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike | None = None,
-        pressure: ArrayLike | None = None,
-        fO2: ArrayLike | None = None,
-    ) -> ArrayLike:
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
+    ) -> Array:
         del fugacity
         del temperature
         del pressure
@@ -108,13 +105,13 @@ class SolubilityPowerLaw(Solubility):
         exponent: Exponent
     """
 
-    constant: float
+    constant: float = eqx.field(converter=float)
     """Constant"""
-    exponent: float
+    exponent: float = eqx.field(converter=float)
     """Exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> Array:
         del args
         del kwargs
 
@@ -130,13 +127,13 @@ class SolubilityPowerLawLog10(Solubility):
 
     """
 
-    log10_constant: float
+    log10_constant: float = eqx.field(converter=float)
     """Log10 constant"""
-    log10_exponent: float
+    log10_exponent: float = eqx.field(converter=float)
     """Log10 exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))

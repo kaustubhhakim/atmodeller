@@ -29,16 +29,12 @@ import optimistix as optx
 from jax import jacfwd
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.thermodata import CriticalData
-from atmodeller.utilities import safe_exp
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
+from atmodeller.utilities import as_j64, safe_exp, to_native_floats
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -124,7 +120,7 @@ class RealGas(eqx.Module):
 
             return fugacity - target_fugacity
 
-        initial_pressure: ArrayLike = jnp.asarray(100.0)  # Initial guess for pressure
+        initial_pressure: ArrayLike = as_j64(100)  # Initial guess for pressure
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "target_fugacity": fugacity}
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
@@ -159,8 +155,8 @@ class RealGas(eqx.Module):
         Returns:
             Derivative of the compressibility factor with respect to pressure
         """
-        temperature = jnp.asarray(temperature, dtype=jnp.float64)
-        pressure = jnp.asarray(pressure, dtype=jnp.float64)
+        temperature = as_j64(temperature)
+        pressure = as_j64(pressure)
         dzdp_fn: Callable = jacfwd(self.compressibility_factor, argnums=1)
 
         return dzdp_fn(temperature, pressure)
@@ -176,14 +172,14 @@ class RealGas(eqx.Module):
         Returns:
             Derivative of volume with respect to pressure
         """
-        temperature = jnp.asarray(temperature, dtype=jnp.float64)
-        pressure = jnp.asarray(pressure, dtype=jnp.float64)
+        temperature = as_j64(temperature)
+        pressure = as_j64(pressure)
         dvdp_fn: Callable = jacfwd(self.volume, argnums=1)
 
         return dvdp_fn(temperature, pressure)
 
     @eqx.filter_jit
-    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log activity
 
         Args:
@@ -466,7 +462,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         Returns:
             Log fugacity
         """
-        z: Array = jnp.asarray(self.compressibility_factor(temperature, pressure))
+        z: Array = as_j64(self.compressibility_factor(temperature, pressure))
         A: ArrayLike = self.A_factor(temperature, pressure)
         B: ArrayLike = self.B_factor(temperature, pressure)
 
@@ -599,13 +595,13 @@ class VirialCompensation(eqx.Module):
             significantly and may be determined from experimental data.
     """
 
-    a_coefficients: tuple[float, ...]
+    a_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`"""
-    b_coefficients: tuple[float, ...]
+    b_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """As above for the b coefficients"""
-    c_coefficients: tuple[float, ...]
+    c_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """As above for the c coefficients"""
-    P0: float
+    P0: float = eqx.field(converter=float)
     """Pressure at which the MRK equation begins to overestimate the molar volume significantly"""
 
     @eqx.filter_jit
@@ -622,7 +618,7 @@ class VirialCompensation(eqx.Module):
             `a` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1}`
         """
         a: Array = (
-            self.a_coefficients[1] * jnp.asarray(temperature)
+            self.a_coefficients[1] * as_j64(temperature)
             + self.a_coefficients[0] * critical_data.temperature
         )
         a = a / jnp.square(critical_data.pressure)
@@ -643,7 +639,7 @@ class VirialCompensation(eqx.Module):
             `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1/2}`
         """
         b: Array = (
-            self.b_coefficients[1] * jnp.asarray(temperature)
+            self.b_coefficients[1] * as_j64(temperature)
             + self.b_coefficients[0] * critical_data.temperature
         )
         b = b / jnp.power(critical_data.pressure, (3.0 / 2))
@@ -662,7 +658,7 @@ class VirialCompensation(eqx.Module):
             `c` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1/4}`
         """
         c: Array = (
-            self.c_coefficients[1] * jnp.asarray(temperature)
+            self.c_coefficients[1] * as_j64(temperature)
             + self.c_coefficients[0] * critical_data.temperature
         )
         c = c / jnp.power(critical_data.pressure, (5.0 / 4))
@@ -679,7 +675,7 @@ class VirialCompensation(eqx.Module):
         Returns:
             Pressure difference relative to :attr:`P0` in bar
         """
-        pressure_array: Array = jnp.asarray(pressure)
+        pressure_array: Array = as_j64(pressure)
         condition: Array = pressure_array > self.P0
 
         def pressure_above_P0() -> Array:

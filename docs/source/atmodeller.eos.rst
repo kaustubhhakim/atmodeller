@@ -17,21 +17,21 @@ atmodeller.eos.core module
 
 .. automodule:: atmodeller.eos.core
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 atmodeller.eos.library module
 -----------------------------
 
 .. automodule:: atmodeller.eos.library
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Module contents
 ---------------
 
 .. automodule:: atmodeller.eos
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

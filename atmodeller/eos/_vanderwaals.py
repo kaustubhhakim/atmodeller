@@ -21,6 +21,7 @@ import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import (
@@ -34,11 +35,6 @@ from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration
 
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
-
 
 class VanderWaals(RealGas):
     r"""Van der Waals EOS
@@ -48,9 +44,9 @@ class VanderWaals(RealGas):
         b: b constant in :math:`\mathrm{m}^3 \mathrm{mol}^{-1}`
     """
 
-    a: float
+    a: float = eqx.field(converter=float)
     r"""a constant in :math:`\mathrm{m}^6 \mathrm{bar} \mathrm{mol}^{-2}`"""
-    b: float
+    b: float = eqx.field(converter=float)
     r"""b constant in :math:`\mathrm{m}^3 \mathrm{mol}^{-1}`"""
 
     @eqx.filter_jit
@@ -125,7 +121,7 @@ class VanderWaals(RealGas):
         volume_integral: Array = (
             self.b * (vol0 - vol) / ((vol - self.b) * (vol0 - self.b))  # type: ignore
             - jnp.log((vol - self.b) / (vol0 - self.b))
-        ) * GAS_CONSTANT_BAR * temperature - 2 * self.a * (1 / vol - 1 / vol0)  # type:ignore
+        ) * GAS_CONSTANT_BAR * temperature - 2 * self.a * (1 / vol - 1 / vol0)  # type: ignore
 
         return volume_integral
 

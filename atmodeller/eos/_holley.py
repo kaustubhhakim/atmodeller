@@ -23,17 +23,13 @@ import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
-from atmodeller._mytypes import OptxSolver
+from atmodeller import override
+from atmodeller._mytypes import OptxSolver, Scalar
 from atmodeller.constants import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -41,17 +37,17 @@ logger: logging.Logger = logging.getLogger(__name__)
 # in bar). Using the original values in the paper also facilitates visual comparison and checking.
 
 
-def volume_conversion(x: float) -> float:
+def volume_conversion(x: Scalar) -> float:
     """Volume conversion for :cite:t:`HWZ58` units"""
     return x * unit_conversion.litre_to_m3
 
 
-def A0_conversion(x: float) -> float:
+def A0_conversion(x: Scalar) -> float:
     """:math:`PV^2` conversion for :cite:t:`HWZ58` units"""
     return x * ATMOSPHERE * unit_conversion.litre_to_m3**2
 
 
-def atm2bar(x: float) -> float:
+def atm2bar(x: Scalar) -> float:
     """Atmosphere to bar conversion"""
     return unit_conversion.atmosphere_to_bar * x
 
@@ -72,15 +68,15 @@ class BeattieBridgeman(RealGas):
         c: c empirical constant
     """
 
-    A0: float
+    A0: float = eqx.field(converter=float)
     """A0 empirical constant"""
-    a: float
+    a: float = eqx.field(converter=float)
     """a empirical constant"""
-    B0: float
+    B0: float = eqx.field(converter=float)
     """B0 empirical constant"""
-    b: float
+    b: float = eqx.field(converter=float)
     """b empirical constant"""
-    c: float
+    c: float = eqx.field(converter=float)
     """c empirical constant"""
 
     @eqx.filter_jit
@@ -212,7 +208,7 @@ H2_beattie_holley58: RealGas = BeattieBridgeman(
 """H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 H2_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
     [H2_beattie_holley58],
-    [ExperimentalCalibration(30, 1000, pressure_min, atm2bar(1000.0))],
+    [ExperimentalCalibration(30, 1000, pressure_min, atm2bar(1000))],
 )
 """H2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -225,7 +221,7 @@ N2_beattie_holley58: RealGas = BeattieBridgeman(
 )
 """N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 N2_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
-    [N2_beattie_holley58], [ExperimentalCalibration(70, 1000, pressure_min, atm2bar(1000.0))]
+    [N2_beattie_holley58], [ExperimentalCalibration(70, 1000, pressure_min, atm2bar(1000))]
 )
 """N2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -238,7 +234,7 @@ O2_beattie_holley58: RealGas = BeattieBridgeman(
 )
 """O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 O2_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
-    [O2_beattie_holley58], [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000.0))]
+    [O2_beattie_holley58], [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000))]
 )
 """O2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -252,7 +248,7 @@ CO2_beattie_holley58: RealGas = BeattieBridgeman(
 """CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 CO2_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
     [CO2_beattie_holley58],
-    [ExperimentalCalibration(200, 1000, pressure_min, atm2bar(1000.0))],
+    [ExperimentalCalibration(200, 1000, pressure_min, atm2bar(1000))],
 )
 """CO2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -265,7 +261,7 @@ NH3_beattie_holley58: RealGas = BeattieBridgeman(
 )
 """NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
 NH3_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
-    [NH3_beattie_holley58], [ExperimentalCalibration(300, 1000, pressure_min, atm2bar(500.0))]
+    [NH3_beattie_holley58], [ExperimentalCalibration(300, 1000, pressure_min, atm2bar(500))]
 )
 """NH3 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -279,7 +275,7 @@ CH4_beattie_holley58: RealGas = BeattieBridgeman(
 """CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
 CH4_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
     [CH4_beattie_holley58],
-    [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000.0))],
+    [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000))],
 )
 """CH4 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -293,7 +289,7 @@ He_beattie_holley58: RealGas = BeattieBridgeman(
 """He Beattie-Bridgeman :cite:p:`HWZ58`"""
 He_beattie_holley58_bounded: RealGas = CombinedRealGas.create(
     [He_beattie_holley58],
-    [ExperimentalCalibration(10, 1000, pressure_min, atm2bar(1000.0))],
+    [ExperimentalCalibration(10, 1000, pressure_min, atm2bar(1000))],
 )
 """He Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 

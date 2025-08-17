@@ -29,19 +29,13 @@ import pandas as pd
 from jax.scipy.interpolate import RegularGridInterpolator
 from jaxtyping import Array, ArrayLike
 from molmass import Formula
-from xmmutablemap import ImmutableMap
 
-from atmodeller import PRESSURE_REFERENCE
+from atmodeller import PRESSURE_REFERENCE, override
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import ExperimentalCalibration, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
+from atmodeller.utilities import ExperimentalCalibration, as_j64, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -61,26 +55,13 @@ class Chabrier(RealGas):
 
     CHABRIER_DIRECTORY: ClassVar[Path] = Path("chabrier")
     """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`"""
-    He_fraction_map: ClassVar[ImmutableMap[str, float]] = ImmutableMap(
-        {
-            "TABLE_H_TP_v1": 0.0,
-            "TABLE_HE_TP_v1": 1.0,
-            "TABLEEOS_2021_TP_Y0275_v1": 0.275,
-            "TABLEEOS_2021_TP_Y0292_v1": 0.292,
-            "TABLEEOS_2021_TP_Y0297_v1": 0.297,
-        }
-    )
-    """Mole fraction of He in the gas mixture, the other component being H2.
-    
-    Dictionary keys should correspond to the name of the Chabrier file.
-    """
     log10_density_func: Callable
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
-    He_fraction: float
+    He_fraction: float = eqx.field(converter=float)
     """He fraction"""
-    H2_molar_mass_g_mol: float
+    H2_molar_mass_g_mol: float = eqx.field(converter=float)
     """Molar mass of H2"""
-    He_molar_mass_g_mol: float
+    He_molar_mass_g_mol: float = eqx.field(converter=float)
     """Molar mass of He"""
     integration_steps: int
     """Number of integration steps"""
@@ -101,7 +82,7 @@ class Chabrier(RealGas):
             Instance
         """
         log10_density_func: Callable = cls._get_interpolator(filename)
-        He_fraction: float = cls.He_fraction_map[filename.name]
+        He_fraction: float = cls.get_He_fraction_map()[filename.name]
         H2_molar_mass_g_mol: float = Formula("H2").mass
         He_molar_mass_g_mol: float = Formula("He").mass
 
@@ -138,7 +119,7 @@ class Chabrier(RealGas):
         )
         with data as datapath:
             df: pd.DataFrame = pd.read_csv(
-                datapath,  # type: ignore
+                datapath,
                 sep=r"\s+",
                 comment="#",
                 usecols=[0, 1, 2],  # type: ignore
@@ -181,6 +162,22 @@ class Chabrier(RealGas):
 
         return molar_density
 
+    @staticmethod
+    def get_He_fraction_map() -> dict[str, float]:
+        """Mole fraction of He in the gas mixture, the other component being H2.
+
+        Dictionary keys should correspond to the name of the Chabrier file.
+        """
+        He_fraction_map: dict[str, float] = {
+            "TABLE_H_TP_v1": 0.0,
+            "TABLE_HE_TP_v1": 1.0,
+            "TABLEEOS_2021_TP_Y0275_v1": 0.275,
+            "TABLEEOS_2021_TP_Y0292_v1": 0.292,
+            "TABLEEOS_2021_TP_Y0297_v1": 0.297,
+        }
+
+        return He_fraction_map
+
     @override
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -197,7 +194,7 @@ class Chabrier(RealGas):
         Returns:
             Log fugacity in bar
         """
-        temperature = jnp.asarray(temperature)
+        temperature = as_j64(temperature)
         log10_pressure: Array = jnp.log10(pressure)
         temperature, log10_pressure = jnp.broadcast_arrays(temperature, log10_pressure)
 

@@ -19,7 +19,7 @@
 import logging
 import pprint
 from collections.abc import Callable, Mapping
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import equinox as eqx
 import jax
@@ -58,8 +58,8 @@ class InteriorAtmosphere:
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    _solver: Callable | None = None
-    _output: Output | None = None
+    _solver: Optional[Callable] = None
+    _output: Optional[Output] = None
 
     def __init__(self, species: SpeciesCollection, tau: float = TAU):
         self.species: SpeciesCollection = species
@@ -77,12 +77,12 @@ class InteriorAtmosphere:
     def solve(
         self,
         *,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-        solver_parameters: SolverParameters | None = None,
+        planet: Optional[Planet] = None,
+        initial_log_number_density: Optional[ArrayLike] = None,
+        initial_log_stability: Optional[ArrayLike] = None,
+        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        solver_parameters: Optional[SolverParameters] = None,
     ) -> None:
         """Solves the system and initialises an Output instance for processing the result
 
@@ -417,7 +417,7 @@ class InteriorAtmosphere:
 
 
 def _broadcast_component(
-    component: ArrayLike | None, default_value: float, dim: int, batch_size: int, name: str
+    component: Optional[ArrayLike], default_value: float, dim: int, batch_size: int, name: str
 ) -> NpFloat:
     """Broadcasts a scalar, 1D, or 2D input array to shape (batch_size, dim).
 
@@ -468,8 +468,8 @@ def _broadcast_component(
 
 
 def broadcast_initial_solution(
-    initial_log_number_density: ArrayLike | None,
-    initial_log_stability: ArrayLike | None,
+    initial_log_number_density: Optional[ArrayLike],
+    initial_log_stability: Optional[ArrayLike],
     number_of_species: int,
     batch_size: int,
 ) -> Array:

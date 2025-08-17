@@ -24,7 +24,7 @@ import logging
 import pickle
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -111,8 +111,8 @@ class Output:
             fixed_parameters.active_stability(), log_stability, np.nan
         )
         # Caching output to avoid recomputation
-        self._cached_dict: dict[str, dict[str, NpArray]] | None = None
-        self._cached_dataframes: dict[str, pd.DataFrame] | None = None
+        self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
+        self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
 
     @property
     def active_indices(self) -> NpInt:
@@ -862,7 +862,7 @@ class Output:
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
-        unsuccessful_indices: NpArray[np.int_] = np.where(
+        unsuccessful_indices: NpArray = np.where(
             np.array(self._solver_status) == False  # noqa: E712
         )[0]
 

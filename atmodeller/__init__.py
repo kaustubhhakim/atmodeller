@@ -16,11 +16,10 @@
 #
 """Package level variables and initialises the package logger"""
 
-__version__: str = "0.8.2"
+__version__: str = "0.9.1"
 
 import logging
 import os
-import sys
 
 import jax
 import jax.numpy as jnp
@@ -28,6 +27,14 @@ import numpy as np
 
 # from beartype.claw import beartype_this_package
 # beartype_this_package()
+
+try:
+    from typing import override as _override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override as _override  # Python 3.11 and earlier
+
+override = _override
+
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
@@ -45,10 +52,10 @@ print("Atmodeller initialized with double precision (float64)")
 os.environ["EQX_ON_ERROR"] = "raise"
 
 # Suppress warnings (notably from Equinox about static JAX arrays)
-if not sys.warnoptions:
-    import warnings
+# if not sys.warnoptions:
+#     import warnings
 
-    warnings.simplefilter("ignore")
+#     warnings.simplefilter("ignore")
 
 # Thermodynamic standard state
 TEMPERATURE_REFERENCE: float = 298.15
