@@ -39,7 +39,7 @@ from atmodeller import (
     LOG_STABILITY_UPPER,
     TAU,
 )
-from atmodeller._mytypes import NpArray, NpFloat, NpInt, OptxSolver
+from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt, OptxSolver
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
@@ -165,14 +165,16 @@ class SpeciesCollection(eqx.Module):
     """Molar masses"""
     unique_elements: tuple[str, ...]
     """Unique elements in species in alphabetical order"""
+    diatomic_oxygen_index: int
+    """Index of diatomic oxygen"""
     number_reactions: int
     """Number of reactions"""
     formula_matrix: NpInt
     """Formula matrix"""
     reaction_matrix: NpFloat
     """Reaction matrix"""
-    diatomic_oxygen_index: int
-    """Index of diatomic oxygen"""
+    active_reactions: NpBool
+    """Active reactions"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
@@ -194,12 +196,13 @@ class SpeciesCollection(eqx.Module):
         unique_elements: list[str] = list(set(elements))
         self.unique_elements = tuple(sorted(unique_elements))
 
+        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
+
         # Reactions
         self.number_reactions = max(0, self.number_species - len(self.unique_elements))
         self.formula_matrix = self.get_formula_matrix()
         self.reaction_matrix = self.get_reaction_matrix()
-
-        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
+        self.active_reactions = np.ones(self.number_reactions, dtype=bool)
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -886,14 +889,6 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(species, planet_, fugacity_constraints_, mass_constraints_, solver_parameters_)
-
-    def active_reactions(self) -> Bool[Array, " reactions"]:
-        """Active reactions
-
-        Returns:
-            `True` for all reactions
-        """
-        return jnp.ones(self.species.number_reactions, dtype=bool)
 
     def active_stability(self) -> Bool[Array, " species"]:
         """Active species stability

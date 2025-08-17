@@ -42,6 +42,7 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
 
+from atmodeller._mytypes import NpBool
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
     Parameters,
@@ -67,7 +68,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """
     # Get all masks separately
     fugacity_mask: Array = parameters.fugacity_constraints.active()
-    reactions_mask: Array = parameters.active_reactions()
+    reactions_mask: NpBool = parameters.species.active_reactions
     mass_mask: Array = parameters.mass_constraints.active()
     stability_mask: Array = parameters.active_stability()
 
@@ -412,7 +413,7 @@ def get_reactions_only_mask(parameters: Parameters) -> Array:
     mask: Array = jnp.zeros(size, dtype=bool)
 
     fugacity_mask: Array = parameters.fugacity_constraints.active()
-    reactions_mask: Array = parameters.active_reactions()
+    reactions_mask: NpBool = parameters.species.active_reactions
     num_active_fugacity: Array = jnp.sum(fugacity_mask)
 
     # Place the reactions_mask at position num_active_fugacity dynamically.
