@@ -28,8 +28,10 @@ Usage:
 from atmodeller.eos._chabrier import get_chabrier_eos_models
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
+from atmodeller.eos._reid_connolly import get_reid_connolly_eos_models
 from atmodeller.eos._saxena import get_saxena_eos_models
 from atmodeller.eos._vanderwaals import get_vanderwaals_eos_models
+from atmodeller.eos._wang import get_wang_eos_models
 from atmodeller.eos._zhang_duan import get_zhang_eos_models
 from atmodeller.eos.core import RealGas
 
@@ -43,8 +45,10 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models = get_chabrier_eos_models()
     eos_models |= get_holley_eos_models()
     eos_models |= get_holland_eos_models()
+    eos_models |= get_reid_connolly_eos_models()
     eos_models |= get_saxena_eos_models()
     eos_models |= get_vanderwaals_eos_models()
+    eos_models |= get_wang_eos_models()
     eos_models |= get_zhang_eos_models()
 
     return eos_models
