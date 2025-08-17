@@ -14,7 +14,12 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Vmapped engine"""
+"""Vmapped wrappers for core engine functions.
+
+This module provides a high-level container (:class:`VmappedFunctions`) that precompiles
+vectorised versions of key thermodynamic and mass-balance functions. By wrapping each function with
+:func:`equinox.filter_vmap`, the module ensures efficient batched evaluation of model properties.
+"""
 
 from collections.abc import Callable
 from typing import Literal
@@ -36,32 +41,25 @@ from atmodeller.engine import (
     get_total_pressure,
     objective_function,
 )
-from atmodeller.solvers import vmap_axes_spec
+from atmodeller.solvers import LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec
 from atmodeller.utilities import get_log_number_density_from_log_pressure
-
-# FIXME: In practice, this is probably mostly a convenient wrapper for computing output, and won't
-# be used for the actual numerical solution, which seems cleaner and easy to do using functional
-# programming.
 
 
 class VmappedFunctions(eqx.Module):
-    """Container for precompiled `vmap`ped model functions.
+    """Container for precompiled ``vmap``ped model functions.
 
     This class wraps a set of model functions (e.g., thermodynamic property calculations, reaction
-    masks, etc.) with :func:`eqx.filter_vmap` so they can be evaluated efficiently over batched
+    masks, etc.) with :func:`equinox.filter_vmap` so they can be evaluated efficiently over batched
     inputs.
 
     The primary assumption is that ``log_number_density`` inputs are already batched along axis 0.
-    The ``in_axes`` specifications for all ``vmap`` calls are precomputed at initialization from
+    The ``in_axes`` specifications for all ``vmap`` calls are precomputed at initialisation from
     the provided ``parameters`` object, ensuring consistent vectorisation behavior across all
     functions.
 
-    Each wrapped function is stored as a bound method (e.g., `get_atmosphere_log_molar_mass`),
-    and internally calls a preconstructed ``vmap`` object. This minimizes tracing overhead and
-    avoids recomputing ``in_axes`` specs for each call.
-
-    In addition, the ``objective_function`` is precompiled with both ``vmap`` and ``jit`` for use
-    inside iterative solvers, ensuring minimal Python dispatch cost during repeated evaluations.
+    Each wrapped function is stored as a bound method and internally calls a preconstructed
+    ``vmap`` object. This minimizes tracing overhead and avoids recomputing ``in_axes`` specs for
+    each call.
 
     Args:
         parameters: Parameters
@@ -88,43 +86,42 @@ class VmappedFunctions(eqx.Module):
 
         # Compute axes specs once
         parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
-        log_number_density_vmap_axes: int = 0
         temperature_vmap_axes: Literal[0, None] = vmap_axes_spec(parameters.planet.temperature)
 
         # Pre-build vmap wrappers
         self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
             get_atmosphere_log_molar_mass,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_atmosphere_log_volume = eqx.filter_vmap(
             get_atmosphere_log_volume,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_element_density = eqx.filter_vmap(
             get_element_density,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_element_density_in_melt = eqx.filter_vmap(
             get_element_density_in_melt,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_log_activity = eqx.filter_vmap(
             get_log_activity,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_log_number_density_from_log_pressure = eqx.filter_vmap(
             get_log_number_density_from_log_pressure,
-            in_axes=(log_number_density_vmap_axes, temperature_vmap_axes),
+            in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, temperature_vmap_axes),
         )
 
         self._get_pressure_from_log_number_density = eqx.filter_vmap(
             get_pressure_from_log_number_density,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_reactions_only_mask = eqx.filter_vmap(
@@ -134,22 +131,22 @@ class VmappedFunctions(eqx.Module):
 
         self._get_species_density_in_melt = eqx.filter_vmap(
             get_species_density_in_melt,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_species_ppmw_in_melt = eqx.filter_vmap(
             get_species_ppmw_in_melt,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,
-            in_axes=(parameters_vmap_axes, log_number_density_vmap_axes),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_DENSITY_VMAP_AXES),
         )
 
         self._objective_function_vmap = eqx.filter_vmap(
             objective_function,
-            in_axes=(log_number_density_vmap_axes, parameters_vmap_axes),
+            in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, parameters_vmap_axes),
         )
 
     def get_atmosphere_log_molar_mass(self, log_number_density: Array) -> Array:

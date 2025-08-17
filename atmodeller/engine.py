@@ -30,7 +30,7 @@ model (e.g., mass balance, fugacity constraints, phase stability), and are inten
        vectorisation.
 
 In practice, these functions are rarely called directly in production code. Instead, they are
-wrapped with :func:`eqx.filter_vmap` to enable efficient batched evaluation over multiple
+wrapped with :func:`equinox.filter_vmap` to enable efficient batched evaluation over multiple
 scenarios or parameter sets.
 """
 
