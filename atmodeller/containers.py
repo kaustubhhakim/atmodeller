@@ -121,7 +121,7 @@ class Species(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to
-                :data:`GAS_STATE <atmodeller.GAS_STATE>`
+                :data:`GAS_STATE <atmodeller.constants.GAS_STATE>`
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
             solve_for_stability. Solve for stability. Defaults to `False`.

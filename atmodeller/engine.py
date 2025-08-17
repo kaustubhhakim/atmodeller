@@ -24,14 +24,14 @@ These functions form the building blocks for solving the coupled system of equat
 model (e.g., mass balance, fugacity constraints, phase stability), and are intended to be:
 
     1. Pure: No side effects, deterministic outputs for given inputs.
-    2. JAX-compatible: Written with `jax.numpy` and compatible with transformations such as
-        `jit`, `grad`, and `vmap`.
+    2. JAX-compatible: Written with ``jax.numpy`` and compatible with transformations such as
+       ``jit``, ``grad``, and ``vmap``.
     3. Shape-consistent: Accept and return arrays with predictable shapes, enabling easy
-        vectorization.
+       vectorisation.
 
 In practice, these functions are rarely called directly in production code. Instead, they are
-wrapped with `eqx.filter_vmap` to enable efficient batched evaluation over multiple scenarios or
-parameter sets.
+wrapped with :func:`eqx.filter_vmap` to enable efficient batched evaluation over multiple
+scenarios or parameter sets.
 """
 
 from collections.abc import Callable
