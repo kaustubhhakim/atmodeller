@@ -14,7 +14,12 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solvers"""
+"""Non-linear solvers for chemical equilibrium and parameterised systems.
+
+This module provides JAX-compatible solver utilities for efficiently handling both single-system
+and batched systems of non-linear equations. The solvers are designed to integrate seamlessly with
+JAX transformations support Equinox-based pytrees for flexible parameter handling.
+"""
 
 from collections.abc import Callable
 from typing import Any, Literal, cast

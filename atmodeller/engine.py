@@ -67,17 +67,17 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         Active mask
     """
     # Get all masks separately
-    fugacity_mask: Array = parameters.fugacity_constraints.active()
-    reactions_mask: NpBool = parameters.species.active_reactions
-    mass_mask: Array = parameters.mass_constraints.active()
-    stability_mask: NpBool = parameters.species.active_stability
+    fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
+    reactions_mask: ArrayLike = parameters.species.active_reactions
+    mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
+    stability_mask: ArrayLike = parameters.species.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
     # jax.debug.print("mass_mask = {out}", out=mass_mask)
     # jax.debug.print("stability_mask = {out}", out=stability_mask)
 
-    active_mask: Array = jnp.concatenate(
+    active_mask: Bool[Array, " dim"] = jnp.concatenate(
         (fugacity_mask, reactions_mask, mass_mask, stability_mask)
     )
     # jax.debug.print("active_mask = {out}", out=active_mask)
@@ -103,7 +103,6 @@ def get_atmosphere_log_molar_mass(
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
         parameters, jnp.array(parameters.species.molar_masses)
     )
-
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
         gas_log_number_density, b=parameters.species.gas_species_mask
     )
@@ -399,7 +398,7 @@ def get_pressure_from_log_number_density(
     return safe_exp(get_log_pressure_from_log_number_density(parameters, log_number_density))
 
 
-def get_reactions_only_mask(parameters: Parameters) -> Array:
+def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
 
     Args:
@@ -410,15 +409,17 @@ def get_reactions_only_mask(parameters: Parameters) -> Array:
     """
     # Create a full mask of False
     size: int = parameters.species.number_solution
-    mask: Array = jnp.zeros(size, dtype=bool)
+    mask: Bool[Array, " dim"] = jnp.zeros(size, dtype=bool)
 
-    fugacity_mask: Array = parameters.fugacity_constraints.active()
+    fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
     reactions_mask: NpBool = parameters.species.active_reactions
-    num_active_fugacity: Array = jnp.sum(fugacity_mask)
+    num_active_fugacity: Integer[Array, ""] = jnp.sum(fugacity_mask)
 
     # Place the reactions_mask at position num_active_fugacity dynamically.
     # Use lax.dynamic_update_slice: (array_to_update, update, start_indices)
-    mask = lax.dynamic_update_slice(mask, reactions_mask, (num_active_fugacity,))
+    mask: Bool[Array, " dim"] = lax.dynamic_update_slice(
+        mask, reactions_mask, (num_active_fugacity,)
+    )
 
     return mask
 
@@ -569,7 +570,7 @@ def objective_function(
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
     # Fugacity constraints residual (dimensionless, log-ratio of number densities)
-    fugacity_residual = (
+    fugacity_residual: Float[Array, " reactions"] = (
         log_activity_number_density
         - parameters.fugacity_constraints.log_number_density(temperature, total_pressure)
     )
@@ -590,18 +591,22 @@ def objective_function(
         parameters.species.reaction_matrix
     )
 
-    log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(parameters)
+    log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
+        get_log_reaction_equilibrium_constant(parameters)
+    )
     # jax.debug.print(
     #     "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant.shape
     # )
-    reaction_residual: Array = (
+    reaction_residual: Float[Array, " reactions"] = (
         reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
     )
     # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
-    reaction_stability_mask: Array = jnp.broadcast_to(
+    reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
         parameters.species.active_stability, reaction_matrix.shape
     )
-    reaction_stability_matrix: Array = reaction_matrix * reaction_stability_mask
+    reaction_stability_matrix: Float[Array, "reactions species"] = (
+        reaction_matrix * reaction_stability_mask
+    )
     # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)
 
     # Dimensionless (log K residual)
@@ -685,7 +690,7 @@ def objective_function(
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    active_mask: Array = get_active_mask(parameters)
+    active_mask: Bool[Array, " dim"] = get_active_mask(parameters)
     # jax.debug.print("active_mask = {out}", out=active_mask)
     size: int = parameters.species.number_solution
     # jax.debug.print("size = {out}", out=size)
