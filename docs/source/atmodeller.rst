@@ -46,6 +46,14 @@ atmodeller.engine module
    :show-inheritance:
    :undoc-members:
 
+atmodeller.engine\_vmap module
+------------------------------
+
+.. automodule:: atmodeller.engine_vmap
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 atmodeller.interfaces module
 ----------------------------
 
@@ -58,6 +66,14 @@ atmodeller.output module
 ------------------------
 
 .. automodule:: atmodeller.output
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+atmodeller.solvers module
+-------------------------
+
+.. automodule:: atmodeller.solvers
    :members:
    :show-inheritance:
    :undoc-members:

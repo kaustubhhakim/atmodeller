@@ -44,7 +44,13 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
 ]
+
+intersphinx_mapping = {
+    "jax": ("https://docs.jax.dev/en/latest/", None),
+    "equinox": ("https://docs.kidger.site/equinox/", None),
+}
 
 bibtex_bibfiles = ["refs.bib"]
 

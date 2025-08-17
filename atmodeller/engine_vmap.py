@@ -36,7 +36,8 @@ from atmodeller.engine import (
     get_total_pressure,
     objective_function,
 )
-from atmodeller.utilities import get_log_number_density_from_log_pressure, vmap_axes_spec
+from atmodeller.solvers import vmap_axes_spec
+from atmodeller.utilities import get_log_number_density_from_log_pressure
 
 # FIXME: In practice, this is probably mostly a convenient wrapper for computing output, and won't
 # be used for the actual numerical solution, which seems cleaner and easy to do using functional
@@ -49,15 +50,15 @@ class VmappedFunctions(eqx.Module):
     This class wraps a set of model functions (e.g., thermodynamic property calculations, reaction
     masks, etc.) with `eqx.filter_vmap` so they can be evaluated efficiently over batched inputs.
 
-    The primary assumption is that ``log_number_density`` inputs are **already batched** along axis
-    0. The `in_axes` specifications for all `vmap` calls are precomputed at initialization from the
+    The primary assumption is that `log_number_density` inputs are already batched along axis 0.
+    The `in_axes` specifications for all `vmap` calls are precomputed at initialization from the
     provided `parameters` object, ensuring consistent vectorization behavior across all functions.
 
-    Each wrapped function is stored as a bound method (e.g., ``get_atmosphere_log_molar_mass``),
+    Each wrapped function is stored as a bound method (e.g., `get_atmosphere_log_molar_mass`),
     and internally calls a preconstructed `vmap` object. This minimizes tracing overhead and
     avoids recomputing `in_axes` specs for each call.
 
-    In addition, the ``objective_function`` is precompiled with both `vmap` and `jit` for use
+    In addition, the `objective_function` is precompiled with both `vmap` and `jit` for use
     inside iterative solvers, ensuring minimal Python dispatch cost during repeated evaluations.
 
     Args:

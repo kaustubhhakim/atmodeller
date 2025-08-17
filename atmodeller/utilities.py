@@ -18,14 +18,14 @@
 
 import logging
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-from jax.tree_util import Partial, tree_map
+from jax.tree_util import Partial
 from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
@@ -62,11 +62,6 @@ def all_not_nan(x: ArrayLike) -> Bool[Array, "..."]:
 
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
-
-
-def is_jax_array(element: Any) -> bool:
-    """Returns `True` if `element` is a JAX array."""
-    return isinstance(element, jax.Array)
 
 
 def to_hashable(x: Any) -> Callable:
@@ -330,45 +325,6 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
     return jnp.power(values, exponent) * constant
 
 
-def is_arraylike_batched(x: Any) -> Literal[0, None]:
-    """Checks if x is batched.
-
-    The logic accommodates batching for scalars, 1-D arrays, and 2-D arrays.
-
-    Args:
-        x: Something to check
-
-    Returns:
-        0 (axis) if batched, else None (not batched)
-    """
-    if is_jax_array(x):
-        # Vectorise over any 1-D array
-        if x.ndim == 1:
-            return 0
-        # Any 2-D array (i.e., log_abundance in MassConstraints) should be vectorised over the
-        # the first dimension if it is not unity
-        elif x.ndim == 2 and x.shape[0] > 1:
-            return 0
-
-    # Returning None is implicit, meaning "not batched".
-    # This applies when:
-    # 1. x is not an array
-    # 2. x is a scalar array (ndim == 0)
-    # 3. x is a 2-D array with only one row (e.g., log_abundance in MassConstraints)
-
-
-def vmap_axes_spec(x: Any) -> Any:
-    """Recursively generate in_axes for vmap by checking if each leaf is batched (axis 0).
-
-    Args:
-        x: Pytree of nested containers possibly containing arrays or scalars
-
-    Returns:
-        Pytree matching the structure of x
-    """
-    return tree_map(is_arraylike_batched, x)
-
-
 def get_batch_size(x: Any) -> int:
     """Determines the maximum batch size (i.e., length along axis 0) among all array-like leaves.
 
@@ -384,30 +340,3 @@ def get_batch_size(x: Any) -> int:
             max_size = max(max_size, leaf.shape[0] if leaf.ndim else 1)
 
     return max_size
-
-
-def pytree_debug(pytree: Any, name: str) -> None:
-    """Prints the pytree structure for debugging vmap.
-
-    Args:
-        pytree: Pytree to print
-        name: Name for the debug print
-    """
-    arrays, static = eqx.partition(pytree, is_jax_array)
-    arrays_tree = tree_map(
-        lambda x: (
-            type(x),
-            "True" if is_jax_array(x) else ("False" if x is not None else "None"),
-        ),
-        arrays,
-    )
-    jax.debug.print("{name} arrays_tree = {out}", name=name, out=arrays_tree)
-
-    static_tree = tree_map(
-        lambda x: (
-            type(x),
-            "True" if is_jax_array(x) else ("False" if x is not None else "None"),
-        ),
-        static,
-    )
-    jax.debug.print("{name} static_tree = {out}", name=name, out=static_tree)

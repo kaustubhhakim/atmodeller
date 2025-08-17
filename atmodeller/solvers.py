@@ -17,74 +17,137 @@
 """Solvers"""
 
 from collections.abc import Callable
-from typing import cast
+from typing import Any, Literal, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
 from jax import lax, random
+from jax.tree_util import tree_map
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller.containers import Parameters
 from atmodeller.engine import objective_function
-from atmodeller.utilities import vmap_axes_spec
 
 LOG_NUMBER_DENSITY_VMAP_AXES: int = 0
+
+
+def is_jax_array(element: Any) -> bool:
+    """Returns ``True`` if ``element`` is a JAX array."""
+    return isinstance(element, jax.Array)
+
+
+def is_arraylike_batched(x: Any) -> Literal[0, None]:
+    """Determines whether an object should be treated as batched along axis 0 for :func:`jax.vmap`.
+
+    This function only considers JAX arrays for batching. While :func:`equinox.is_array` regards
+    both JAX and NumPy arrays as arrays for tracing, NumPy arrays are treated here as static
+    constants and are never batched. This allows fixed matrices (e.g., reaction matrices,
+    stoichiometric formulae) to remain inside pytrees without being inadvertently vectorised.
+
+    Batching rules for JAX arrays:
+        - 1-D JAX arrays: Always considered batched along axis 0.
+        - 2-D JAX arrays: Considered batched if they have more than one row; the leading axis
+          (rows) is the batch dimension.
+        - 0-D (scalar) JAX arrays: Not batched.
+
+    All other objects (non-arrays or NumPy arrays) are treated as not batched.
+
+    Args:
+        x: Candidate object to check for batching.
+
+    Returns:
+        ``0`` if ``x`` should be batched along axis 0, otherwise ``None``.
+    """
+    if is_jax_array(x):
+        # Vectorise over any 1-D array
+        if x.ndim == 1:
+            return 0
+        # Any 2-D array (i.e., log_abundance in MassConstraints) should be vectorised over the
+        # the first dimension if it is not unity
+        elif x.ndim == 2 and x.shape[0] > 1:
+            return 0
+
+
+def vmap_axes_spec(x: Any) -> Any:
+    """Recursively generate ``in_axes`` for :func:`jax.vmap` by checking if each leaf is batched.
+
+    Unlike :func:`equinox.is_array`, which treats both JAX and NumPy arrays as arrays for tracing,
+    batching here is only applied to JAX array leaves. This distinction is important because:
+
+    - JAX arrays: These are the only leaves considered for batching. If a JAX array is 1-D or a
+      2-D array with more than one row, its leading axis (0) is marked for vectorisation.
+    - NumPy arrays: These are traced like arrays by Equinox but are treated as static constants
+      here. They are not batched, which allows domain-specific matrices (e.g., formula matrices,
+      reaction matrices, stoichiometry tables) to remain inside pytrees without being mistakenly
+      vectorised.
+
+    This behaviour ensures that only model inputs and outputs represented as JAX arrays
+    participate in :func:`jax.vmap`, while fixed structural data stored as NumPy arrays are
+    preserved as-is.
+
+    Args:
+        x: A pytree of nested containers possibly containing JAX arrays, NumPy arrays, or scalars.
+
+    Returns:
+        A pytree with the same structure as ``x``. Each leaf is ``0`` if batched, or ``None``
+        if not.
+    """
+    return tree_map(is_arraylike_batched, x)
 
 
 # @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solver_single(
-    solution: Float[Array, "..."], parameters: Parameters, objective_function: Callable
+    initial_guess: Float[Array, "..."], parameters: Parameters, objective_function: Callable
 ) -> tuple[Float[Array, "..."], Bool[Array, ""], Integer[Array, ""]]:
     """Solves a single system of non-linear equations.
 
     Args:
-        solution: Initial guess for the solution array
+        initial_guess: Initial guess for the solution
         parameters: Model parameters required by the objective function and solver
         objective_function: Callable returning residuals for the system
 
     Returns:
-        - solver_value: Array of computed solution values
-        - solver_status: Boolean scalar indicating whether the solver converged successfully
-        - solver_steps: Integer scalar giving the number of iterations performed
+        tuple:
+            - solution: Array of solution values
+            - status: Boolean scalar indicating whether the solver converged
+            - steps: Integer scalar giving the number of iterations performed
     """
     sol: optx.Solution = optx.root_find(
         objective_function,
         parameters.solver_parameters.get_solver_instance(),
-        solution,
+        initial_guess,
         args=parameters,
         throw=parameters.solver_parameters.throw,
         max_steps=parameters.solver_parameters.max_steps,
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
 
-    solver_value: Float[Array, "..."] = sol.value
-    solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
-    solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+    solution: Float[Array, "..."] = sol.value
+    status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
+    steps: Integer[Array, ""] = sol.stats["num_steps"]
 
-    # jax.debug.print("solver_value = {out}", out=solver_value)
-    # jax.debug.print("solver_steps = {out}", out=solver_steps)
-    # jax.debug.print("solver_status = {out}", out=solver_status)
+    # jax.debug.print("solution = {out}", out=solution)
+    # jax.debug.print("status = {out}", out=status)
+    # jax.debug.print("steps = {out}", out=steps)
 
-    return solver_value, solver_status, solver_steps
+    return solution, status, steps
 
 
 def get_solver_individual(parameters: Parameters) -> Callable:
     """Gets a vmapped, JIT-compiled solver for independent batch systems.
 
-    Wraps `solver_single` with `equinox.filter_vmap` and `filter_jit` so that it can solve multiple
-    independent systems in a batch efficiently. Each batch element is solved separately, producing
-    per-element convergence statistics.
+    Wraps :func:`solver_single` with :func:`equinox.filter_vmap` and :func:`filter_jit` so that it
+    can solve multiple independent systems in a batch efficiently. Each batch element is solved
+    separately, producing per-element convergence statistics.
 
     Args:
-        parameters: Model parameters used for all systems in the batch.
+        parameters: Model parameters required by the objective function and solver
 
     Returns:
-        Callable that takes:
-            - solution: Array of initial guesses for each batch element
-            - parameters: Model parameters
+        Callable
     """
     solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_function)
 
@@ -99,22 +162,19 @@ def get_solver_batch(parameters: Parameters) -> Callable:
     """Gets a JIT-compiled solver for batched systems treated as a single problem.
 
     In this mode, the objective function is already vmapped across the batch dimension, so
-    `solver_single` sees the batch as one system. The solver returns a single convergence status
-    and iteration count, which are broadcast to match the batch shape.
+    :func:`solver_single` sees the batch as one system. The solver returns a single convergence
+    status and iteration count, which are broadcast to match the batch shape.
 
     Args:
-        parameters: Model parameters used for the batch
+        parameters: Model parameters required by the objective function and solver
 
     Returns:
-        Callable that takes:
-            - solution: Array of initial guesses for all batch elements
-            - parameters: Model parameters
+        Callable
     """
     objective_vmap: Callable = eqx.filter_vmap(
         objective_function,
         in_axes=(LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec(parameters)),
     )
-
     solver_fn: Callable = eqx.Partial(solver_single, objective_function=objective_vmap)
 
     @eqx.filter_jit
@@ -137,7 +197,7 @@ def get_solver_batch(parameters: Parameters) -> Callable:
 # @eqx.debug.assert_max_traces(max_traces=1)
 def repeat_solver(
     solver_fn: Callable,
-    solution: Float[Array, "batch solution"],
+    initial_guess: Float[Array, "batch solution"],
     parameters: Parameters,
     key: PRNGKeyArray,
 ) -> tuple[
@@ -150,24 +210,29 @@ def repeat_solver(
 
     This function attempts to solve a system of equations for a batch of initial solutions. If
     some entries fail to converge, it perturbs only the failing solutions and retries, up to a
-    maximum number of attempts specified in `parameters.solver_parameters.multistart`.
+    maximum number of attempts specified in
+    :attr:`~atmodeller.containers.SolverParameters.multistart`.
 
     The perturbation is applied proportionally to
-    `parameters.solver_parameters.multistart_perturbation`. Successful solutions are kept as-is,
-    and the function tracks the iteration when each entry first succeeded.
+    :attr:`~atmodeller.containers.SolverParameters.multistart_perturbation`. Successful solutions
+    are kept as-is, and the function tracks the iteration when each entry first succeeded.
 
     Args:
         solver_fn: Solver function
-        solution: Initial batch of solutions to be solved
-        parameters: Parameters
+        initial_guess: Initial guess for the solution
+        parameters: Model parameters required by the objective function and solver
         key: A JAX random key for generating perturbations
 
     Returns:
-        A tuple with the state: (solution, solver_status, solver_steps, solver_attempts)
+        tuple:
+            - final_solution: Array of solution values
+            - final_status: Boolean scalar indicating whether the solver converged
+            - final_steps: Integer scalar giving the number of iterations performed
+            - final_attempts: Success attempts
     """
 
     def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
-        """Perform one iteration of the solver retry loop
+        """Performs one iteration of the solver retry loop.
 
         Args:
             state: Tuple containing:
@@ -226,7 +291,7 @@ def repeat_solver(
         )
 
     def cond_fn(state: tuple[Array, ...]) -> Bool[Array, "..."]:
-        """Check if the solver should continue retrying
+        """Checks if the solver should continue retrying.
 
         Args:
             state: Tuple containing:
@@ -249,13 +314,13 @@ def repeat_solver(
         return jnp.logical_and(i < parameters.solver_parameters.multistart, jnp.any(~status))
 
     # Try first solution
-    first_solution, first_solver_status, first_solver_steps = solver_fn(solution, parameters)
+    first_solution, first_solver_status, first_solver_steps = solver_fn(initial_guess, parameters)
     # jax.debug.print("first_solution = {out}", out=first_solution)
     # jax.debug.print("first_solver_status = {out}", out=first_solver_status)
     # jax.debug.print("first_solver_steps = {out}", out=first_solver_steps)
 
     # Failback solution
-    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
+    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, initial_guess))
     # jax.debug.print("solution = {out}", out=solution)
 
     initial_state: tuple[Array, ...] = (
@@ -277,27 +342,28 @@ def repeat_solver(
 def make_solve_tau_step(solver_fn: Callable, parameters: Parameters) -> Callable:
     """Factory function that creates a JIT-compiled solver step for a sequence of tau values.
 
-    This wraps a repeatable, vmapped solver function (`solver_vmap_fn`) to update the `tau`
-    parameter dynamically at each step. The returned function is suitable for use in `jax.lax.scan`
-    to efficiently sweep over multiple tau values in a single compiled loop.
+    This wraps a repeatable, vmapped solver function (``solver_fn``) to update the ``tau``
+    parameter dynamically at each step. The returned function is suitable for use in
+    :func:`jax.lax.scan` to efficiently sweep over multiple tau values in a single compiled loop.
 
     Args:
         solver_fn: Solver function
-        parameters: Template `Parameters` object containing the full solver configuration. The
-            `tau` leaf inside `solver_parameters` will be replaced at each step.
+        parameters: Template :class:`~atmodeller.containers.Parameters` object containing the
+            full solver configuration. The ``tau`` leaf inside
+            :class:`~atmodeller.containers.SolverParameters` will be replaced at each step.
 
     Returns:
-        A JIT-compiled function
+        Callable
     """
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
     def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
-        """Perform a single solver step for a given batch of tau values.
+        """Performs a single solver step for a given batch of tau values.
 
-        This function is intended to be used inside `jax.lax.scan` to iterate over multiple tau
-        values efficiently. It updates the `tau` leaf in the parameters, calls the `repeat_solver`
-        for the current batch, and returns the updated carry and results.
+        This function is intended to be used inside :func``jax.lax.scan`` to iterate over multiple
+        tau values efficiently. It updates the ``tau`` leaf in the parameters, calls the
+        :func:`repeat_solver` for the current batch, and returns the updated carry and results.
 
         Args:
             carry: Tuple of carry values
@@ -312,7 +378,7 @@ def make_solve_tau_step(solver_fn: Callable, parameters: Parameters) -> Callable
         # Get new parameters with tau value
         get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
         new_parameters: Parameters = eqx.tree_at(get_leaf, parameters, tau)
-        jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
+        # jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
 
         new_solution, new_status, new_steps, success_attempt = repeat_solver(
             solver_fn, solution, new_parameters, subkey
