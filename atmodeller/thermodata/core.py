@@ -30,8 +30,7 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
-from atmodeller import TEMPERATURE_REFERENCE
-from atmodeller.constants import GAS_CONSTANT
+from atmodeller.constants import GAS_CONSTANT, TEMPERATURE_REFERENCE
 from atmodeller.utilities import as_j64, to_native_floats, unit_conversion
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")

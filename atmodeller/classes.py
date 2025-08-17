@@ -26,8 +26,14 @@ import jax.random as random
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
 from atmodeller._mytypes import NpFloat
+from atmodeller.constants import (
+    INITIAL_LOG_NUMBER_DENSITY,
+    INITIAL_LOG_STABILITY,
+    TAU,
+    TAU_MAX,
+    TAU_NUM,
+)
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution

@@ -31,16 +31,17 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Float64
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
-from atmodeller import (
+from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt, OptxSolver
+from atmodeller.constants import (
+    AVOGADRO,
     GAS_STATE,
+    GRAVITATIONAL_CONSTANT,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
     TAU,
 )
-from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt, OptxSolver
-from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.solubility.library import NoSolubility
