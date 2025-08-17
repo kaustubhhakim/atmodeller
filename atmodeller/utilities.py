@@ -36,15 +36,15 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ExperimentalCalibration(eqx.Module):
-    """Experimental calibration
+    r"""Experimental calibration
 
     Args:
         temperature_min: Minimum calibrated temperature. Defaults to ``None``.
         temperature_max: Maximum calibrated temperature. Defaults to ``None``.
         pressure_min: Minimum calibrated pressure. Defaults to ``None``.
         pressure_max: Maximum calibrated pressure. Defaults to ``None``.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to ``None``.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to ``None``.
+        log10_fO2_min: Minimum calibrated :math:`\log_{10} f\rm{O}_2`. Defaults to ``None``.
+        log10_fO2_max: Maximum calibrated :math:`\log_{10} f\rm{O}_2`. Defaults to ``None``.
     """
 
     temperature_min: Optional[float] = None
@@ -56,9 +56,9 @@ class ExperimentalCalibration(eqx.Module):
     pressure_max: Optional[float] = None
     """Maximum calibrated pressure"""
     log10_fO2_min: Optional[float] = None
-    """Minimum calibrated log10 fO2"""
+    r"""Minimum calibrated :math:`\log_{10} f\rm{O}_2`"""
     log10_fO2_max: Optional[float] = None
-    """Maximum calibrated log10 fO2"""
+    r"""Maximum calibrated :math:`\log_{10} f\rm{O}_2`"""
 
     def __init__(
         self,
