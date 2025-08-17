@@ -169,7 +169,7 @@ class InteriorAtmosphere:
             # )
             # print(new_solver_params)
 
-            if jnp.any(parameters.species.active_stability_array()):
+            if jnp.any(parameters.species.active_stability):
                 logger.info(
                     "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
                     TAU_MAX,

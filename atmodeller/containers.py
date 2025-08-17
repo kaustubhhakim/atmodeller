@@ -139,19 +139,13 @@ class Species(eqx.Module):
 class SpeciesCollection(eqx.Module):
     """A collection of species
 
-    Note:
-        The `active_stability` attribute must be a fixed, non-traced tuple because it is used in
-        JAX operations such as `jnp.where` where the `size` argument must be a static (compile-time
-        known) value. This requirement avoids recompilation and tracing errors in the engine when
-        determining the number of solution quantities.
-
     Args:
-        species: Species
+        species: An iterable of species
     """
 
     data: tuple[Species, ...]
     """Species data"""
-    active_stability: tuple[bool, ...]
+    active_stability: NpBool
     """Active stability mask"""
     gas_species_mask: NpBool
     """Gas species mask"""
@@ -175,12 +169,17 @@ class SpeciesCollection(eqx.Module):
     """Reaction matrix"""
     active_reactions: NpBool
     """Active reactions"""
-    number_stability: int
-    """Number of stability to solve for"""
+    number_solution: int
+    """Number of solution quantities. NOTE: Must be static (cannot depend on traced quantities)."""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
-        self.active_stability = tuple([species.solve_for_stability for species in self.data])
+
+        # Ensure number_solution is static
+        active_stability: list[bool] = [species.solve_for_stability for species in self.data]
+        self.number_solution = self.number_species + sum(active_stability)
+        self.active_stability = np.array(active_stability)
+
         self.gas_species_mask = np.array(
             [species.data.state == GAS_STATE for species in self.data], dtype=bool
         )
@@ -207,7 +206,6 @@ class SpeciesCollection(eqx.Module):
         self.formula_matrix = self.get_formula_matrix()
         self.reaction_matrix = self.get_reaction_matrix()
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
-        self.number_stability = sum(self.active_stability)
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -240,22 +238,6 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    @property
-    def number_solution(self) -> int:
-        """Number of solution quantities
-
-        This must be static.
-        """
-        return self.number_species + self.number_stability
-
-    def active_stability_array(self) -> Bool[Array, " species"]:
-        """Active species stability
-
-        Returns:
-            `True` for species stabilities that are to be solved for, otherwise `False`
-        """
-        return jnp.array(self.active_stability)
-
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
@@ -283,12 +265,11 @@ class SpeciesCollection(eqx.Module):
         Returns:
             Formula matrix
         """
-        unique_elements: tuple[str, ...] = self.unique_elements
         formula_matrix: NpInt = np.zeros(
-            (len(unique_elements), self.number_species), dtype=np.int_
+            (len(self.unique_elements), self.number_species), dtype=np.int_
         )
 
-        for element_index, element in enumerate(unique_elements):
+        for element_index, element in enumerate(self.unique_elements):
             for species_index, species_ in enumerate(self):
                 count: int = 0
                 try:
@@ -308,14 +289,13 @@ class SpeciesCollection(eqx.Module):
             Reactions as a dictionary
         """
         reaction_matrix: NpFloat = self.get_reaction_matrix()
-        species_names: tuple[str, ...] = self.species_names
 
         reactions: dict[int, str] = {}
         if reaction_matrix.size != 0:
             for reaction_index in range(reaction_matrix.shape[0]):
                 reactants: str = ""
                 products: str = ""
-                for species_index, name in enumerate(species_names):
+                for species_index, name in enumerate(self.species_names):
                     coeff: float = reaction_matrix[reaction_index, species_index].item()
                     if coeff != 0:
                         if coeff < 0:

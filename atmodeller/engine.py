@@ -70,7 +70,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     fugacity_mask: Array = parameters.fugacity_constraints.active()
     reactions_mask: NpBool = parameters.species.active_reactions
     mass_mask: Array = parameters.mass_constraints.active()
-    stability_mask: Array = parameters.species.active_stability_array()
+    stability_mask: NpBool = parameters.species.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -599,7 +599,7 @@ def objective_function(
     )
     # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual.shape)
     reaction_stability_mask: Array = jnp.broadcast_to(
-        parameters.species.active_stability_array(), reaction_matrix.shape
+        parameters.species.active_stability, reaction_matrix.shape
     )
     reaction_stability_matrix: Array = reaction_matrix * reaction_stability_mask
     # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)

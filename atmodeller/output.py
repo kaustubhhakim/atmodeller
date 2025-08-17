@@ -71,7 +71,7 @@ class Output:
         self._log_number_density: NpFloat = log_number_density
         # Mask stabilities that are not solved
         self._log_stability: NpFloat = np.where(
-            parameters.species.active_stability_array(), log_stability, np.nan
+            parameters.species.active_stability, log_stability, np.nan
         )
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
@@ -614,7 +614,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self._parameters.species.active_stability_array(), log_activity_without_stability.shape
+            self._parameters.species.active_stability, log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
