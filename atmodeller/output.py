@@ -80,7 +80,7 @@ class Output:
     @property
     def formula_matrix(self) -> NpInt:
         """Formula matrix"""
-        return np.asarray(self._parameters.formula_matrix)
+        return self._parameters.species.formula_matrix
 
     @property
     def condensed_species_mask(self) -> NpBool:
@@ -345,7 +345,7 @@ class Output:
         Returns:
             Reaction disequilibrium as a dictionary
         """
-        reaction_matrix: NpFloat = np.array(self._parameters.reaction_matrix)
+        reaction_matrix: NpFloat = np.array(self._parameters.species.reaction_matrix)
         species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 

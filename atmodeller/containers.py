@@ -53,10 +53,8 @@ from atmodeller.utilities import (
     as_j64,
     get_batch_size,
     get_log_number_density_from_log_pressure,
-    get_reaction_dictionary,
     partial_rref,
     to_hashable,
-    to_native_floats,
     unit_conversion,
 )
 
@@ -169,6 +167,12 @@ class SpeciesCollection(eqx.Module):
     """Unique elements in species in alphabetical order"""
     number_reactions: int
     """Number of reactions"""
+    formula_matrix: NpInt
+    """Formula matrix"""
+    reaction_matrix: NpFloat
+    """Reaction matrix"""
+    diatomic_oxygen_index: int
+    """Index of diatomic oxygen"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
@@ -190,7 +194,12 @@ class SpeciesCollection(eqx.Module):
         unique_elements: list[str] = list(set(elements))
         self.unique_elements = tuple(sorted(unique_elements))
 
+        # Reactions
         self.number_reactions = max(0, self.number_species - len(self.unique_elements))
+        self.formula_matrix = self.get_formula_matrix()
+        self.reaction_matrix = self.get_reaction_matrix()
+
+        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
@@ -250,6 +259,74 @@ class SpeciesCollection(eqx.Module):
         # all the solubility laws chosen by the user are checked to see if they depend on fO2. And
         # if so, and fO2 is not included in the model, an error is raised.
         return 0
+
+    def get_formula_matrix(self) -> NpInt:
+        """Gets the formula matrix.
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Returns:
+            Formula matrix
+        """
+        unique_elements: tuple[str, ...] = self.unique_elements
+        formula_matrix: NpInt = np.zeros(
+            (len(unique_elements), self.number_species), dtype=np.int_
+        )
+
+        for element_index, element in enumerate(unique_elements):
+            for species_index, species_ in enumerate(self):
+                count: int = 0
+                try:
+                    count = species_.data.composition[element][0]
+                except KeyError:
+                    count = 0
+                formula_matrix[element_index, species_index] = count
+
+        # logger.debug("formula_matrix = %s", formula_matrix)
+
+        return formula_matrix
+
+    def get_reaction_dictionary(self) -> dict[int, str]:
+        """Gets reactions as a dictionary.
+
+        Returns:
+            Reactions as a dictionary
+        """
+        reaction_matrix: NpFloat = self.get_reaction_matrix()
+        species_names: tuple[str, ...] = self.species_names
+
+        reactions: dict[int, str] = {}
+        if reaction_matrix.size != 0:
+            for reaction_index in range(reaction_matrix.shape[0]):
+                reactants: str = ""
+                products: str = ""
+                for species_index, name in enumerate(species_names):
+                    coeff: float = reaction_matrix[reaction_index, species_index].item()
+                    if coeff != 0:
+                        if coeff < 0:
+                            reactants += f"{abs(coeff)} {name} + "
+                        else:
+                            products += f"{coeff} {name} + "
+
+                reactants = reactants.rstrip(" + ")
+                products = products.rstrip(" + ")
+                reaction: str = f"{reactants} = {products}"
+                reactions[reaction_index] = reaction
+
+        return reactions
+
+    def get_reaction_matrix(self) -> NpFloat:
+        """Gets the reaction matrix.
+
+        Returns:
+            A matrix of linearly independent reactions or an empty array if no reactions
+        """
+        transpose_formula_matrix: NpInt = self.get_formula_matrix().T
+        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
+        # logger.debug("reaction_matrix = %s", reaction_matrix)
+
+        return reaction_matrix
 
     def __getitem__(self, index: int) -> Species:
         return self.data[index]
@@ -754,9 +831,6 @@ class Parameters(eqx.Module):
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
-        formula_matrix: Formula matrix
-        reaction_matrix: Reaction matrix
-        diatomic_oxygen_index: Index of diatomic oxygen
     """
 
     species: SpeciesCollection
@@ -769,12 +843,6 @@ class Parameters(eqx.Module):
     """Mass constraints"""
     solver_parameters: SolverParameters
     """Solver parameters"""
-    formula_matrix: tuple[tuple[float, ...], ...]
-    """Formula matrix"""
-    reaction_matrix: NpFloat
-    """Reaction matrix"""
-    diatomic_oxygen_index: int
-    """Index of diatomic oxygen"""
 
     @classmethod
     def create(
@@ -817,64 +885,7 @@ class Parameters(eqx.Module):
         get_leaf: Callable = lambda t: t.tau  # noqa: E731
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
-        formula_matrix: tuple[tuple[float, ...], ...] = to_native_floats(
-            cls.get_formula_matrix(species)
-        )
-        reaction_matrix: NpFloat = cls.get_reaction_matrix(species)
-
-        diatomic_oxygen_index: int = species.get_diatomic_oxygen_index()
-
-        return cls(
-            species,
-            planet_,
-            fugacity_constraints_,
-            mass_constraints_,
-            solver_parameters_,
-            formula_matrix,
-            reaction_matrix,
-            diatomic_oxygen_index,
-        )
-
-    @classmethod
-    def get_formula_matrix(cls, species: SpeciesCollection) -> NpInt:
-        """Gets the formula matrix.
-
-        Elements are given in rows and species in columns following the convention in
-        :cite:t:`LKS17`.
-
-        Returns:
-            Formula matrix
-        """
-        unique_elements: tuple[str, ...] = species.unique_elements
-        formula_matrix: NpInt = np.zeros(
-            (len(unique_elements), species.number_species), dtype=np.int_
-        )
-
-        for element_index, element in enumerate(unique_elements):
-            for species_index, species_ in enumerate(species):
-                count: int = 0
-                try:
-                    count = species_.data.composition[element][0]
-                except KeyError:
-                    count = 0
-                formula_matrix[element_index, species_index] = count
-
-        # logger.debug("formula_matrix = %s", formula_matrix)
-
-        return formula_matrix
-
-    @classmethod
-    def get_reaction_matrix(cls, species: SpeciesCollection) -> NpFloat:
-        """Gets the reaction matrix.
-
-        Returns:
-            A matrix of linearly independent reactions or an empty array if no reactions
-        """
-        transpose_formula_matrix: NpInt = cls.get_formula_matrix(species).T
-        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
-        # logger.debug("reaction_matrix = %s", reaction_matrix)
-
-        return reaction_matrix
+        return cls(species, planet_, fugacity_constraints_, mass_constraints_, solver_parameters_)
 
     def active_reactions(self) -> Bool[Array, " reactions"]:
         """Active reactions
@@ -891,15 +902,3 @@ class Parameters(eqx.Module):
             `True` for species stabilities that are to be solved for, otherwise `False`
         """
         return jnp.array(self.species.active_stability)
-
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
-
-        Returns:
-            Reactions as a dictionary
-        """
-        reaction_matrix: NpFloat = self.get_reaction_matrix(self.species)
-        species_names: tuple[str, ...] = self.species.species_names
-        reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
-
-        return reactions

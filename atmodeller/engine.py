@@ -147,7 +147,9 @@ def get_element_density(
     Returns:
         Number density of elements in the gas or condensed phase
     """
-    formula_matrix: Float[Array, "elements species"] = jnp.array(parameters.formula_matrix)
+    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
+        parameters.species.formula_matrix
+    )
     element_density: Float[Array, " elements"] = formula_matrix @ safe_exp(log_number_density)
 
     return element_density
@@ -168,7 +170,9 @@ def get_element_density_in_melt(
     species_melt_density: Float[Array, " species"] = get_species_density_in_melt(
         parameters, log_number_density
     )
-    formula_matrix: Float[Array, "elements species"] = jnp.array(parameters.formula_matrix)
+    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
+        parameters.species.formula_matrix
+    )
     element_melt_density: Float[Array, " species"] = formula_matrix.dot(species_melt_density)
 
     return element_melt_density
@@ -286,7 +290,9 @@ def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
     gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.planet.temperature)
     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
+        parameters.species.reaction_matrix
+    )
     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
     return jnp.ravel(log_Kp)
@@ -322,7 +328,9 @@ def get_log_reaction_equilibrium_constant(parameters: Parameters) -> Float[Array
     Returns:
         Log equilibrium constant of each reaction, hidden unit base of molecules/m^3
     """
-    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
+        parameters.species.reaction_matrix
+    )
     log_Kp: Float[Array, " reactions"] = get_log_Kp(parameters)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Float[Array, " reactions"] = jnp.sum(
@@ -348,7 +356,9 @@ def get_min_log_elemental_abundance_per_species(
     Returns:
         A vector of the minimum log elemental abundance for each species
     """
-    formula_matrix: Float[Array, "elements species"] = jnp.array(parameters.formula_matrix)
+    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
+        parameters.species.formula_matrix
+    )
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
     mask: Integer[Array, "elements species"] = (formula_matrix != 0).astype(jnp.int_)
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
@@ -456,7 +466,7 @@ def get_species_ppmw_in_melt(
         ppmw of species dissolved in melt
     """
     species: SpeciesCollection = parameters.species
-    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(parameters.diatomic_oxygen_index)
+    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(parameters.species.diatomic_oxygen_index)
     temperature: Float[Array, ""] = parameters.planet.temperature
 
     log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_density)
@@ -576,7 +586,9 @@ def objective_function(
     # )
 
     # Reaction network residual
-    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(parameters.reaction_matrix)
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
+        parameters.species.reaction_matrix
+    )
 
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(parameters)
     # jax.debug.print(

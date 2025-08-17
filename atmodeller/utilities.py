@@ -30,43 +30,10 @@ from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
-from atmodeller._mytypes import NpArray, NpFloat, NpInt, Scalar
+from atmodeller._mytypes import NpArray, NpInt, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-def get_reaction_dictionary(
-    reaction_matrix: NpFloat, species_names: tuple[str, ...]
-) -> dict[int, str]:
-    """Gets reactions as a dictionary.
-
-    Args:
-        reaction_matrix: Reaction matrix
-        species_names: Names of species
-
-    Returns:
-        Reactions as a dictionary
-    """
-    reactions: dict[int, str] = {}
-    if reaction_matrix.size != 0:
-        for reaction_index in range(reaction_matrix.shape[0]):
-            reactants: str = ""
-            products: str = ""
-            for species_index, name in enumerate(species_names):
-                coeff: float = reaction_matrix[reaction_index, species_index].item()
-                if coeff != 0:
-                    if coeff < 0:
-                        reactants += f"{abs(coeff)} {name} + "
-                    else:
-                        products += f"{coeff} {name} + "
-
-            reactants = reactants.rstrip(" + ")
-            products = products.rstrip(" + ")
-            reaction: str = f"{reactants} = {products}"
-            reactions[reaction_index] = reaction
-
-    return reactions
 
 
 def get_log_number_density_from_log_pressure(
