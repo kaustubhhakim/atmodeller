@@ -95,9 +95,9 @@ class Species(eqx.Module):
 
         Args:
             formula: Formula
-            state: State of aggregation as defined by JANAF. Defaults to `"cr"`.
-            activity: Activity. Defaults to `1.0` (unity activity).
-            solve_for_stability. Solve for stability. Defaults to `True`.
+            state: State of aggregation as defined by JANAF. Defaults to ``"cr"``.
+            activity: Activity. Defaults to ``1.0`` (unity activity).
+            solve_for_stability. Solve for stability. Defaults to ``True``.
 
         Returns:
             A condensed species
@@ -121,10 +121,10 @@ class Species(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to
-                :data:`GAS_STATE <atmodeller.constants.GAS_STATE>`
+                :const:`~atmodeller.constants.GAS_STATE`
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
-            solve_for_stability. Solve for stability. Defaults to `False`.
+            solve_for_stability. Solve for stability. Defaults to ``False``.
 
         Returns:
             A gas species
@@ -171,7 +171,7 @@ class SpeciesCollection(eqx.Module):
     active_reactions: NpBool
     """Active reactions"""
     number_solution: int
-    """Number of solution quantities. NOTE: Must be static (cannot depend on traced quantities)."""
+    """Number of solution quantities that cannot depend on traced quantities"""
 
     def __init__(self, data: Iterable[Species]):
         self.data = tuple(data)
@@ -342,19 +342,19 @@ class Planet(eqx.Module):
     Default values are for a fully molten Earth.
 
     Note:
-        All parameters are stored as JAX arrays (`jnp.ndarray`) rather than Python floats. This
-        ensures that JAX sees a consistent type during transformations (e.g., `jit`, `grad`,
-        `vmap`), preventing unnecessary recompilation when values change. In JAX, switching between
-        a Python float and an array for the same argument will trigger retracing or recompilation,
-        so keeping everything as arrays avoids this overhead.
+        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
+        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
+        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
+        between a Python float and an array for the same argument will trigger retracing or
+        recompilation, so keeping everything as arrays avoids this overhead.
 
     Args:
-        planet_mass: Mass of the planet in kg. Defaults to `5.972e24` kg (Earth).
+        planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
         core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to `0.3` kg/kg (Earth).
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to `1.0` kg/kg.
-        surface_radius: Radius of the planetary surface in m. Defaults to `6371000` m (Earth).
-        surface_temperature: Temperature of the planetary surface. Defaults to `2000` K.
+            to ``0.3`` kg/kg (Earth).
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to ``1.0`` kg/kg.
+        surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
+        surface_temperature: Temperature of the planetary surface. Defaults to ``2000`` K.
     """
 
     planet_mass: Array = eqx.field(converter=as_j64, default=5.972e24)
@@ -443,7 +443,7 @@ class ConstantFugacityConstraint(eqx.Module):
     This must adhere to FugacityConstraintProtocol
 
     Args:
-        fugacity: Fugacity. Defaults to `np.nan`.
+        fugacity: Fugacity. Defaults to ``np.nan``.
     """
 
     fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
@@ -453,7 +453,7 @@ class ConstantFugacityConstraint(eqx.Module):
         """Active fugacity constraint
 
         Returns:
-            `True` if the fugacity constraint is active, otherwise `False`
+            ``True`` if the fugacity constraint is active, otherwise ``False``
         """
         return ~jnp.isnan(self.fugacity)
 
@@ -471,7 +471,7 @@ class FugacityConstraints(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
-        species: Species corresponding to the columns of `constraints`
+        species: Species corresponding to the columns of ``constraints``
     """
 
     constraints: tuple[FugacityConstraintProtocol, ...]
@@ -490,7 +490,7 @@ class FugacityConstraints(eqx.Module):
         Args:
             species: Species
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
-                `None`.
+                ``None``.
 
         Returns:
             An instance
@@ -604,7 +604,7 @@ class MassConstraints(eqx.Module):
 
     Args:
         log_abundance: Log number of atoms
-        elements: Elements corresponding to the columns of `log_abundance`
+        elements: Elements corresponding to the columns of ``log_abundance``
     """
 
     log_abundance: Float64[Array, "dim elements"]
@@ -682,7 +682,8 @@ class MassConstraints(eqx.Module):
         """Log number density
 
         The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when `log_abundance` is sometimes batched and sometimes not.
+        unnecessary recompilations when :attr:`~MassConstraints.log_abundance` is sometimes batched
+        and sometimes not.
 
         Args:
             log_atmosphere_volume: Log volume of the atmosphere
@@ -701,18 +702,18 @@ class SolverParameters(eqx.Module):
     """Solver parameters
 
     Args:
-        solver: Solver. Defaults to `optx.Newton`
-        atol: Absolute tolerance. Defaults to `1.0e-6`.
-        rtol: Relative tolerance. Defaults to `1.0e-6`.
-        linear_solver: Linear solver. Defaults to `AutoLinearSolver(well_posed=False)`.
-        norm: Norm. Defaults to `optx.rms_norm`.
-        throw: How to report any failures. Defaults to `False`.
-        max_steps: The maximum number of steps the solver can take. Defaults to `256`
+        solver: Solver. Defaults to ``optx.Newton``
+        atol: Absolute tolerance. Defaults to ``1.0e-6``.
+        rtol: Relative tolerance. Defaults to ``1.0e-6``.
+        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=False)``.
+        norm: Norm. Defaults to ``optx.rms_norm``.
+        throw: How to report any failures. Defaults to ``False``.
+        max_steps: The maximum number of steps the solver can take. Defaults to ``256``
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
-            Can be either `fwd` or `bwd`. Defaults to `fwd`.
-        multistart: Number of multistarts. Defaults to `10`.
-        multistart_perturbation: Perturbation for multistart. Defaults to `30`.
-        tau: Tau factor for species stability. Defaults to `TAU`.
+            Can be either ``fwd`` or ``bwd``. Defaults to ``fwd``.
+        multistart: Number of multistarts. Defaults to ``10``.
+        multistart_perturbation: Perturbation for multistart. Defaults to ``30``.
+        tau: Tau factor for species stability. Defaults to :const:`~atmodeller.constants.TAU`.
     """
 
     solver: type[OptxSolver] = optx.Newton
@@ -738,7 +739,7 @@ class SolverParameters(eqx.Module):
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
-    tau: Array = eqx.field(converter=as_j64, default=TAU)  # NOTE: array to trace tau
+    tau: Array = eqx.field(converter=as_j64, default=TAU)  # NOTE: Must be an array to trace tau
     """Tau factor for species stability"""
 
     def get_solver_instance(self) -> OptxSolver:
@@ -826,7 +827,7 @@ class Parameters(eqx.Module):
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
-        batch_size: Batch size. Defaults to ``1``/
+        batch_size: Batch size. Defaults to ``1``.
     """
 
     species: SpeciesCollection
@@ -855,12 +856,13 @@ class Parameters(eqx.Module):
 
         Args:
             species: Species
-            planet: Planet. Defaults to a new instance of `Planet`.
+            planet: Planet. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
-                a new instance of `FugacityConstraints`.
+                a new instance of ``FugacityConstraints``.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
-                a new instance of `MassConstraints`.
-            solver_parameters: Solver parameters. Defaults to a new instance of `SolverParameters`.
+                a new instance of ``MassConstraints``.
+            solver_parameters: Solver parameters. Defaults to a new instance of
+                ``SolverParameters``.
 
         Returns:
             An instance

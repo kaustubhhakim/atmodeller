@@ -19,6 +19,10 @@
 This module provides a high-level container (:class:`VmappedFunctions`) that precompiles
 vectorised versions of key thermodynamic and mass-balance functions. By wrapping each function with
 :func:`equinox.filter_vmap`, the module ensures efficient batched evaluation of model properties.
+
+Currently, these wrappers are used primarily as a convenience for generating and inspecting
+outputs. They are not responsible for performing the actual equilibrium solution, which is instead
+handled by the :mod:`~atmodeller.solvers` module.
 """
 
 from collections.abc import Callable
@@ -46,7 +50,7 @@ from atmodeller.utilities import get_log_number_density_from_log_pressure
 
 
 class VmappedFunctions(eqx.Module):
-    """Container for precompiled ``vmap``ped model functions.
+    """Container for precompiled ``vmap``-ped model functions.
 
     This class wraps a set of model functions (e.g., thermodynamic property calculations, reaction
     masks, etc.) with :func:`equinox.filter_vmap` so they can be evaluated efficiently over batched

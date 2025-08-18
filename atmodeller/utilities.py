@@ -136,8 +136,8 @@ def safe_exp(x: ArrayLike) -> Array:
     """Computes the elementwise exponential of ``x`` with input clipping to prevent overflow.
 
     This function clips the input ``x`` to a maximum value defined by
-    :data:`MAX_EXP_INPUT <atmodeller.constants.MAX_EXP_INPUT>` before applying
-    :func:`jax.numpy.exp`, ensuring numerical stability for large values.
+    :const:`~atmodeller.constants.MAX_EXP_INPUT` before applying :func:`jax.numpy.exp`, ensuring
+    numerical stability for large values.
 
     Args:
         x: Array-like input. Can be a scalar, 1-D, or multi-dimensional array

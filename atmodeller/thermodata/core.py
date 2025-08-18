@@ -118,14 +118,14 @@ class ThermodynamicCoefficients(eqx.Module):
     def _cp_over_R(
         self, cp_coefficients: Float[Array, "T 7"], temperature: ArrayLike
     ) -> Float[Array, " T"]:
-        """Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+        """Heat capacity relative to :const:`~atmodeller.constants.GAS_CONSTANT`
 
         Args:
             cp_coefficients: Heat capacity coefficients
             temperature: Temperature in K
 
         Returns:
-            Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+            Heat capacity relative to :const:`~atmodeller.constants.GAS_CONSTANT`
         """
         temperature = jnp.atleast_1d(as_j64(temperature))
         temperature_terms: Float[Array, "T 7"] = jnp.stack(
@@ -150,7 +150,7 @@ class ThermodynamicCoefficients(eqx.Module):
     def _S_over_R(
         self, cp_coefficients: Float[Array, "T 7"], b2: ArrayLike, temperature: ArrayLike
     ) -> Float[Array, " T"]:
-        """Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+        """Entropy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
 
         Args:
             cp_coefficients: Heat capacity coefficients
@@ -158,7 +158,7 @@ class ThermodynamicCoefficients(eqx.Module):
             temperature: Temperature in K
 
         Returns:
-            Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+            Entropy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
         """
         temperature = jnp.atleast_1d(as_j64(temperature))
         temperature_terms: Float[Array, "T 7"] = jnp.stack(
@@ -183,7 +183,7 @@ class ThermodynamicCoefficients(eqx.Module):
     def _H_over_RT(
         self, cp_coefficients: Float[Array, "T 7"], b1: ArrayLike, temperature: ArrayLike
     ) -> Float[Array, " T"]:
-        r"""Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+        r"""Enthalpy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
         :math:`\times T`
 
         Args:
@@ -192,7 +192,7 @@ class ThermodynamicCoefficients(eqx.Module):
             temperature: Temperature in K
 
         Returns:
-            Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+            Enthalpy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
             :math:`\times T`
         """
         temperature = jnp.atleast_1d(as_j64(temperature))
@@ -222,7 +222,7 @@ class ThermodynamicCoefficients(eqx.Module):
         b2: ArrayLike,
         temperature: ArrayLike,
     ) -> Float[Array, " T"]:
-        r"""Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+        r"""Gibbs energy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
         :math:`\times T`
 
         Args:
@@ -232,7 +232,7 @@ class ThermodynamicCoefficients(eqx.Module):
             temperature: Temperature in K
 
         Returns:
-            Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+            Gibbs energy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
             :math:`\times T`
         """
         enthalpy: Float[Array, " T"] = self._H_over_RT(cp_coefficients, b1, temperature)
@@ -245,14 +245,14 @@ class ThermodynamicCoefficients(eqx.Module):
         return gibbs
 
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Float[Array, " T"]:
-        r"""Gets Gibbs energy to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+        r"""Gets Gibbs energy to :const:`~atmodeller.constants.GAS_CONSTANT`
         :math:`\times T`
 
         Args:
             temperature: Temperature in K
 
         Returns:
-            Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
+            Gibbs energy relative to :const:`~atmodeller.constants.GAS_CONSTANT`
             :math:`\times T`
         """
         index: Integer[Array, " T"] = self._get_index(temperature)
