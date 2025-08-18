@@ -21,23 +21,16 @@ Hence for bounded EOS a minimum pressure of 1 bar is assumed.
 """
 
 import logging
-import sys
-from abc import abstractmethod
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
-from atmodeller import PRESSURE_REFERENCE
+from atmodeller import PRESSURE_REFERENCE, override
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import ExperimentalCalibration
-
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+from atmodeller.utilities import ExperimentalCalibration, to_native_floats
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -49,14 +42,14 @@ class VirialQuadratic(RealGas):
         a_coefficients: `a` coefficients
         b_coefficients: `b` coefficients
         c_coefficients: `c` coefficients
-        critical_data: Critical data. Defaults to unity values, effectively meaning unused.
+        critical_data: Critical data. Defaults to empty.
     """
 
-    a_coefficients: tuple[float, ...]
+    a_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """`a` coefficients"""
-    b_coefficients: tuple[float, ...]
+    b_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """`b` coefficients"""
-    c_coefficients: tuple[float, ...]
+    c_coefficients: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """`c` coefficients"""
 
     @override
@@ -74,7 +67,7 @@ class VirialQuadratic(RealGas):
             The relevant coefficient
         """
         coefficient: Array = (
-            jnp.asarray(coefficients[0])  
+            jnp.asarray(coefficients[0])
             + coefficients[1] * temperature
             + coefficients[2] * jnp.square(temperature)
         )
@@ -126,7 +119,7 @@ class VirialQuadratic(RealGas):
     @override
     @eqx.filter_jit
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Compressibility factor 
+        """Compressibility factor
 
         This overrides the base class because the compressibility factor is used to determine the
         volume, whereas in the base class the volume is used to determine the compressibility
@@ -198,6 +191,7 @@ class VirialQuadratic(RealGas):
 
         return volume_integral
 
+
 experimental_calibration_wang18: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=1200,
     temperature_max=4100,
@@ -220,6 +214,7 @@ H4Si_wang18_bounded: RealGas = CombinedRealGas.create(
 )
 """OSi MRK corresponding states bounded :cite:p:`C16`"""
 
+
 def get_wang_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of virial EOS
 
@@ -228,4 +223,5 @@ def get_wang_eos_models() -> dict[str, RealGas]:
     """
     eos_models: dict[str, RealGas] = {}
     eos_models["H4Si_wang18"] = H4Si_wang18_bounded
+
     return eos_models
