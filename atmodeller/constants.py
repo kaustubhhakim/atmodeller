@@ -99,22 +99,22 @@ attempt.
 """
 
 AVOGADRO: float = constants.Avogadro
-"""Avogadro constant in 1/mol"""
+r"""Avogadro constant in :math:`\mathrm{mol}^{-1}`"""
 GAS_CONSTANT: float = constants.gas_constant
-"""Gas constant in J/K/mol"""
+r"""Gas constant in :math:`\mathrm{J}\ \mathrm{K}^{-1}\ \mathrm{mol}^{-1}`"""
 GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5
-"""Gas constant in m^3 bar/K/mol"""
+r"""Gas constant in :math:`\mathrm{m}^3\ \mathrm{bar}^{-1}\ \mathrm{K}^{-1}\ \mathrm{mol}^{-1}`"""
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant
-"""Gravitational constant in m^3/kg/s^2"""
+r"""Gravitational constant in :math:`\mathrm{m}^3\ \mathrm{kg}^{-1}\ \mathrm{s}^{-2}`"""
 ATMOSPHERE: float = constants.atmosphere / constants.bar
 """Atmospheres in 1 bar"""
 BOLTZMANN_CONSTANT: float = constants.Boltzmann
-"""Boltzmann constant in J/K"""
+r"""Boltzmann constant in :math:`\mathrm{J}\ \mathrm{K}^{-1}`"""
 BOLTZMANN_CONSTANT_BAR: float = BOLTZMANN_CONSTANT * 1e-5
-"""Boltzmann constant in bar m^3/K"""
+r"""Boltzmann constant in :math:`\mathrm{bar}\ \mathrm{m}^3\ \mathrm{K}^{-1}`"""
 OCEAN_MOLES: float = 7.68894973907177e22
-"""Moles of H2 or H2O in one present-day Earth ocean"""
+r"""Moles of :math:`\mathrm{H}_2` or :math:`\mathrm{H}_2\mathrm{O}` in present-day Earth's ocean"""
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass / 1e3
-"""Mass of H2 in one present-day Earth ocean in kilograms"""
+r"""Mass of :math:`\mathrm{H}_2` in one present-day Earth ocean in kg"""
 OCEAN_MASS_H2O: float = OCEAN_MOLES * Formula("H2O").mass / 1e3
-"""Mass of H2O in one present-day Earth ocean in kilograms"""
+r"""Mass of :math:`\mathrm{H}_2\mathrm{O}` in one present-day Earth ocean in kg"""
