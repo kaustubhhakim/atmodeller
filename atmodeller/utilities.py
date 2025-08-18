@@ -14,7 +14,12 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Utilities"""
+"""General utilities
+
+This module is designed to have minimal dependencies on the core Atmodeller package, as its
+functionality is broadly applicable across different parts of the codebase. Keeping this module
+lightweight also helps avoid circular imports.
+"""
 
 import logging
 from collections.abc import Callable, Iterable
@@ -337,11 +342,15 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
 def get_batch_size(x: Any) -> int:
     """Determines the maximum batch size (i.e., length along axis 0) among all array-like leaves.
 
+    This inspects every leaf in the pytree and checks whether it is an array. Scalars contribute a
+    size of 1, while arrays contribute the length of their leading dimension (``shape[0]``). The
+    result is the largest such size found.
+
     Args:
-        x: Pytree of nested containers possibly containing arrays or scalars
+        x: Pytree of nested containers that may include arrays or scalars
 
     Returns:
-        The maximum size along axis 0 among all array-like leaves
+        The maximum leading dimension size across all array-like leaves
     """
     max_size: int = 1
     for leaf in jax.tree_util.tree_leaves(x):

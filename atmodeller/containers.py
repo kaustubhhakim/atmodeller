@@ -826,6 +826,7 @@ class Parameters(eqx.Module):
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
+        batch_size: Batch size. Defaults to ``1``/
     """
 
     species: SpeciesCollection
@@ -838,6 +839,8 @@ class Parameters(eqx.Module):
     """Mass constraints"""
     solver_parameters: SolverParameters
     """Solver parameters"""
+    batch_size: int = 1
+    """Batch size"""
 
     @classmethod
     def create(
@@ -868,6 +871,8 @@ class Parameters(eqx.Module):
         )
         mass_constraints_: MassConstraints = MassConstraints.create(species, mass_constraints)
 
+        # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
+        # that should remain scalar)
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
@@ -880,4 +885,11 @@ class Parameters(eqx.Module):
         get_leaf: Callable = lambda t: t.tau  # noqa: E731
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
-        return cls(species, planet_, fugacity_constraints_, mass_constraints_, solver_parameters_)
+        return cls(
+            species,
+            planet_,
+            fugacity_constraints_,
+            mass_constraints_,
+            solver_parameters_,
+            batch_size,
+        )

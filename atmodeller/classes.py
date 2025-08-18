@@ -38,7 +38,6 @@ from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesC
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
 from atmodeller.solvers import get_solver_individual, make_solve_tau_step, repeat_solver
-from atmodeller.utilities import get_batch_size
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -87,9 +86,8 @@ class InteriorAtmosphere:
             log_number_density: Log number density
         """
         parameters: Parameters = Parameters.create(self.species, planet)
-        batch_size: int = get_batch_size(planet)
         solution_array: Array = broadcast_initial_solution(
-            log_number_density, None, self.species.number_species, batch_size
+            log_number_density, None, self.species.number_species, parameters.batch_size
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
@@ -118,13 +116,11 @@ class InteriorAtmosphere:
         parameters: Parameters = Parameters.create(
             self.species, planet, fugacity_constraints, mass_constraints, solver_parameters
         )
-
-        batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
             self.species.number_species,
-            batch_size,
+            parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
@@ -134,7 +130,7 @@ class InteriorAtmosphere:
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
-        logger.info(f"Attempting to solve {batch_size} model(s)")
+        logger.info(f"Attempting to solve {parameters.batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(base_solution_array, parameters)
         jax.debug.print("solution = {out}", out=solution)
         jax.debug.print("solver_status = {out}", out=solver_status)
@@ -251,7 +247,7 @@ class InteriorAtmosphere:
                     "Multistart, max attempts: %d, model count: %d (%0.2f%%)",
                     val,
                     count,
-                    count * 100 / batch_size,
+                    count * 100 / parameters.batch_size,
                 )
 
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
@@ -260,14 +256,14 @@ class InteriorAtmosphere:
         logger.info(
             "Solve complete: %d (%0.2f%%) successful model(s)",
             num_successful_models,
-            num_successful_models * 100 / batch_size,
+            num_successful_models * 100 / parameters.batch_size,
         )
 
         if num_failed_models > 0:
             logger.warning(
                 "%d (%0.2f%%) model(s) still failed",
                 num_failed_models,
-                num_failed_models * 100 / batch_size,
+                num_failed_models * 100 / parameters.batch_size,
             )
 
         logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
