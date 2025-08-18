@@ -345,8 +345,9 @@ class Output:
         Returns:
             Reaction disequilibrium as a dictionary
         """
-        reaction_matrix: NpFloat = np.array(self._parameters.species.reaction_matrix)
-        species_names: tuple[str, ...] = self._species.species_names
+        # TODO: Prototyping and needs cleaning up
+        # reaction_matrix: NpFloat = np.array(self._parameters.species.reaction_matrix)
+        # species_names: tuple[str, ...] = self._species.species_names
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         reaction_indices: NpBool = self.reaction_indices()
