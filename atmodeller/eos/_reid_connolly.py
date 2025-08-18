@@ -14,18 +14,15 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOS from :cite:t:`RPS77,C16`"""
+"""Real gas EOSs from :cite:t:`RPS77,C16`"""
 
 import logging
-from abc import abstractmethod
-from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import lax
-from jaxtyping import Array, ArrayLike
-from scipy.constants import kilo
+from jaxtyping import ArrayLike
 
+from atmodeller import override
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import (
@@ -35,16 +32,13 @@ from atmodeller.eos.core import (
 from atmodeller.thermodata import CriticalData, critical_data_dictionary
 from atmodeller.utilities import ExperimentalCalibration
 
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
-
-
 logger: logging.Logger = logging.getLogger(__name__)
 
+
 class RedlichKwong49(RedlichKwongABC):
-    """Repulsive pressure term from van der Waals :cite:p:`RK49,C16{Equation 1}`
+    """Redlich-Kwong 1949 model
+
+    Repulsive pressure term from van der Waals :cite:p:`RK49,C16{Equation 1}`
     Attractive pressure term from Redlich-Kwong :cite:p:`RK49,C16{Equation 4}`
 
     Args:
@@ -52,14 +46,15 @@ class RedlichKwong49(RedlichKwongABC):
     """
 
     critical_data: CriticalData
-    _a: float = eqx.field(init=False, converter=float)
-    _b: float = eqx.field(init=False, converter=float)
+    _a: float = eqx.field(converter=float)
+    _b: float = eqx.field(converter=float)
 
-    def __post_init__(self):
-        """Default a (in :math:`(\mathrm{m}^3\ \mathrm{mol}^{-1})^2\ \mathrm{K}^{1/2}\ \mathrm{bar}`) 
-        and b (in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`) for SiO calculated from the
-        critical pressure and temperature from :cite:p:`C16{Table 2}`"""
-        self._a =  0.000448433
+    def __init__(self, critical_data: CriticalData):
+        r"""Default a (in :math:`(\mathrm{m}^3\ \mathrm{mol}^{-1})^2\ \mathrm{K}^{1/2}\ \mathrm{bar}`)
+        and b (in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`) for SiO calculated from  the critical
+        pressure and temperature from :cite:p:`C16{Table 2}`"""
+        self.critical_data = critical_data
+        self._a = 0.000448433
         self._b = 0.00000543922
 
     @property
@@ -97,16 +92,16 @@ class RedlichKwong49(RedlichKwongABC):
             pressure: Pressure in bar
 
         Returns:
-            RK49 `a` parameter in 
+            RK49 `a` parameter in
             :math:`(\mathrm{m}^3\ \mathrm{mol}^{-1})^2\ \mathrm{K}^{1/2}\ \mathrm{bar}`
         """
         del temperature
         del pressure
 
         a: ArrayLike = (
-            jnp.power(GAS_CONSTANT_BAR, (2.0)) 
+            jnp.power(GAS_CONSTANT_BAR, (2.0))
             * jnp.power(self.critical_temperature, (5.0 / 2))
-            / (9 * (jnp.power(2, (1.0 / 3)) - 1)) 
+            / (9 * (jnp.power(2, (1.0 / 3)) - 1))
         ) / self.critical_pressure
 
         return a
@@ -121,13 +116,15 @@ class RedlichKwong49(RedlichKwongABC):
         Returns:
             RK49 `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`.
         """
-        b: ArrayLike = ((jnp.power(2, (1.0 / 3)) - 1) 
-                        * GAS_CONSTANT_BAR 
-                        * self.critical_temperature 
-                        / ( 3 * self.critical_pressure)
+        b: ArrayLike = (
+            (jnp.power(2, (1.0 / 3)) - 1)
+            * GAS_CONSTANT_BAR
+            * self.critical_temperature
+            / (3 * self.critical_pressure)
         )
 
         return b
+
 
 experimental_calibration_connolly16: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=1000,
@@ -158,6 +155,7 @@ OSi_rk49_connolly16_bounded: RealGas = CombinedRealGas.create(
     [OSi_rk49_connolly16], [experimental_calibration_connolly16]
 )
 """OSi Redlich-Kwong bounded :cite:p:`C16`"""
+
 
 def get_reid_connolly_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of EOS models
