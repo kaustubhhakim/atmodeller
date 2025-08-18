@@ -26,7 +26,6 @@ import jax.random as random
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller._mytypes import NpFloat
 from atmodeller.constants import (
     INITIAL_LOG_NUMBER_DENSITY,
     INITIAL_LOG_STABILITY,
@@ -38,6 +37,7 @@ from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesC
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output, OutputSolution
 from atmodeller.solvers import get_solver_individual, make_solve_tau_step, repeat_solver
+from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
 

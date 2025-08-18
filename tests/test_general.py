@@ -23,7 +23,7 @@ import pandas as pd
 from numpy.testing import assert_array_equal
 
 from atmodeller import debug_logger
-from atmodeller._mytypes import NpFloat
+from atmodeller.type_aliases import NpFloat
 from atmodeller.utilities import partial_rref, to_native_floats
 
 logger: logging.Logger = debug_logger()

@@ -42,13 +42,13 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
 
-from atmodeller._mytypes import NpBool
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
     Parameters,
     Planet,
     SpeciesCollection,
 )
+from atmodeller.type_aliases import NpBool
 from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     safe_exp,

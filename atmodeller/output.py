@@ -35,12 +35,12 @@ from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
 from atmodeller import override
-from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.constants import AVOGADRO, GAS_CONSTANT
 from atmodeller.containers import Parameters, Planet, SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
+from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)

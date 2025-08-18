@@ -31,7 +31,6 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Float64
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
-from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt, OptxSolver
 from atmodeller.constants import (
     AVOGADRO,
     GAS_STATE,
@@ -50,6 +49,7 @@ from atmodeller.thermodata import (
     IndividualSpeciesData,
     thermodynamic_data_source,
 )
+from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt, OptxSolver
 from atmodeller.utilities import (
     as_j64,
     get_batch_size,

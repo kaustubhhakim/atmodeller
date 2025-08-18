@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool
 
 from atmodeller import override
-from atmodeller._mytypes import Scalar
+from atmodeller.type_aliases import Scalar
 from atmodeller.utilities import ExperimentalCalibration, as_j64, to_native_floats, unit_conversion
 
 

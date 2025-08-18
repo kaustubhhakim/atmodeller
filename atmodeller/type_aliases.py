@@ -14,7 +14,12 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""My types"""
+"""Common type aliases
+
+This module centralizes type definitions for NumPy arrays, scalar values, and Optimistix solvers.
+Having a single place for these aliases improves readability and consistency across the codebase,
+whilst also simplifying type checking and documentation.
+"""
 
 from typing import TypeAlias
 

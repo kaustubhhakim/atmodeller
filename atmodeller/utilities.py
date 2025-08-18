@@ -34,8 +34,8 @@ from jax.tree_util import Partial
 from jaxtyping import Array, ArrayLike, Float64
 from scipy.constants import kilo, mega
 
-from atmodeller._mytypes import NpArray, NpInt, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, MAX_EXP_INPUT, OCEAN_MASS_H2
+from atmodeller.type_aliases import NpArray, NpInt, Scalar
 
 logger: logging.Logger = logging.getLogger(__name__)
 

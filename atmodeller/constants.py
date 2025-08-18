@@ -14,6 +14,14 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
+"""Physical and numerical constants
+
+This module defines reference thermodynamic conditions, numerical limits, solver parameters, and
+key physical constants (e.g., Avogadro number, Boltzmann constant). These constants are used
+throughout the codebase to ensure consistency with standard conventions (JANAF tables, IUPAC
+values) and to provide empirically tested defaults for numerical solvers.
+"""
+
 import numpy as np
 from molmass import Formula
 from scipy import constants
