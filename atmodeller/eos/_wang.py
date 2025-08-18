@@ -26,8 +26,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
-from atmodeller import PRESSURE_REFERENCE, override
-from atmodeller.constants import GAS_CONSTANT_BAR
+from atmodeller import override
+from atmodeller.constants import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration, to_native_floats
