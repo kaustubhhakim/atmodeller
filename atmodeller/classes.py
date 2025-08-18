@@ -17,6 +17,7 @@
 """Classes"""
 
 import logging
+import pprint
 from collections.abc import Callable, Mapping
 from typing import Optional, cast
 
@@ -43,7 +44,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class InteriorAtmosphere:
-    """Interior atmosphere
+    """Interior atmosphere coupled system
 
     This is the main class that the user interacts with to build interior-atmosphere systems,
     solve them, and retrieve the results.
@@ -58,8 +59,7 @@ class InteriorAtmosphere:
     def __init__(self, species: SpeciesCollection):
         self.species: SpeciesCollection = species
         logger.info("species = %s", str(self.species))
-        # FIXME: To reinstate
-        # logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
+        logger.info("reactions = %s", pprint.pformat(self.species.get_reaction_dictionary()))
 
     @property
     def output(self) -> Output:
@@ -106,12 +106,12 @@ class InteriorAtmosphere:
         """Solves the system and initialises an Output instance for processing the result
 
         Args:
-            planet: Planet. Defaults to `None`.
-            initial_log_number_density: Initial log number density. Defaults to `None`.
-            initial_log_stability: Initial log stability. Defaults to `None`.
-            fugacity_constraints: Fugacity constraints. Defaults to `None`.
-            mass_constraints: Mass constraints. Defaults to `None`.
-            solver_parameters: Solver parameters. Defaults to `None`.
+            planet: Planet. Defaults to ``None``.
+            initial_log_number_density: Initial log number density. Defaults to ``None``.
+            initial_log_stability: Initial log stability. Defaults to ``None``.
+            fugacity_constraints: Fugacity constraints. Defaults to ``None``.
+            mass_constraints: Mass constraints. Defaults to ``None``.
+            solver_parameters: Solver parameters. Defaults to ``None``.
         """
         parameters: Parameters = Parameters.create(
             self.species, planet, fugacity_constraints, mass_constraints, solver_parameters
@@ -125,19 +125,20 @@ class InteriorAtmosphere:
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
         self._solver = get_solver_individual(parameters)
-        # Another option to solve the batch with a single root find
+        # Alternative: solve the entire batch with a single root-finding call. This approach is
+        # less flexible because it doesn't allow inspecting  the solution for each individual
+        # system.
         # self._solver = get_solver_batch(parameters)
 
-        # First solution attempt. If the initial guess is close enough we might just find solutions
-        # for all cases.
+        # First solution attempt. A good initial guess might find solutions for all cases.
         logger.info(f"Attempting to solve {parameters.batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(base_solution_array, parameters)
-        jax.debug.print("solution = {out}", out=solution)
-        jax.debug.print("solver_status = {out}", out=solver_status)
-        jax.debug.print("solver_steps = {out}", out=solver_steps)
+        # jax.debug.print("solution = {out}", out=solution)
+        # jax.debug.print("solver_status = {out}", out=solver_status)
+        # jax.debug.print("solver_steps = {out}", out=solver_steps)
 
         solver_attempts: Integer[Array, "..."] = solver_status.astype(int)
-        jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+        # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
 
         if jnp.any(~solver_status):
             num_failed: int = jnp.sum(~solver_status).item()
@@ -276,23 +277,23 @@ class InteriorAtmosphere:
 def _broadcast_component(
     component: Optional[ArrayLike], default_value: float, dim: int, batch_size: int, name: str
 ) -> NpFloat:
-    """Broadcasts a scalar, 1D, or 2D input array to shape (batch_size, dim).
+    """Broadcasts a scalar, 1D, or 2D input array to shape ``(batch_size, dim)``.
 
     This function standardizes inputs that may be:
-        - None (in which case a default value is used),
-        - a scalar (promoted to a 1D array of length `dim`),
-        - a 1D array of shape (`dim`,) (broadcast across the batch),
-        - or a 2D array of shape (`batch_size`, `dim`) (used as-is).
+        - ``None`` (in which case ``default_value`` is used),
+        - a scalar (promoted to a 1D array of length ``dim``),
+        - a 1D array of shape ``(dim,)`` (broadcast across the batch),
+        - or a 2D array of shape ``(batch_size``, dim)`` (used as-is).
 
     Args:
-        component: The input data (or None), representing either a scalar, 1D array, or 2D array
-        default_value: The default scalar value to use if `component` is None
+        component: The input data (or ``None``), representing either a scalar, 1D array, or 2D array
+        default_value: The default scalar value to use if ``component`` is ``None``
         dim: The number of features or dimensions per batch item
         batch_size: The number of batch items
         name: Name of the component (used for error messages)
 
     Returns:
-        A numpy array of shape (batch_size, dim), with values broadcast as needed
+        A numpy array of shape ``(batch_size, dim)``, with values broadcast as needed
 
     Raises:
         ValueError: If the input array has an unexpected shape or inconsistent dimensions
@@ -329,19 +330,19 @@ def broadcast_initial_solution(
     initial_log_stability: Optional[ArrayLike],
     number_of_species: int,
     batch_size: int,
-) -> Array:
-    """Creates and broadcasts the initial solution to shape (batch_size, D)
+) -> Float[Array, " batch_size solution"]:
+    """Creates and broadcasts the initial solution to shape ``(batch_size, solution)``
 
-    D = number_of_species + number_of_stability, i.e. the total number of solution quantities
+    ``D = number_of_species + number_of_stability``, i.e. the total number of solution quantities
 
     Args:
-        initial_log_number_density: Initial log number density. Defaults to None.
-        initial_log_stability: Initial log stability. Defaults to None.
+        initial_log_number_density: Initial log number density or ``None``
+        initial_log_stability: Initial log stability or ``None``
         number_of_species: Number of species
         batch_size: Batch size
 
     Returns:
-        Initial solution with shape (batch_size, D)
+        Initial solution with shape ``(batch_size, solution)``
     """
     number_density: NpFloat = _broadcast_component(
         initial_log_number_density,
