@@ -287,6 +287,6 @@ Other output
 ------------
 
 - constraints: Applied elemental mass and/or species fugacity constraints
-- raw_solution: Raw solution from the solver, i.e. number densities and stabilities
+- raw: Raw solution from the solver, i.e. number densities and stabilities
 - residual: Residuals of the reaction network and mass balance
 - solver: Solver quantities

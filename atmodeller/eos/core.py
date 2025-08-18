@@ -30,10 +30,10 @@ from jax import jacfwd
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.thermodata import CriticalData
+from atmodeller.type_aliases import OptxSolver
 from atmodeller.utilities import as_j64, safe_exp, to_native_floats
 
 logger: logging.Logger = logging.getLogger(__name__)

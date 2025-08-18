@@ -14,10 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functions for solubility laws.
-
-Units for temperature and pressure are K and bar, respectively.
-"""
+"""Core classes and functions for solubility laws"""
 
 from abc import abstractmethod
 from typing import Optional
@@ -48,13 +45,13 @@ class Solubility(eqx.Module):
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
     ) -> Array:
-        """Concentration in ppmw
+        r"""Concentration in ppmw
 
         Args:
             fugacity: Fugacity in bar
-            temperature: Temperature in K. Defaults to None for not used.
-            pressure: Pressure in bar. Defaults to None for not used.
-            fO2: fO2 in bar. Defaults to None for not used.
+            temperature: Temperature in K. Defaults to ``None`` for not used.
+            pressure: Pressure in bar. Defaults to ``None`` for not used.
+            fO2: :math:`\log_{10} f\rm{O}_2` in bar. Defaults to ``None`` for not used.
 
         Returns:
             Concentration in ppmw
@@ -63,13 +60,13 @@ class Solubility(eqx.Module):
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> Array:
-        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+        r"""Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:
             fugacity: Fugacity in bar
             temperature: Temperature in K
             pressure: Pressure in bar
-            fO2: fO2 in bar
+            fO2: :math:`\log_{10} f\rm{O}_2` in bar
 
         Returns:
             Concentration in ppmw
@@ -146,21 +143,21 @@ def fO2_temperature_correction(
     pressure: ArrayLike,
     reference_temperature: ArrayLike,
 ) -> Array:
-    """Applies a temperature correction to fO2.
+    r"""Applies a temperature correction to :math:`\log_{10} f\rm{O}_2`.
 
-    Some experimentally derived solubility laws operate on absolute fO2, which depends on
-    temperature and pressure. A temperature correction has to be applied to maintain the same
-    fO2 shift at arbitrary temperature.
+    Some experimentally derived solubility laws operate on absolute :math:`\log_{10} f\rm{O}_2`,
+    which depends on temperature and pressure. A temperature correction has to be applied to
+    maintain the same :math:`\log_{10} f\rm{O}_2` shift at arbitrary temperature.
 
     Args:
-        fO2: Absolute oxygen fugacity at `temperature` in bar
+        fO2: Absolute oxygen fugacity at ``temperature`` in bar
         temperature: Temperature in K
         pressure: Absolute pressure in bar
         reference_temperature: Reference temperature, which is usually the temperature at which the
             experiment was performed.
 
     Returns:
-        Adjusted fO2
+        Adjusted :math:`\log_{10} f\rm{O}_2`
     """
     iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
     logiw_fugacity_at_current_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(

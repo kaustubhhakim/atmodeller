@@ -25,9 +25,9 @@ import numpy as np
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller._mytypes import Scalar
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
+from atmodeller.type_aliases import Scalar
 from atmodeller.utilities import as_j64, unit_conversion
 
 H2_andesite_hirschmann12: Solubility = SolubilityPowerLawLog10(1.01058631, 0.60128868)

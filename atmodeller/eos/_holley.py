@@ -24,11 +24,11 @@ import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller._mytypes import OptxSolver, Scalar
 from atmodeller.constants import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
+from atmodeller.type_aliases import OptxSolver, Scalar
 from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)

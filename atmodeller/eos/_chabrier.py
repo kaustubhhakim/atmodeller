@@ -30,8 +30,8 @@ from jax.scipy.interpolate import RegularGridInterpolator
 from jaxtyping import Array, ArrayLike
 from molmass import Formula
 
-from atmodeller import PRESSURE_REFERENCE, override
-from atmodeller.constants import GAS_CONSTANT_BAR
+from atmodeller import override
+from atmodeller.constants import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
@@ -48,7 +48,7 @@ class Chabrier(RealGas):
     Args:
         log10_density_func: Spline lookup for density from :cite:t:`CD21` T-P-rho tables
         He_fraction: He fraction
-        H2_molar_mass_g_mol: Molar mass of H2
+        H2_molar_mass_g_mol: Molar mass of :math:`\mathrm{H}_2`
         He_molar_mass_g_mol: Molar mass of He
         integration_steps: Number of integration steps
     """
@@ -60,7 +60,7 @@ class Chabrier(RealGas):
     He_fraction: float = eqx.field(converter=float)
     """He fraction"""
     H2_molar_mass_g_mol: float = eqx.field(converter=float)
-    """Molar mass of H2"""
+    r"""Molar mass of :math:`\mathrm{H}_2`"""
     He_molar_mass_g_mol: float = eqx.field(converter=float)
     """Molar mass of He"""
     integration_steps: int
@@ -68,15 +68,15 @@ class Chabrier(RealGas):
 
     @classmethod
     def create(cls, filename: Path, integration_steps: int = 100) -> RealGas:
-        """Creates a Chabrier instance
+        r"""Creates a Chabrier instance
 
         Args:
             filename: Filename of the density-T-P data
-            integration_steps: Number of integration steps. Defaults to 100, which computes the
-                fugacity of H2 to within 4% (relative to 1000 steps, for T from 1000 to 5000 K and
-                pressure to 10 GPa), and to within 10% (relative to 1000 steps, for T from 1000 to
-                5000 K and pressure to 100 GPa). Increasing the integration steps will increase the
-                run time but provide better accuracy.
+            integration_steps: Number of integration steps. Defaults to ``100``, which computes the
+                fugacity of :math:`\mathrm{H}_2` to within 4% (relative to 1000 steps, for T from
+                1000 to 5000 K and pressure to 10 GPa), and to within 10% (relative to 1000 steps,
+                for T from 1000 to 5000 K and pressure to 100 GPa). Increasing the integration
+                steps will increase the run time but provide better accuracy.
 
         Returns:
             Instance
@@ -144,8 +144,6 @@ class Chabrier(RealGas):
     @eqx.filter_jit
     def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
         r"""Converts density to molar density
-
-        Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
 
         Args:
             log10_density_gcc: Log10 density in g/cc
@@ -246,12 +244,12 @@ calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
 )
 """Calibration for :cite:t:`CD21`"""
 H2_chabrier21: RealGas = Chabrier.create(Path("TABLE_H_TP_v1"))
-"""H2 :cite:p:`CD21`"""
+r""":math:`\mathrm{H}_2` :cite:p:`CD21`"""
 H2_chabrier21_bounded: RealGas = CombinedRealGas.create(
     [H2_chabrier21],
     [calibration_chabrier21],
 )
-"""H2 bounded :cite:p:`CD21`"""
+r""":math:`\mathrm{H}_2` bounded :cite:p:`CD21`"""
 He_chabrier21: RealGas = Chabrier.create(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
 He_chabrier21_bounded: RealGas = CombinedRealGas.create([He_chabrier21], [calibration_chabrier21])

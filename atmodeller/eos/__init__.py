@@ -27,11 +27,11 @@ r"""Absolute tolerance when solving for the volume in :math:`\mathrm{m}^3\ \math
 RELATIVE_TOLERANCE: float = 1.0e-6
 r"""Relative tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
 THROW: bool = False
-"""Whether to throw errors. Change to True for debugging purposes."""
+"""Whether to throw errors. Change to ``True`` for debugging purposes."""
 PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
 VOLUME_EPSILON: float = 1.0e-12
-r"""Small volume offset in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`"""
+r"""Small volume offset in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
 
 # Expose the public API
 from atmodeller.eos._aggregators import CombinedRealGas  # noqa: E402, F401

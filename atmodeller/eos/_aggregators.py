@@ -43,7 +43,7 @@ class CombinedRealGas(RealGas):
 
     Args:
         real_gases: Real gases to combine
-        calibrations: Experimental calibrations that correspond to `real_gases`
+        calibrations: Experimental calibrations that correspond to ``real_gases``
     """
 
     real_gases: tuple[RealGas, ...]
@@ -87,9 +87,9 @@ class CombinedRealGas(RealGas):
 
         Args:
             real_gases: Real gases to combine
-            calibrations: Experimental calibrations that correspond to `real_gases`
+            calibrations: Experimental calibrations that correspond to ``real_gases``
             extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and
-                above the maximum calibration pressure if required. Defaults to True.
+                above the maximum calibration pressure if required. Defaults to ``True``.
 
         Returns:
             An instance
@@ -114,7 +114,7 @@ class CombinedRealGas(RealGas):
 
         Args:
             real_gases: Real gases to combine
-            calibrations: Experimental calibrations that correspond to `real_gases`
+            calibrations: Experimental calibrations that correspond to ``real_gases``
         """
         assert calibrations[0].pressure_min is not None
         real_gases.insert(0, IdealGas())
@@ -168,7 +168,7 @@ class CombinedRealGas(RealGas):
 
     @eqx.filter_jit
     def _get_index(self, pressure: ArrayLike) -> Array:
-        """Gets the index of the appropriate EOS model based on `pressure`.
+        """Gets the index of the appropriate EOS model based on ``pressure``.
 
         Args:
             pressure: Pressure in bar
@@ -223,7 +223,8 @@ class CombinedRealGas(RealGas):
                 pressure_low: Lower pressure bound
 
             Returns:
-                Volume integral"""
+                Volume integral
+            """
             volume_integral_high: Array = lax.switch(
                 i, self._volume_integral_functions, temperature, pressure_high
             )
@@ -248,7 +249,7 @@ class CombinedRealGas(RealGas):
                 i: Index of the EOS model
 
             Returns:
-                Updated carry and None (unused)
+                Updated carry and ``None`` (unused)
             """
             # jax.debug.print("scan_fn: i = {out}", out=i)
             pressure_low = lax.dynamic_index_in_dim(
@@ -317,22 +318,22 @@ class UpperBoundRealGas(RealGas):
 
     This is used to extrapolate an EOS assuming that the compressibility factor is a linear
     function of pressure. Importantly, this class is not intended to be used directly, but rather
-    as a component of `CombinedRealGas`.
+    as a component of :class:`~atmodeller.eos._aggregators.CombinedRealGas`.
 
-    `p_eval` is used to evaluate the compressibility factor and its gradient, and therefore to
+    ``p_eval`` is used to evaluate the compressibility factor and its gradient, and therefore to
     avoid recompilation of JAX functions it is converted to a JAX array of dtype float64 within
     the methods, which is the expected type for the pressure argument of the EOS functions.
 
     Args:
-        real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
+        real_gas: Real gas to evaluate the compressibility factor at ``p_eval``.
         p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
-            of `real_gas`. Defaults to 1 bar.
+            of ``real_gas``. Defaults to ``1`` bar.
     """
 
     real_gas: RealGas
-    """Real gas to evaluate the compressibility factor at `p_eval`"""
+    """Real gas to evaluate the compressibility factor at ``p_eval``"""
     p_eval: float = eqx.field(converter=float, default=1.0)
-    """Evaluation pressure in bar. Defaults to 1 bar."""
+    """Evaluation pressure in bar. Defaults to ``1`` bar."""
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
@@ -340,7 +341,7 @@ class UpperBoundRealGas(RealGas):
         """Compressibility factor of the previous EOS to blend smoothly with.
 
         Importantly, we don't want to trigger a recompilation of the compressibility factor, so we
-        pass `p_eval` as an array.
+        pass :attr:`p_eval` as an array.
 
         Args:
             temperature: Temperature in K
@@ -353,7 +354,7 @@ class UpperBoundRealGas(RealGas):
         """Gradient of the compressibility factor of the previous EOS to blend smoothly with.
 
         Importantly, we don't want to trigger a recompilation of the compressibility factor, so we
-        pass `p_eval` as an array.
+        pass :attr:`p_eval` as an array.
 
         Args:
             temperature: Temperature in K

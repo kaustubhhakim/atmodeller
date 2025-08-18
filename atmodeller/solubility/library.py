@@ -16,13 +16,16 @@
 #
 """Solubility library
 
-Usage:
-    from atmodeller.solubility.library import get_solubility_models
-    sol_models = get_solubility_models()
-    H2O_peridotite = sol_models["H2O_peridotite_sossi23"]
-    # Evaluate solubility (concentration) at 2 bar fH2O and 2000 K
-    concentration = H2O_peridotite.concentration(2, temperature=2000)
-    print(concentration)
+.. code-block::
+   :caption: Usage
+
+        from atmodeller.solubility.library import get_solubility_models
+
+        sol_models = get_solubility_models()
+        H2O_peridotite = sol_models["H2O_peridotite_sossi23"]
+        # Evaluate solubility (concentration) at 2 bar fH2O and 2000 K
+        concentration = H2O_peridotite.concentration(2, temperature=2000)
+        print(concentration)
 """
 
 from atmodeller.solubility._carbon_species import (

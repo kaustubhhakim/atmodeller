@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas Virial EOSs
+"""Real gas Virial EOS
 
 The papers state a volume integration from :math:`P_0` to :math:`P`, where :math:`f(P_0=1)=1`.
 Hence for bounded EOS a minimum pressure of 1 bar is assumed.
@@ -26,8 +26,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
-from atmodeller import PRESSURE_REFERENCE, override
-from atmodeller.constants import GAS_CONSTANT_BAR
+from atmodeller import override
+from atmodeller.constants import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration, to_native_floats

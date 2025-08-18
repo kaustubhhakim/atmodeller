@@ -24,7 +24,6 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller._mytypes import Scalar
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.solubility.core import (
@@ -34,6 +33,7 @@ from atmodeller.solubility.core import (
     power_law,
 )
 from atmodeller.thermodata import IronWustiteBuffer
+from atmodeller.type_aliases import Scalar
 from atmodeller.utilities import safe_exp, unit_conversion
 
 Cl2_ano_dio_for_thomas21: Solubility = SolubilityPowerLaw(

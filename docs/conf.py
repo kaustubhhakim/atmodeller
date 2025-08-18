@@ -29,7 +29,7 @@ copyright = "2024, Dan J. Bower"
 author = "Dan J. Bower"
 
 # The full version, including alpha/beta/rc tags
-release = "0.9.1"
+release = "0.9.2"
 
 
 # -- General configuration ---------------------------------------------------
@@ -44,7 +44,13 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
 ]
+
+intersphinx_mapping = {
+    "jax": ("https://docs.jax.dev/en/latest/", None),
+    "equinox": ("https://docs.kidger.site/equinox/", None),
+}
 
 bibtex_bibfiles = ["refs.bib"]
 
@@ -89,10 +95,10 @@ autodoc_member_order = "bysource"
 
 autodoc_default_options = {
     "members": True,
-    "show-inheritance": True,
+    "show-inheritance": False,
     "inherited-members": True,
     "undoc-members": False,
-    "private-members": False,
+    "private-members": True,
 }
 
 latex_logo = "logo.png"

@@ -82,7 +82,7 @@ class RedlichKwong49(RedlichKwongABC):
     @override
     @eqx.filter_jit
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""RK49 `a` parameter  :cite:p:`RK49{Equation 4}.
+        r"""RK49 `a` parameter :cite:p:`RK49{Equation 4}`.
 
         Args:
             temperature: Temperature in K
@@ -106,9 +106,7 @@ class RedlichKwong49(RedlichKwongABC):
     @override
     @eqx.filter_jit
     def b(self) -> ArrayLike:
-        r"""RK49 `b` parameter  :cite:p:`RK49{Equation 5}.
-
-        Args:
+        r"""RK49 `b` parameter :cite:p:`RK49{Equation 5}`.
 
         Returns:
             RK49 `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`.

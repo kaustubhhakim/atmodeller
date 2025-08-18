@@ -27,7 +27,6 @@ from jaxtyping import Array, ArrayLike
 from scipy.constants import kilo
 
 from atmodeller import override
-from atmodeller._mytypes import Scalar
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import (
@@ -39,6 +38,7 @@ from atmodeller.eos.core import (
     VirialCompensation,
 )
 from atmodeller.thermodata import CriticalData, critical_data_dictionary
+from atmodeller.type_aliases import Scalar
 from atmodeller.utilities import ExperimentalCalibration, as_j64, to_native_floats
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -493,7 +493,7 @@ class H2OMrkGasFluid91(RealGas):
     mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
     """The MRK for the subcritical gas"""
     Ta: float = eqx.field(converter=float, default=Ta_H2O)
-    """ Temperature at which a_gas = a in the MRK formulation in K"""
+    """Temperature at which a_gas = a in the MRK formulation in K"""
     Tc: float = eqx.field(converter=float, default=Tc_H2O)
     """Critical temperature in K"""
 

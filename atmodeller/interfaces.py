@@ -14,7 +14,11 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Interfaces"""
+"""Interfaces for thermodynamic models and constraints.
+
+This module defines formal protocol classes (via :class:`typing.Protocol`) that specify the
+expected interfaces for different thermodynamic components.
+"""
 
 from typing import Optional, Protocol, runtime_checkable
 
@@ -35,7 +39,7 @@ class FugacityConstraintProtocol(Protocol):
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    evaluation_pressure: Optional[ArrayLike]
+    evaluation_pressure: Optional[float]
 
     @property
     def log10_shift(self) -> Array: ...
