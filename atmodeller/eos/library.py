@@ -16,13 +16,16 @@
 #
 """Real gas EOS library
 
-Usage:
-    from atmodeller.eos.library import get_eos_models
-    eos_models = get_eos_models()
-    CH4_beattie = eos_models["CH4_beattie_holley58"]
-    # Evaluate fugacity at 10 bar and 800 K
-    fugacity = CH4_beattie.fugacity(800, 10)
-    print(fugacity)
+.. code-block::
+   :caption: Usage
+
+        from atmodeller.eos.library import get_eos_models
+
+        eos_models = get_eos_models()
+        CH4_beattie = eos_models["CH4_beattie_holley58"]
+        # Evaluate fugacity at 10 bar and 800 K
+        fugacity = CH4_beattie.fugacity(800, 10)
+        print(fugacity)
 """
 
 from atmodeller.eos._chabrier import get_chabrier_eos_models

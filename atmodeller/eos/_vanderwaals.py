@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from :cite:t:`Lide2005`"""
+"""Real gas EOS from :cite:t:`Lide2005`"""
 
 import equinox as eqx
 import jax.numpy as jnp

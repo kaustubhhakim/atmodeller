@@ -120,7 +120,7 @@ def get_log_number_density_from_log_pressure(
 
     Args:
         log_pressure: Log pressure
-        temperature: Temperature
+        temperature: Temperature in K
 
     Returns:
         Log number density

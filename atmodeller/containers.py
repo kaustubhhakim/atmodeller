@@ -526,7 +526,7 @@ class FugacityConstraints(eqx.Module):
         """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -550,7 +550,7 @@ class FugacityConstraints(eqx.Module):
         """Log fugacity
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -585,7 +585,7 @@ class FugacityConstraints(eqx.Module):
         """Log number density
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:

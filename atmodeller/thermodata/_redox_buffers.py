@@ -65,7 +65,7 @@ class RedoxBuffer(eqx.Module):
         """Gets the log10 fugacity at the buffer
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -98,7 +98,7 @@ class RedoxBuffer(eqx.Module):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -110,7 +110,7 @@ class RedoxBuffer(eqx.Module):
         """Gets the log fugacity
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -148,7 +148,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -318,7 +318,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:
@@ -378,7 +378,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """Check to use the low temperature buffer for fO2
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
 
         Returns:
             True/False whether to use the low temperature formulation
@@ -390,7 +390,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """Gets the log10 fugacity at the buffer
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             pressure: Pressure
 
         Returns:

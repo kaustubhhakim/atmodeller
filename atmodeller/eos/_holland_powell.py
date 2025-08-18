@@ -493,7 +493,7 @@ class H2OMrkGasFluid91(RealGas):
     mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
     """The MRK for the subcritical gas"""
     Ta: float = eqx.field(converter=float, default=Ta_H2O)
-    """ Temperature at which a_gas = a in the MRK formulation in K"""
+    """Temperature at which a_gas = a in the MRK formulation in K"""
     Tc: float = eqx.field(converter=float, default=Tc_H2O)
     """Critical temperature in K"""
 

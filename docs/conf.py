@@ -95,10 +95,10 @@ autodoc_member_order = "bysource"
 
 autodoc_default_options = {
     "members": True,
-    "show-inheritance": True,
+    "show-inheritance": False,
     "inherited-members": True,
     "undoc-members": False,
-    "private-members": False,
+    "private-members": True,
 }
 
 latex_logo = "logo.png"
