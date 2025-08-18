@@ -125,7 +125,7 @@ def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
         if isinstance(value, pd.Series) and len(value) == 1:
             val = float(value.iloc[0])
         else:
-            val = float(value)
+            val = float(value)  # type: ignore
 
         return (val,) if force_tuple else val
     except (TypeError, ValueError):
