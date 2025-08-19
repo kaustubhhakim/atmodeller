@@ -101,7 +101,7 @@ def get_atmosphere_log_molar_mass(
         parameters, log_number_density
     )
     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, jnp.array(parameters.species.molar_masses)
+        parameters, parameters.species.molar_masses
     )
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
         gas_log_number_density, b=parameters.species.gas_species_mask
@@ -441,7 +441,7 @@ def get_species_density_in_melt(
     Returns:
         Number density of species dissolved in melt
     """
-    molar_masses: Float[Array, " species"] = jnp.array(parameters.species.molar_masses)
+    molar_masses: ArrayLike = parameters.species.molar_masses
     melt_mass: Float[Array, ""] = parameters.planet.melt_mass
 
     ppmw: Float[Array, " species"] = get_species_ppmw_in_melt(parameters, log_number_density)

@@ -91,7 +91,7 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
-        self._output = Output(self.species, solution_array, parameters)
+        self._output = Output(parameters, solution_array)
 
     def solve(
         self,
@@ -270,7 +270,7 @@ class InteriorAtmosphere:
         logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
 
         self._output = OutputSolution(
-            self.species, solution, parameters, solver_status, solver_steps, solver_attempts
+            parameters, solution, solver_status, solver_steps, solver_attempts
         )
 
 
