@@ -140,7 +140,7 @@ def get_element_density(
 ) -> Float[Array, " elements"]:
     """Number density of elements in the gas or condensed phase
 
-    Input values are sanitised only in output routines, where partitioning between condensed and
+    Input values are sanitised only for output routines, where partitioning between condensed and
     gas species is required. For the solver itself, this distinction is unnecessary.
 
     Args:
