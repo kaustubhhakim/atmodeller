@@ -465,23 +465,18 @@ class Output:
     def element_density_condensed(self) -> NpFloat:
         """Gets the number density of elements in the condensed phase.
 
-        Unlike for the objective function, we want the number density of all elements, regardless
-        of whether they were used to impose a mass constraint on the system.
-
         Returns:
             Number density of elements in the condensed phase
         """
+        condensed_species_mask: NpFloat = np.where(self.condensed_species_mask, 1.0, np.nan)
         element_density: Array = self._vmapf.get_element_density(
-            jnp.asarray(self.log_number_density * self.condensed_species_mask)
+            jnp.asarray(self.log_number_density) * condensed_species_mask
         )
 
         return np.asarray(element_density)
 
     def element_density_dissolved(self) -> NpFloat:
         """Gets the number density of elements dissolved in melt due to species solubility.
-
-        Unlike for the objective function, we want the number density of all elements, regardless
-        of whether they were used to impose a mass constraint on the system.
 
         Returns:
             Number density of elements dissolved in melt due to species solubility
@@ -495,14 +490,12 @@ class Output:
     def element_density_gas(self) -> NpFloat:
         """Gets the number density of elements in the gas phase.
 
-        Unlike for the objective function, we want the number density of all elements, regardless
-        of whether they were used to impose a mass constraint on the system.
-
         Returns:
             Number density of elements in the gas phase
         """
+        gas_species_mask: NpFloat = np.where(self.gas_species_mask, 1.0, np.nan)
         element_density: Array = self._vmapf.get_element_density(
-            jnp.asarray(self.log_number_density * self.gas_species_mask),
+            jnp.asarray(self.log_number_density) * gas_species_mask,
         )
 
         return np.asarray(element_density)

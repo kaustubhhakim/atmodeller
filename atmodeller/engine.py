@@ -140,6 +140,9 @@ def get_element_density(
 ) -> Float[Array, " elements"]:
     """Number density of elements in the gas or condensed phase
 
+    Input values are sanitised only in output routines, where partitioning between condensed and
+    gas species is required. For the solver itself, this distinction is unnecessary.
+
     Args:
         parameters: Parameters
         log_number_density: Log number density
@@ -147,10 +150,12 @@ def get_element_density(
     Returns:
         Number density of elements in the gas or condensed phase
     """
+    species_densities: Array = jnp.nan_to_num(safe_exp(log_number_density), nan=0.0)
+
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
         parameters.species.formula_matrix
     )
-    element_density: Float[Array, " elements"] = formula_matrix @ safe_exp(log_number_density)
+    element_density: Float[Array, " elements"] = formula_matrix @ species_densities
 
     return element_density
 
