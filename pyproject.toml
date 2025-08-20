@@ -40,8 +40,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
 dependencies = [
-    "scipy>=1.14.1",
-    "numpy>=1.26.4",
+    # JAX pinned only on Intel macOS
+    "jax==0.4.38; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    # Otherwise, get the latest JAX
+    "jax>=0.4.38; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    # SciPy and NumPy minimum requirements for jax 0.4.31
+    "scipy>=1.10.0",
+    "numpy>=1.24.0",
     "pandas>=2.2.3",
     "openpyxl>=3.1.2",
     "molmass>=2025.4.14",
@@ -53,7 +58,6 @@ dependencies = [
     "optax>=0.2.5",
     "xmmutablemap>=0.1",
     "optimistix>=0.0.10",
-    "jax>=0.7.0",
     "equinox>=0.13.0",
 ]
 
