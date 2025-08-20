@@ -162,7 +162,7 @@ def get_reid_connolly_eos_models() -> dict[str, RealGas]:
         Dictionary of EOS models
     """
     eos_models: dict[str, RealGas] = {}
-    eos_models["OSi_rk49_connolly16"] = OSi_rk49_connolly16
+    eos_models["OSi_rk49_connolly16"] = OSi_rk49_connolly16_bounded
     eos_models["H4Si_rk49_reid87"] = H4Si_rk49_reid87
     eos_models["CHN_rk49_reid87"] = CHN_rk49_reid87
     eos_models["H3N_rk49_reid87"] = H3N_rk49_reid87
