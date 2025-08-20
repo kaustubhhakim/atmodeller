@@ -159,10 +159,10 @@ class Output:
             self.number_solutions,
         )
 
-        out["residual"], residual = self.residual_asdict()  # type: ignore since keys are int
+        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         # TODO: Could only output for disequilibrium calculations
-        out["disequilibrium"] = self.disequilibrium_asdict(gas_species_asdict, residual)
+        out["disequilibrium"] = self.disequilibrium_asdict()
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -310,16 +310,8 @@ class Output:
 
         return species_out
 
-    def disequilibrium_asdict(
-        self,
-        gas_species_asdict: dict[str, dict[str, NpArray]],
-        residual: NpArray,
-    ) -> dict[str, NpArray]:
+    def disequilibrium_asdict(self) -> dict[str, NpArray]:
         """Gets the reaction disequilibrium as a dictionary.
-
-        Args:
-            gas_species_asdict: Gas species as a dictionary
-            residual: Residual
 
         Returns:
             Reaction disequilibrium as a dictionary
@@ -330,6 +322,7 @@ class Output:
         # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
 
         reaction_mask: NpBool = self.reaction_mask()
+        residual: NpFloat = np.asarray(self.vmapf.objective_function(jnp.asarray(self.solution)))
 
         # Number of True entries per row (must be same for all rows)
         n_cols: NpInt = reaction_mask.sum(axis=1)[0]
@@ -711,7 +704,7 @@ class Output:
 
         return raw_solution
 
-    def residual_asdict(self) -> tuple[dict[int, NpFloat], NpArray]:
+    def residual_asdict(self) -> dict[int, NpFloat]:
         """Gets the residual.
 
         Returns:
@@ -723,7 +716,7 @@ class Output:
         for ii in range(residual.shape[1]):
             out[ii] = np.asarray(residual[:, ii])
 
-        return out, np.asarray(residual)
+        return out
 
     def species_density_in_melt(self) -> NpFloat:
         """Gets species number density in the melt.
