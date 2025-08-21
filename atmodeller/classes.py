@@ -36,7 +36,7 @@ from atmodeller.constants import (
 )
 from atmodeller.containers import Parameters, Planet, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
-from atmodeller.output import Output, OutputSolution
+from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.solvers import get_solver_individual, make_solve_tau_step, repeat_solver
 from atmodeller.type_aliases import NpFloat
 
@@ -91,7 +91,7 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
-        self._output = Output(parameters, solution_array)
+        self._output = OutputDisequilibrium(parameters, solution_array)
 
     def solve(
         self,

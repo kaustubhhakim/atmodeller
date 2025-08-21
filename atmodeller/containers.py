@@ -235,6 +235,11 @@ class SpeciesCollection(eqx.Module):
         return thermodynamic_data_source.available_species()
 
     @property
+    def gas_only(self) -> bool:
+        """Checks if a gas-only network"""
+        return len(self.data) == len(self.gas_species_mask)
+
+    @property
     def number_species(self) -> int:
         """Number of species"""
         return len(self.data)

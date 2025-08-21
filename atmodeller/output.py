@@ -161,9 +161,6 @@ class Output:
 
         out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
-        # TODO: Could only output for disequilibrium calculations
-        out["disequilibrium"] = self.disequilibrium_asdict()
-
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
             log10_fugacity: NpFloat = np.log10(out["O2_g"]["fugacity"])
@@ -309,103 +306,6 @@ class Output:
         }
 
         return species_out
-
-    def disequilibrium_asdict(self) -> dict[str, NpArray]:
-        """Gets the reaction disequilibrium as a dictionary.
-
-        Returns:
-            Reaction disequilibrium as a dictionary
-        """
-        # TODO: Prototyping and needs cleaning up
-        # reaction_matrix: NpFloat = np.array(self._parameters.species.reaction_matrix)
-        # species_names: tuple[str, ...] = self._species.species_names
-        # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
-
-        reaction_mask: NpBool = self.reaction_mask()
-        residual: NpFloat = np.asarray(self.vmapf.objective_function(jnp.asarray(self.solution)))
-
-        # Number of True entries per row (must be same for all rows)
-        n_cols: NpInt = reaction_mask.sum(axis=1)[0]
-        logger.debug("n_cols = %s", n_cols)
-        # Convert boolean mask to sorted column indices for each row
-        col_indices: NpInt = np.argsort(~reaction_mask, axis=1)[:, :n_cols]
-        logger.debug("col_indices = %s", col_indices)
-        # Gather the True entries in order
-        compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
-        logger.debug("compressed = %s", compressed)
-
-        # To compute the limiting reactant/product in each reaction we need to know the
-        # availability of each species. We will ignore condensates later because their stability
-        # criteria prevents a simple calculation.
-        number_density: NpFloat = self.number_density()
-        logger.debug("number_density = %s", number_density)
-
-        number_fraction: NpFloat = number_density / np.sum(number_density, axis=1, keepdims=True)
-        logger.debug("number_fraction = %s", number_fraction)
-
-        reaction_matrix: NpFloat = self.parameters.species.reaction_matrix
-        logger.debug("reaction_matrix = %s", reaction_matrix)
-
-        out: dict[str, NpArray] = {}
-
-        for jj in range(n_cols):
-            logger.debug("Working on reaction %d", jj)
-            per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
-            out[f"Reaction_{jj}"] = per_mole_of_reaction
-
-            reaction_stoich: NpFloat = reaction_matrix[jj]
-            logger.debug("reaction_stoich = %s", reaction_stoich)
-
-            # TODO: Working here
-            reactant_mask = reaction_stoich < 0
-            product_mask = reaction_stoich > 0
-
-            # value is shape (batch, n_species)
-            # NOTE: was previously vmr_array not number density
-            # TODO: Need to normalise by total number density
-            value = np.where(reaction_stoich != 0, number_fraction / reaction_stoich, np.nan)
-            limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
-
-            # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
-            mask_back: NpBool = per_mole_of_reaction > 0
-            if np.any(mask_back):
-                limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
-            # Forward favoured -> reactants limit it -> stoich < 0
-            # NOTE: want largest negative number (closest to zero)
-            mask_fwd: NpBool = ~mask_back
-            if np.any(mask_fwd):
-                limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
-
-            energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
-
-            out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
-
-        # for k, v in residual_asdict.items():
-
-        #     # Get reaction stoichiometry
-        #     # reaction_stoich is shape (n_species,)
-        #     reaction_stoich: NpFloat = reaction_matrix[k]
-        #     logger.debug("reaction_stoich = %s", reaction_stoich)
-        #     # value is shape (batch, n_species)
-        #     value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
-
-        #     limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
-
-        #     # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
-        #     mask_back: NpBool = per_mole_of_reaction > 0
-        #     if np.any(mask_back):
-        #         limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
-        #     # Forward favoured -> reactants limit it -> stoich < 0
-        #     # NOTE: want largest negative number (closest to zero)
-        #     mask_fwd: NpBool = ~mask_back
-        #     if np.any(mask_fwd):
-        #         limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
-
-        #     energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
-
-        #     out[f"Reaction_{reaction_index}_per_atmosphere"] = energy_per_mol_atmosphere
-
-        return out
 
     def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
         """Gets the element properties as a dictionary.
@@ -799,12 +699,99 @@ class Output:
         logger.info("Output written to %s", output_file)
 
 
+class OutputDisequilibrium(Output):
+    """Output disequilibrium calculations
+
+    Args:
+        parameters: Parameters
+        solution: Solution
+    """
+
+    @override
+    def asdict(self) -> dict[str, dict[str, NpArray]]:
+        """All outputs in a dictionary, with caching.
+
+        Additionally includes the disequilibrium group, compared to the base class.
+
+        Returns:
+            Dictionary of all output
+        """
+        out: dict[str, dict[str, NpArray]] = super().asdict()
+
+        out["disequilibrium"] = self.disequilibrium_asdict()
+
+        self._cached_dict = out  # Re-cache result for faster re-accessing
+
+        return out
+
+    def disequilibrium_asdict(self) -> dict[str, NpArray]:
+        """Gets the reaction disequilibrium as a dictionary.
+
+        Returns:
+            Reaction disequilibrium as a dictionary
+        """
+        reaction_mask: NpBool = self.reaction_mask()
+        residual: NpFloat = np.asarray(self.vmapf.objective_function(jnp.asarray(self.solution)))
+
+        # Number of True entries per row (must be same for all rows)
+        n_cols: NpInt = reaction_mask.sum(axis=1)[0]
+        # logger.debug("n_cols = %s", n_cols)
+        # Convert boolean mask to sorted column indices for each row
+        col_indices: NpInt = np.argsort(~reaction_mask, axis=1)[:, :n_cols]
+        # logger.debug("col_indices = %s", col_indices)
+        # Gather the True entries in order
+        compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
+        # logger.debug("compressed = %s", compressed)
+
+        # To compute the limiting reactant/product in each reaction we need to know the
+        # availability of each species. We will ignore condensates later because their stability
+        # criteria prevents a simple calculation of what is limiting the reaction.
+        number_density: NpFloat = self.number_density()
+        # logger.debug("number_density = %s", number_density)
+        number_fraction: NpFloat = number_density / np.sum(number_density, axis=1, keepdims=True)
+        # logger.debug("number_fraction = %s", number_fraction)
+        reaction_matrix: NpFloat = self.parameters.species.reaction_matrix
+        # logger.debug("reaction_matrix = %s", reaction_matrix)
+
+        out: dict[str, NpArray] = {}
+
+        for jj in range(n_cols):
+            logger.debug("Working on reaction %d", jj)
+            per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
+            stoich: NpFloat = reaction_matrix[jj]
+            # logger.debug("stoich = %s", stoich)
+
+            # Normalised ratios for limiting species
+            ratios: NpFloat = np.where(stoich != 0, number_fraction / stoich, np.nan)
+            limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
+
+            # Backward-favoured: products limit
+            mask_back: NpBool = per_mole_of_reaction > 0
+            if np.any(mask_back):
+                limiting[mask_back] = np.nanmin(ratios[mask_back][:, stoich > 0], axis=1)
+
+            # Forward-favoured: reactants limit
+            mask_fwd: NpBool = ~mask_back
+            if np.any(mask_fwd):
+                # Limiting species is the largest negative ratio among reactants (closest to zero)
+                limiting[mask_fwd] = np.nanmax(ratios[mask_fwd][:, stoich < 0], axis=1)
+
+            # Compute the energy per mole of atmosphere
+            energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
+
+            out[f"Reaction_{jj}"] = per_mole_of_reaction
+            if self.species.gas_only:
+                out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
+
+        return out
+
+
 class OutputSolution(Output):
     """Output equilibrium solution(s)
 
     Args:
         parameters: Parameters
-        solution: Array output from solve
+        solution: Solution
         solver_status: Solver status
         solver_steps: Number of solver steps
         solver_attempts: Number of solver attempts (multistart)
