@@ -40,10 +40,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
 dependencies = [
-    # JAX pinned only on Intel macOS
+    # JAX pinned for Intel macOS
     "jax==0.4.38; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    # Otherwise, get the latest JAX
-    "jax>=0.4.38; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    # JAX pinned for all other platforms
+    "jax==0.7.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     # SciPy and NumPy minimum requirements for jax 0.4.31
     "scipy>=1.10.0",
     "numpy>=1.24.0",
