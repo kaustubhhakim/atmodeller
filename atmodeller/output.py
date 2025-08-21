@@ -750,8 +750,9 @@ class OutputDisequilibrium(Output):
             stoich: NpFloat = reaction_matrix[jj]
             # logger.debug("stoich = %s", stoich)
 
-            # Normalised ratios for limiting species
-            ratios: NpFloat = np.where(stoich != 0, number_fraction / stoich, np.nan)
+            # Normalised ratios for limiting species (ignore divide-by-zero warnings)
+            with np.errstate(divide="ignore"):
+                ratios: NpFloat = np.where(stoich != 0, number_fraction / stoich, np.nan)
             limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
 
             # Backward-favoured: products limit
