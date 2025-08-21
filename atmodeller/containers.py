@@ -156,7 +156,7 @@ class SpeciesCollection(eqx.Module):
     """Gas species names"""
     condensed_species_names: tuple[str, ...]
     """Condensed species names"""
-    molar_masses: tuple[float, ...]
+    molar_masses: NpFloat
     """Molar masses"""
     unique_elements: tuple[str, ...]
     """Unique elements in species in alphabetical order"""
@@ -191,7 +191,7 @@ class SpeciesCollection(eqx.Module):
         self.condensed_species_names = tuple(
             [species.name for species in self.data if species.data.state != GAS_STATE]
         )
-        self.molar_masses = tuple([species_.data.molar_mass for species_ in self.data])
+        self.molar_masses = np.array([species_.data.molar_mass for species_ in self.data])
 
         # Unique elements
         elements: list[str] = []
@@ -233,6 +233,11 @@ class SpeciesCollection(eqx.Module):
     @classmethod
     def available_species(cls) -> tuple[str, ...]:
         return thermodynamic_data_source.available_species()
+
+    @property
+    def gas_only(self) -> bool:
+        """Checks if a gas-only network"""
+        return len(self.data) == len(self.gas_species_mask)
 
     @property
     def number_species(self) -> int:

@@ -14,11 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Output
-
-This uses existing functions as much as possible to calculate desired output quantities, where some
-must be vmapped to compute the output.
-"""
+"""Output"""
 
 import logging
 import pickle
@@ -50,27 +46,20 @@ class Output:
     """Output
 
     Args:
-        species: Species
-        solution: Array output from solve
         parameters: Parameters
+        solution: Solution
     """
 
-    def __init__(
-        self,
-        species: SpeciesCollection,
-        solution: Float[Array, " batch solution"],
-        parameters: Parameters,
-    ):
+    def __init__(self, parameters: Parameters, solution: Float[Array, " batch solution"]):
         logger.debug("Creating Output")
-        self._species: SpeciesCollection = species
-        self._solution: NpFloat = np.asarray(solution)
-        self._parameters: Parameters = parameters
-        self._vmapf: VmappedFunctions = VmappedFunctions(parameters)
+        self.parameters: Parameters = parameters
+        self.solution: NpFloat = np.asarray(solution)
+        self.vmapf: VmappedFunctions = VmappedFunctions(parameters)
 
-        log_number_density, log_stability = np.split(self._solution, 2, axis=1)
-        self._log_number_density: NpFloat = log_number_density
+        log_number_density, log_stability = np.split(self.solution, 2, axis=1)
+        self.log_number_density: NpFloat = log_number_density
         # Mask stabilities that are not solved
-        self._log_stability: NpFloat = np.where(
+        self.log_stability: NpFloat = np.where(
             parameters.species.active_stability, log_stability, np.nan
         )
         # Caching output to avoid recomputation
@@ -78,44 +67,34 @@ class Output:
         self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
 
     @property
-    def formula_matrix(self) -> NpInt:
-        """Formula matrix"""
-        return self._parameters.species.formula_matrix
-
-    @property
     def condensed_species_mask(self) -> NpBool:
         """Mask of condensed species"""
-        return np.invert(self._parameters.species.gas_species_mask)
+        return np.invert(self.parameters.species.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:
         """Mask of gas species"""
-        return self._parameters.species.gas_species_mask
-
-    @property
-    def log_number_density(self) -> NpFloat:
-        """Log number density"""
-        return self._log_number_density
-
-    @property
-    def log_stability(self) -> NpFloat:
-        """Log stability of relevant species"""
-        return self._log_stability
+        return self.parameters.species.gas_species_mask
 
     @property
     def molar_mass(self) -> NpFloat:
         """Molar mass of all species"""
-        return np.asarray(self._parameters.species.molar_masses)
+        return self.parameters.species.molar_masses
 
     @property
     def number_solutions(self) -> int:
         """Number of solutions"""
-        return self.log_number_density.shape[0]
+        return self.parameters.batch_size
 
     @property
     def planet(self) -> Planet:
         """Planet"""
-        return self._parameters.planet
+        return self.parameters.planet
+
+    @property
+    def species(self) -> SpeciesCollection:
+        """Species"""
+        return self.parameters.species
 
     @property
     def temperature(self) -> NpFloat:
@@ -171,18 +150,6 @@ class Output:
         out["atmosphere"]["temperature"] = temperature
         out["raw"] = self.raw_solution_asdict()
 
-        out["constraints"] = {}
-        out["constraints"] |= broadcast_arrays_in_dict(
-            self._parameters.mass_constraints.asdict(), self.number_solutions
-        )
-        out["constraints"] |= broadcast_arrays_in_dict(
-            self._parameters.fugacity_constraints.asdict(temperature, pressure),
-            self.number_solutions,
-        )
-
-        out["residual"], residual = self.residual_asdict()  # type: ignore since keys are int
-        out["disequilibrium"] = self.disequilibrium_asdict(gas_species_asdict, residual)
-
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
             log10_fugacity: NpFloat = np.log10(out["O2_g"]["fugacity"])
@@ -223,7 +190,7 @@ class Output:
         """
         out: dict[str, NpArray] = {}
 
-        log_number_density: Array = self._vmapf.get_log_number_density_from_log_pressure(
+        log_number_density: Array = self.vmapf.get_log_number_density_from_log_pressure(
             jnp.log(self.total_pressure()), jnp.asarray(self.temperature)
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
@@ -253,7 +220,7 @@ class Output:
         Returns:
             Log molar mass of the atmosphere
         """
-        atmosphere_log_molar_mass: Array = self._vmapf.get_atmosphere_log_molar_mass(
+        atmosphere_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
             jnp.asarray(self.log_number_density)
         )
 
@@ -273,7 +240,7 @@ class Output:
         Returns:
             Log volume of the atmosphere
         """
-        atmosphere_log_volume: Array = self._vmapf.get_atmosphere_log_volume(
+        atmosphere_log_volume: Array = self.vmapf.get_atmosphere_log_volume(
             jnp.asarray(self.log_number_density)
         )
 
@@ -293,9 +260,7 @@ class Output:
         Returns:
             Total pressure
         """
-        total_pressure: Array = self._vmapf.get_total_pressure(
-            jnp.asarray(self.log_number_density)
-        )
+        total_pressure: Array = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_density))
 
         return np.asarray(total_pressure)
 
@@ -316,7 +281,7 @@ class Output:
         number_density = number_density[:, self.condensed_species_mask]
         activity = activity[:, self.condensed_species_mask]
 
-        condensed_species: tuple[str, ...] = self._species.condensed_species_names
+        condensed_species: tuple[str, ...] = self.species.condensed_species_names
 
         out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "total_"
@@ -330,88 +295,6 @@ class Output:
         }
 
         return species_out
-
-    def disequilibrium_asdict(
-        self,
-        gas_species_asdict: dict[str, dict[str, NpArray]],
-        residual: NpArray,
-    ) -> dict[str, NpArray]:
-        """Gets the reaction disequilibrium as a dictionary.
-
-        Args:
-            gas_species_asdict: Gas species as a dictionary
-            residual_asdict: Residual as a dictionary
-
-        Returns:
-            Reaction disequilibrium as a dictionary
-        """
-        # TODO: Prototyping and needs cleaning up
-        # reaction_matrix: NpFloat = np.array(self._parameters.species.reaction_matrix)
-        # species_names: tuple[str, ...] = self._species.species_names
-        # reactions: dict[int, str] = get_reaction_dictionary(reaction_matrix, species_names)
-
-        reaction_indices: NpBool = self.reaction_indices()
-
-        # Number of True entries per row (must be same for all rows)
-        n_cols: NpInt = reaction_indices.sum(axis=1)[0]  # or assert all equal
-        logger.debug("n_cols = %s", n_cols)
-        # Convert boolean mask to sorted column indices for each row
-        col_indices: NpInt = np.argsort(~reaction_indices, axis=1)[:, :n_cols]
-        logger.debug("col_indices = %s", col_indices)
-        # Gather the True entries in order
-        compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
-        logger.debug("compressed = %s", compressed)
-
-        out: dict[str, NpArray] = {}
-
-        for jj in range(n_cols):
-            per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
-            out[f"Reaction_{jj}"] = per_mole_of_reaction
-
-        # FIXME: Working here
-        # sys.exit(0)
-
-        # FIXME: Could break for condensates
-        # To compute the limiting reactant/product in each reaction we need to know the volume
-        # mixing ratio of each species, ordered according to the species names
-        # vmr_array: NpFloat = np.column_stack(
-        #     [
-        #         gas_species_asdict[species_name]["volume_mixing_ratio"]
-        #         for species_name in self._species.species_names
-        #     ]
-        # )
-
-        # for k, v in residual_asdict.items():
-        #     print(k, v)
-        #     reaction_index: int = int(k)
-        #     # reaction_str: str = reactions[reaction_index]
-        #     per_mole_of_reaction: NpFloat = v * GAS_CONSTANT * self.temperature
-        #     out[f"Reaction_{reaction_index}"] = per_mole_of_reaction
-
-        #     # Get reaction stoichiometry
-        #     # reaction_stoich is shape (n_species,)
-        #     reaction_stoich: NpFloat = reaction_matrix[k]
-        #     logger.debug("reaction_stoich = %s", reaction_stoich)
-        #     # value is shape (batch, n_species)
-        #     value = np.where(reaction_stoich != 0, vmr_array / reaction_stoich, np.nan)
-
-        #     limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
-
-        #     # Backward favoured -> products limit it -> stoich > 0 - want smallest positive
-        #     mask_back: NpBool = per_mole_of_reaction > 0
-        #     if np.any(mask_back):
-        #         limiting[mask_back] = np.nanmin(value[mask_back][:, reaction_stoich > 0], axis=1)
-        #     # Forward favoured -> reactants limit it -> stoich < 0
-        #     # NOTE: want largest negative number (closest to zero)
-        #     mask_fwd: NpBool = ~mask_back
-        #     if np.any(mask_fwd):
-        #         limiting[mask_fwd] = np.nanmax(value[mask_fwd][:, reaction_stoich < 0], axis=1)
-
-        #     energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
-
-        #     out[f"Reaction_{reaction_index}_per_atmosphere"] = energy_per_mol_atmosphere
-
-        return out
 
     def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
         """Gets the element properties as a dictionary.
@@ -442,7 +325,7 @@ class Output:
             out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
         )
 
-        unique_elements: tuple[str, ...] = self._species.unique_elements
+        unique_elements: tuple[str, ...] = self.species.unique_elements
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
             H_total_moles: NpArray = out["total_moles"][:, index]
@@ -469,7 +352,7 @@ class Output:
             Number density of elements in the condensed phase
         """
         condensed_species_mask: NpFloat = np.where(self.condensed_species_mask, 1.0, np.nan)
-        element_density: Array = self._vmapf.get_element_density(
+        element_density: Array = self.vmapf.get_element_density(
             jnp.asarray(self.log_number_density) * condensed_species_mask
         )
 
@@ -481,7 +364,7 @@ class Output:
         Returns:
             Number density of elements dissolved in melt due to species solubility
         """
-        element_density_dissolved: Array = self._vmapf.get_element_density_in_melt(
+        element_density_dissolved: Array = self.vmapf.get_element_density_in_melt(
             jnp.asarray(self.log_number_density)
         )
 
@@ -494,7 +377,7 @@ class Output:
             Number density of elements in the gas phase
         """
         gas_species_mask: NpFloat = np.where(self.gas_species_mask, 1.0, np.nan)
-        element_density: Array = self._vmapf.get_element_density(
+        element_density: Array = self.vmapf.get_element_density(
             jnp.asarray(self.log_number_density) * gas_species_mask,
         )
 
@@ -506,7 +389,7 @@ class Output:
         Returns:
             Molar mass of elements
         """
-        unique_elements: tuple[str, ...] = self._species.unique_elements
+        unique_elements: tuple[str, ...] = self.species.unique_elements
         molar_mass: npt.ArrayLike = np.array(
             [Formula(element).mass for element in unique_elements]
         )
@@ -567,7 +450,7 @@ class Output:
         total_number_density: NpArray = number_density + dissolved_number_density
         pressure: NpArray = self.pressure()[:, self.gas_species_mask]
 
-        gas_species: tuple[str, ...] = self._species.gas_species_names
+        gas_species: tuple[str, ...] = self.species.gas_species_names
 
         out: dict[str, NpArray] = {}
         out |= self._get_number_density_output(number_density, molar_mass, "atmosphere_")
@@ -608,7 +491,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self._parameters.species.active_stability, log_activity_without_stability.shape
+            self.parameters.species.active_stability, log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
@@ -626,7 +509,7 @@ class Output:
         Returns:
             Log activity without stability
         """
-        log_activity: Array = self._vmapf.get_log_activity(jnp.asarray(self.log_number_density))
+        log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_density))
 
         return np.asarray(log_activity)
 
@@ -638,16 +521,15 @@ class Output:
         """
         return np.exp(self.log_number_density)
 
-    # TODO: Rename to reaction_mask?
-    def reaction_indices(self) -> NpBool:
-        """Gets the reaction indices of the residual array.
+    def reaction_mask(self) -> NpBool:
+        """Gets the reaction mask of the residual array.
 
         Returns:
-            Reaction indices of the residual array
+            Reaction mask of the residual array
         """
-        reaction_indices: Bool[Array, "..."] = self._vmapf.get_reactions_only_mask()
+        reaction_mask: Bool[Array, "..."] = self.vmapf.get_reactions_only_mask()
 
-        return np.asarray(reaction_indices, dtype=bool)
+        return np.asarray(reaction_mask, dtype=bool)
 
     def species_molar_mass_expanded(self) -> NpFloat:
         """Gets molar mass of all species in an expanded array.
@@ -665,7 +547,7 @@ class Output:
         Returns:
             Pressure of species in bar
         """
-        pressure: Array = self._vmapf.get_pressure_from_log_number_density(
+        pressure: Array = self.vmapf.get_pressure_from_log_number_density(
             jnp.asarray(self.log_number_density)
         )
 
@@ -682,7 +564,7 @@ class Output:
         """
         out: dict[str, ArrayLike] = {}
 
-        for nn, species_ in enumerate(self._species):
+        for nn, species_ in enumerate(self.species):
             pressure: NpArray = self.pressure()[:, nn]
             activity: NpArray = self.activity()[:, nn]
             out[species_.name] = pressure
@@ -698,7 +580,7 @@ class Output:
         """
         raw_solution: dict[str, NpArray] = {}
 
-        species_names: tuple[str, ...] = self._species.species_names
+        species_names: tuple[str, ...] = self.species.species_names
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
@@ -711,19 +593,19 @@ class Output:
 
         return raw_solution
 
-    def residual_asdict(self) -> tuple[dict[int, NpFloat], NpArray]:
+    def residual_asdict(self) -> dict[int, NpFloat]:
         """Gets the residual.
 
         Returns:
             Dictionary of the residual
         """
-        residual: Array = self._vmapf.objective_function(jnp.asarray(self._solution))
+        residual: Array = self.vmapf.objective_function(jnp.asarray(self.solution))
 
         out: dict[int, NpArray] = {}
         for ii in range(residual.shape[1]):
             out[ii] = np.asarray(residual[:, ii])
 
-        return out, np.asarray(residual)
+        return out
 
     def species_density_in_melt(self) -> NpFloat:
         """Gets species number density in the melt.
@@ -731,7 +613,7 @@ class Output:
         Returns:
             Species number density in the melt
         """
-        species_density_in_melt: Array = self._vmapf.get_species_density_in_melt(
+        species_density_in_melt: Array = self.vmapf.get_species_density_in_melt(
             jnp.asarray(self.log_number_density)
         )
 
@@ -743,7 +625,7 @@ class Output:
         Return:
             Species ppmw in the melt
         """
-        species_ppmw_in_melt: Array = self._vmapf.get_species_ppmw_in_melt(
+        species_ppmw_in_melt: Array = self.vmapf.get_species_ppmw_in_melt(
             jnp.asarray(self.log_number_density)
         )
 
@@ -806,13 +688,100 @@ class Output:
         logger.info("Output written to %s", output_file)
 
 
+class OutputDisequilibrium(Output):
+    """Output disequilibrium calculations
+
+    Args:
+        parameters: Parameters
+        solution: Solution
+    """
+
+    @override
+    def asdict(self) -> dict[str, dict[str, NpArray]]:
+        """All outputs in a dictionary, with caching.
+
+        Additionally includes the disequilibrium group, compared to the base class.
+
+        Returns:
+            Dictionary of all output
+        """
+        out: dict[str, dict[str, NpArray]] = super().asdict()
+
+        out["disequilibrium"] = self.disequilibrium_asdict()
+
+        self._cached_dict = out  # Re-cache result for faster re-accessing
+
+        return out
+
+    def disequilibrium_asdict(self) -> dict[str, NpArray]:
+        """Gets the reaction disequilibrium as a dictionary.
+
+        Returns:
+            Reaction disequilibrium as a dictionary
+        """
+        reaction_mask: NpBool = self.reaction_mask()
+        residual: NpFloat = np.asarray(self.vmapf.objective_function(jnp.asarray(self.solution)))
+
+        # Number of True entries per row (must be same for all rows)
+        n_cols: NpInt = reaction_mask.sum(axis=1)[0]
+        # logger.debug("n_cols = %s", n_cols)
+        # Convert boolean mask to sorted column indices for each row
+        col_indices: NpInt = np.argsort(~reaction_mask, axis=1)[:, :n_cols]
+        # logger.debug("col_indices = %s", col_indices)
+        # Gather the True entries in order
+        compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
+        # logger.debug("compressed = %s", compressed)
+
+        # To compute the limiting reactant/product in each reaction we need to know the
+        # availability of each species. We will ignore condensates later because their stability
+        # criteria prevents a simple calculation of what is limiting the reaction.
+        number_density: NpFloat = self.number_density()
+        # logger.debug("number_density = %s", number_density)
+        number_fraction: NpFloat = number_density / np.sum(number_density, axis=1, keepdims=True)
+        # logger.debug("number_fraction = %s", number_fraction)
+        reaction_matrix: NpFloat = self.parameters.species.reaction_matrix
+        # logger.debug("reaction_matrix = %s", reaction_matrix)
+
+        out: dict[str, NpArray] = {}
+
+        for jj in range(n_cols):
+            logger.debug("Working on reaction %d", jj)
+            per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
+            stoich: NpFloat = reaction_matrix[jj]
+            # logger.debug("stoich = %s", stoich)
+
+            # Normalised ratios for limiting species (ignore divide-by-zero warnings)
+            with np.errstate(divide="ignore"):
+                ratios: NpFloat = np.where(stoich != 0, number_fraction / stoich, np.nan)
+            limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
+
+            # Backward-favoured: products limit
+            mask_back: NpBool = per_mole_of_reaction > 0
+            if np.any(mask_back):
+                limiting[mask_back] = np.nanmin(ratios[mask_back][:, stoich > 0], axis=1)
+
+            # Forward-favoured: reactants limit
+            mask_fwd: NpBool = ~mask_back
+            if np.any(mask_fwd):
+                # Limiting species is the largest negative ratio among reactants (closest to zero)
+                limiting[mask_fwd] = np.nanmax(ratios[mask_fwd][:, stoich < 0], axis=1)
+
+            # Compute the energy per mole of atmosphere
+            energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
+
+            out[f"Reaction_{jj}"] = per_mole_of_reaction
+            if self.species.gas_only:
+                out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
+
+        return out
+
+
 class OutputSolution(Output):
     """Output equilibrium solution(s)
 
     Args:
-        species: Species
-        solution: Array output from solve
         parameters: Parameters
+        solution: Solution
         solver_status: Solver status
         solver_steps: Number of solver steps
         solver_attempts: Number of solver attempts (multistart)
@@ -820,14 +789,13 @@ class OutputSolution(Output):
 
     def __init__(
         self,
-        species: SpeciesCollection,
-        solution: Float[Array, "batch solution"],
         parameters: Parameters,
+        solution: Float[Array, "batch solution"],
         solver_status: Bool[Array, "..."],
         solver_steps: Integer[Array, "..."],
         solver_attempts: Integer[Array, "..."],
     ):
-        super().__init__(species, solution, parameters)
+        super().__init__(parameters, solution)
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
         self._solver_attempts: NpInt = np.asarray(solver_attempts)
@@ -836,12 +804,25 @@ class OutputSolution(Output):
     def asdict(self) -> dict[str, dict[str, NpArray]]:
         """All outputs in a dictionary, with caching.
 
-        Additionally includes the solver group, compared to the base class.
-
         Returns:
             Dictionary of all output
         """
         out: dict[str, dict[str, NpArray]] = super().asdict()
+
+        # Temperature and pressure have already been expanded to the number of solutions
+        temperature: NpFloat = out["planet"]["surface_temperature"]
+        pressure: NpFloat = out["atmosphere"]["pressure"]
+
+        out["constraints"] = {}
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self.parameters.mass_constraints.asdict(), self.number_solutions
+        )
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self.parameters.fugacity_constraints.asdict(temperature, pressure),
+            self.number_solutions,
+        )
+
+        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         out["solver"] = {
             "status": self._solver_status,

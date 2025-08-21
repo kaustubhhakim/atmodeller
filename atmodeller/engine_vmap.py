@@ -26,6 +26,7 @@ handled by the :mod:`~atmodeller.solvers` module.
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Literal
 
 import equinox as eqx
@@ -49,7 +50,8 @@ from atmodeller.solvers import LOG_NUMBER_DENSITY_VMAP_AXES, vmap_axes_spec
 from atmodeller.utilities import get_log_number_density_from_log_pressure
 
 
-class VmappedFunctions(eqx.Module):
+@dataclass
+class VmappedFunctions:
     """Container for precompiled ``vmap``-ped model functions.
 
     This class wraps a set of model functions (e.g., thermodynamic property calculations, reaction
