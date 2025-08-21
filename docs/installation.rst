@@ -13,7 +13,6 @@ For more information, see the `Python documentation on venv <https://docs.python
 
 We recommend using a modern dependency manager such as `uv <https://docs.astral.sh/uv>`_, which offers fast installs and reproducible environments by default (See section '2b. Install *Atmodeller*' below).
 
-
 1. Quick install
 ----------------
 
@@ -142,3 +141,24 @@ To install additional dependencies:
         pip install -e '.[dev]'
         # or
         pip install -e .\[dev\]
+
+.. _DependencyNotes:
+
+3. Dependency notes
+-------------------
+The dependencies in *Atmodeller* are defined in the ``pyproject.toml`` file, with special handling for JAX:
+
+- **Apple Intel (x86_64)**: JAX is pinned to version ``0.4.38``, the last release that supports this architecture.
+- **All other platforms**: JAX is pinned to the most recent tested version. The pinned version is incremented whenever *Atmodeller* is validated against a new JAX release.
+
+This approach balances stability and reliability on older systems with the latest features and performance improvements from JAX and related libraries on supported platforms.
+
+When working directly with the source code, it may be necessary to update the packages in your virtual environment so they match the versions specified in the latest ``pyproject.toml``. This ensures compatibility with the current development state of *Atmodeller* and avoids conflicts caused by outdated dependencies.
+
+If you encounter issues installing *Atmodeller*, work through the usual checks:
+
+1. Is the Python version at least the required minimum?
+2. Is the correct environment activated?
+3. Is a lock file preventing dependency updates? (E.g., see `uv project sync docs <https://docs.astral.sh/uv/concepts/projects/sync/>`_)
+
+Error messages from the resolver are often helpful in diagnosing dependency conflicts. If you suspect the problem is specific to *Atmodeller*, please open an issue on GitHub.

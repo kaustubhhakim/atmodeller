@@ -5,7 +5,7 @@ Troubleshooting
 
 Pipeline integration
 --------------------
-:ref:`Installation <InstallationFile>` of *Atmodeller* is straightforward, but some package dependencies may conflict with others in a larger Python pipeline. In general, *Atmodeller* has relatively flexible requirements, though the JAX-related dependencies are typically pinned to recent versions to ensure optimal performance and access to the latest features.
+:ref:`Installation <InstallationFile>` of *Atmodeller* is straightforward, but some package dependencies may conflict with others in a larger Python pipeline. In general, *Atmodeller* has relatively flexible requirements, though the JAX-related dependencies are typically pinned to ensure stability on older hardware whilst still taking advantage of the latest JAX features and performance improvements where possible (see :ref:`Dependency notes <DependencyNotes>`).
 
 If you encounter compatibility issues when integrating *Atmodeller* into your pipeline, please contact the development team for assistance.
 
