@@ -150,17 +150,6 @@ class Output:
         out["atmosphere"]["temperature"] = temperature
         out["raw"] = self.raw_solution_asdict()
 
-        out["constraints"] = {}
-        out["constraints"] |= broadcast_arrays_in_dict(
-            self.parameters.mass_constraints.asdict(), self.number_solutions
-        )
-        out["constraints"] |= broadcast_arrays_in_dict(
-            self.parameters.fugacity_constraints.asdict(temperature, pressure),
-            self.number_solutions,
-        )
-
-        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
-
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
             log10_fugacity: NpFloat = np.log10(out["O2_g"]["fugacity"])
@@ -814,12 +803,25 @@ class OutputSolution(Output):
     def asdict(self) -> dict[str, dict[str, NpArray]]:
         """All outputs in a dictionary, with caching.
 
-        Additionally includes the solver group, compared to the base class.
-
         Returns:
             Dictionary of all output
         """
         out: dict[str, dict[str, NpArray]] = super().asdict()
+
+        # Temperature and pressure have already been expanded to the number of solutions
+        temperature: NpFloat = out["planet"]["surface_temperature"]
+        pressure: NpFloat = out["atmosphere"]["pressure"]
+
+        out["constraints"] = {}
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self.parameters.mass_constraints.asdict(), self.number_solutions
+        )
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self.parameters.fugacity_constraints.asdict(temperature, pressure),
+            self.number_solutions,
+        )
+
+        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         out["solver"] = {
             "status": self._solver_status,
