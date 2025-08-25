@@ -273,6 +273,8 @@ def test_CHO_low_temperature(helper) -> None:
     """Tests C-H-O system at 450 K"""
 
     planet: Planet = Planet(surface_temperature=450)
+    # This is a trick to keep the same argument structure and avoid JAX recompilation, even though
+    # for this case we want to turn off the O2_g constraint.
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }

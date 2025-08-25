@@ -676,19 +676,22 @@ class MassConstraints(eqx.Module):
         """Active mass constraints
 
         The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when `log_abundance` is sometimes batched and sometimes not.
+        unnecessary recompilations when
+        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
+        sometimes not.
 
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return ~jnp.isnan(self.log_abundance.squeeze())
+        return ~jnp.isnan(jnp.atleast_1d(self.log_abundance.squeeze()))
 
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Float64[Array, "..."]:
         """Log number density
 
         The array is squeezed to ensure it is consistently 1-D when possible. This avoids
-        unnecessary recompilations when :attr:`~MassConstraints.log_abundance` is sometimes batched
-        and sometimes not.
+        unnecessary recompilations when
+        :attr:`~atmodeller.containers.MassConstraints.log_abundance` is sometimes batched and
+        sometimes not.
 
         Args:
             log_atmosphere_volume: Log volume of the atmosphere
