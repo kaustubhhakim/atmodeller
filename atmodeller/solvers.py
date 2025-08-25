@@ -144,9 +144,9 @@ def solver_single(
 def get_solver_individual(parameters: Parameters) -> Callable:
     """Gets a vmapped, JIT-compiled solver for independent batch systems.
 
-    Wraps :func:`solver_single` with :func:`equinox.filter_vmap` and :func:`filter_jit` so that it
-    can solve multiple independent systems in a batch efficiently. Each batch element is solved
-    separately, producing per-element convergence statistics.
+    Wraps :func:`solver_single` with :func:`equinox.filter_vmap` and :func:`equinox.filter_jit` so
+    that it can solve multiple independent systems in a batch efficiently. Each batch element is
+    solved separately, producing per-element convergence statistics.
 
     Args:
         parameters: Model parameters required by the objective function and solver
