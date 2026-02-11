@@ -72,6 +72,9 @@ class SpeciesProtocol(Protocol):
     @property
     def data(self) -> ChemicalSpeciesData: ...
 
+    @property
+    def number_solution(self) -> int: ...
+
 
 @runtime_checkable
 class ActivityProtocol(Protocol):

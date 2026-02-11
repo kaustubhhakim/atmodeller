@@ -52,7 +52,7 @@ class EquilibriumModel:
     _selected_solver: Literal["basic", "robust"] = "basic"
 
     def __init__(self, species_collection: SpeciesCollection):
-        self.species_collection: SpeciesCollection = species_collection
+        self.species_collection = species_collection
         logger.info("species_network = %s", str(self.species_network))
         temperature_min, temperature_max = self.species_network.get_temperature_range()
         logger.info(
@@ -89,11 +89,11 @@ class EquilibriumModel:
             state: Thermodynamic state
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.species_network, state)
+        parameters: Parameters = Parameters.create(self.species_collection, state)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
-            self.species_network.number_reaction_species,
+            self.species_collection.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
@@ -136,12 +136,16 @@ class EquilibriumModel:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.species_network, state, fugacity_constraints, mass_constraints, solver_parameters
+            self.species_collection,
+            state,
+            fugacity_constraints,
+            mass_constraints,
+            solver_parameters,
         )
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.species_network.number_reaction_species,
+            self.species_collection.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)

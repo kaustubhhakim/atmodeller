@@ -58,7 +58,6 @@ from atmodeller.thermodata.core import (
     thermodynamic_coefficients_dictionary,
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
-from atmodeller.utilities import get_diatomic_oxygen_index
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -191,16 +190,18 @@ class ReservoirSpecies(eqx.Module):
     """Reservoir species
 
     A species that is not part of the reaction network but can exchange with it. For example, this
-    could represent a volatile species dissolved in a melt that can exchange with the gas phase but
+    can represent a volatile species dissolved in a melt that can exchange with the gas phase but
     is not explicitly included in the reaction network.
 
     Args:
         data: Chemical species data
+        activity: Activity
         solubility: Solubility
         number_solution: Number of solution quantities
     """
 
     data: ChemicalSpeciesData
+    activity: ActivityProtocol
     solubility: SolubilityProtocol
     number_solution: int
 
@@ -210,6 +211,7 @@ class ReservoirSpecies(eqx.Module):
         formula: str,
         *,
         state=DISSOLVED_STATE,
+        activity: ActivityProtocol = CondensateActivity(),
         solubility: Optional[SolubilityProtocol] = None,
     ) -> "ReservoirSpecies":
         """Creates a dissolved species with some default values.
@@ -217,6 +219,7 @@ class ReservoirSpecies(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation. Defaults to :const:`~atmodeller.constants.DISSOLVED_STATE`
+            activity: Activity. Defaults to unity activity.
             solubility: Solubility. Defaults to no solubility.
 
         Returns:
@@ -224,17 +227,129 @@ class ReservoirSpecies(eqx.Module):
         """
         species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
 
-        # For dissolved species, we maintain the same convention of number of moles and stability
-        # as for reactive species to allow subsequent easier array manipulation in the "engine",
-        # particularly to allow splitting arrays symmetrically (i.e. by 2). However, the stability
-        # is not meaningful for a reservoir species and is effectively ignored.
         if solubility is None:
             solubility = NoSolubility()
             number_solution: int = 0
         else:
-            number_solution = 2
+            number_solution = 1
 
-        return cls(species_data, solubility, number_solution)
+        return cls(species_data, activity, solubility, number_solution)
+
+
+class SpeciesCollectionData(eqx.Module):
+    """Data container for a species collection
+
+    Args:
+        species: An iterable of species
+    """
+
+    species: tuple[SpeciesProtocol, ...]
+    """Species in the collection"""
+    species_names: tuple[str, ...]
+    """Unique names of all species"""
+    gas_species_mask: NpBool
+    """Gas species mask"""
+    molar_masses: NpFloat
+    """Molar masses"""
+    unique_elements: tuple[str, ...]
+    """Unique elements in species in alphabetical order"""
+    element_molar_masses: NpFloat
+    """Molar masses of the ordered elements"""
+    diatomic_oxygen_index: NpFloat
+    """Index of diatomic oxygen or np.nan if not present"""
+    formula_matrix: NpInt
+    """Formula matrix"""
+    number_solution: int
+    """Number of solution quantities that cannot depend on traced quantities"""
+
+    def __init__(self, species: Iterable[SpeciesProtocol]):
+        self.species = tuple(species)
+        self.species_names = tuple([species_.data.name for species_ in self.species])
+        self.gas_species_mask = np.array(
+            [species.data.state == GAS_STATE for species in self.species], dtype=bool
+        )
+        self.molar_masses = np.array([species_.data.molar_mass for species_ in self.species])
+
+        # Unique elements
+        elements: list[str] = []
+        for species_ in self.species:
+            elements.extend(species_.data.elements)
+        unique_elements: list[str] = list(set(elements))
+        self.unique_elements = tuple(sorted(unique_elements))
+
+        # Element molar masses
+        element_molar_masses: list[float] = []
+        for element_ in self.unique_elements:
+            mformula: Formula = Formula(element_)
+            molar_mass: float = mformula.mass * unit_conversion.g_to_kg
+            element_molar_masses.append(molar_mass)
+        self.element_molar_masses = np.array(element_molar_masses)
+
+        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
+
+        self.formula_matrix = self.get_formula_matrix()
+
+        # Ensure number_solution is static
+        self.number_solution = sum([species.number_solution for species in self.species])
+
+    @property
+    def number_species(self) -> int:
+        """Number of species"""
+        return len(self.species)
+
+    def get_diatomic_oxygen_index(self) -> NpFloat:
+        """Gets the species index corresponding to diatomic oxygen.
+
+        Note:
+            This returns a float array for type consistency.
+
+        Returns:
+            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
+        """
+        for nn, species_ in enumerate(self.species):
+            if species_.data.hill_formula == "O2":
+                # logger.debug("Found O2 at index = %d", nn)
+                return np.array(nn, dtype=float)
+
+        return np.array(np.nan, dtype=float)
+
+    def get_formula_matrix(self) -> NpInt:
+        """Gets the formula matrix.
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Returns:
+            Formula matrix
+        """
+        formula_matrix: NpInt = np.zeros(
+            (len(self.unique_elements), self.number_species), dtype=np.int_
+        )
+
+        for element_index, element in enumerate(self.unique_elements):
+            for species_index, species_ in enumerate(self):
+                count: int = 0
+                try:
+                    count = species_.data.composition[element][0]
+                except KeyError:
+                    count = 0
+                formula_matrix[element_index, species_index] = count
+
+        # logger.debug("formula_matrix = %s", formula_matrix)
+
+        return formula_matrix
+
+    def __getitem__(self, index: int) -> SpeciesProtocol:
+        return self.species[index]
+
+    def __iter__(self) -> Iterator[SpeciesProtocol]:
+        return iter(self.species)
+
+    def __len__(self) -> int:
+        return len(self.species)
+
+    def __str__(self) -> str:
+        return str(tuple(str(species) for species in self.species))
 
 
 class SpeciesNetwork(eqx.Module):
@@ -248,16 +363,12 @@ class SpeciesNetwork(eqx.Module):
     """Chemical species data"""
     active_stability: NpBool
     """Active stability mask"""
-    gas_species_mask: NpBool
-    """Gas species mask"""
     species_names: tuple[str, ...]
     """Unique names of all species"""
     gas_species_names: tuple[str, ...]
     """Gas species names"""
     condensed_species_names: tuple[str, ...]
     """Condensed species names"""
-    molar_masses: NpFloat
-    """Molar masses"""
     unique_elements: tuple[str, ...]
     """Unique elements in species in alphabetical order"""
     element_molar_masses: NpFloat
@@ -272,19 +383,12 @@ class SpeciesNetwork(eqx.Module):
     """Reaction matrix"""
     active_reactions: NpBool
     """Active reactions"""
-    number_solution: int
-    """Number of solution quantities that cannot depend on traced quantities"""
 
     def __init__(self, data: Iterable[ChemicalSpecies]):
         self.data = tuple(data)
 
-        # Ensure number_solution is static
-        self.number_solution = sum([species.number_solution for species in self.data])
         active_stability: list[bool] = [species.solve_for_stability for species in self.data]
         self.active_stability = np.array(active_stability)
-        self.gas_species_mask = np.array(
-            [species.data.state == GAS_STATE for species in self.data], dtype=bool
-        )
         self.species_names = tuple([species_.data.name for species_ in self.data])
         self.gas_species_names = tuple(
             [species.data.name for species in self.data if species.data.state == GAS_STATE]
@@ -292,7 +396,6 @@ class SpeciesNetwork(eqx.Module):
         self.condensed_species_names = tuple(
             [species.data.name for species in self.data if species.data.state != GAS_STATE]
         )
-        self.molar_masses = np.array([species_.data.molar_mass for species_ in self.data])
 
         # Unique elements
         elements: list[str] = []
@@ -321,10 +424,12 @@ class SpeciesNetwork(eqx.Module):
     def available_species(cls) -> tuple[str, ...]:
         return thermodynamic_data_source.available_species()
 
-    @property
-    def gas_only(self) -> bool:
-        """Checks if a gas-only network"""
-        return len(self.data) == len(self.gas_species_mask)
+    # TODO: Only used to determine output. Relevant for gas only or should be gas only AND no
+    # solubility?
+    # @property
+    # def gas_only(self) -> bool:
+    #     """Checks if a gas-only network"""
+    #     return len(self.data) == len(self.gas_species_mask)
 
     @property
     def number_reaction_species(self) -> int:
@@ -435,20 +540,29 @@ class SpeciesNetwork(eqx.Module):
 class SpeciesCollection(eqx.Module):
     """A collection of species that can include both reactive and reservoir species"""
 
-    species: tuple[SpeciesProtocol, ...]
+    data: SpeciesCollectionData
+    """Species collection data"""
     reaction_species: tuple[ChemicalSpecies, ...]
+    """Chemical species that participate in reactions"""
     reservoir_species: tuple[ReservoirSpecies, ...]
+    """Reservoir species that do not participate in reactions"""
+    reaction_species_mask: NpBool
+    """Mask for reaction species in the full species list"""
     species_network: SpeciesNetwork
+    """Network of species and their interactions"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = tuple(species)
+        self.data = SpeciesCollectionData(species)
         reaction_species: list[ChemicalSpecies] = []
+        reaction_mask_list: list[bool] = []
         reservoir_species: list[ReservoirSpecies] = []
-        for species_ in self.species:
+        for species_ in self.data.species:
             if isinstance(species_, ChemicalSpecies):
                 reaction_species.append(species_)
+                reaction_mask_list.append(True)
             elif isinstance(species_, ReservoirSpecies):
                 reservoir_species.append(species_)
+                reaction_mask_list.append(False)
             else:
                 raise TypeError(
                     "Species must be either ChemicalSpecies or ReservoirSpecies, "
@@ -456,12 +570,13 @@ class SpeciesCollection(eqx.Module):
                 )
         self.reaction_species = tuple(reaction_species)
         self.reservoir_species = tuple(reservoir_species)
+        self.reaction_species_mask = np.array(reaction_mask_list, dtype=bool)
         self.species_network = SpeciesNetwork(self.reaction_species)
 
     @property
-    def number_species(self) -> int:
-        """Number of species"""
-        return len(self.species)
+    def reservoir_species_mask(self) -> NpBool:
+        """Mask for reservoir species in the full species list"""
+        return ~self.reaction_species_mask
 
     @classmethod
     def create(cls, species: Iterable[str]) -> "SpeciesCollection":
@@ -494,17 +609,6 @@ class SpeciesCollection(eqx.Module):
             species_list.append(species_to_add)
 
         return cls(species_list)
-
-    def get_diatomic_oxygen_index(self) -> NpFloat:
-        """Gets the species index corresponding to diatomic oxygen.
-
-        Note:
-            This returns a float array for type consistency.
-
-        Returns:
-            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
-        """
-        return get_diatomic_oxygen_index(self.species)
 
 
 class ThermodynamicState(eqx.Module):
@@ -772,24 +876,24 @@ class FugacityConstraintSet(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
-        species: Species network
+        species_collection: Species collection
     """
 
     constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
-    species_network: SpeciesNetwork
-    """Species network"""
+    species_collection: SpeciesCollection
+    """Species collection"""
 
     @classmethod
     def create(
         cls,
-        species_network: SpeciesNetwork,
+        species_collection: SpeciesCollection,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
     ) -> "FugacityConstraintSet":
         """Creates an instance
 
         Args:
-            species_network: Species network
+            species_collection: Species collection
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 ``None``.
 
@@ -802,16 +906,15 @@ class FugacityConstraintSet(eqx.Module):
 
         constraints: list[FugacityConstraintProtocol] = []
 
-        for species_name in species_network.species_names:
+        for species_name in species_collection.species_names:
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
-                # NOTE: This is also applied to condensates, which is OK because it returns nans.
-                # Hence for condensates nans means no imposed activity, and for gas species nans
-                # means no imposed fugacity.
+                # NOTE: This is applied to all species, which is OK because it returns nans,
+                # meaning no imposed activity/fugacity.
                 constraints.append(FixedFugacityConstraint())
 
-        return cls(tuple(constraints), species_network)
+        return cls(tuple(constraints), species_collection)
 
     def active(self) -> Bool[Array, "..."]:
         """Active fugacity constraints
@@ -842,7 +945,7 @@ class FugacityConstraintSet(eqx.Module):
         out: dict[str, NpArray] = {
             # Subtle, but np.exp will collapse scalar array to 0-D, violating the type hint.
             f"{key}_fugacity": np.exp(np.atleast_1d(log_fugacity_list[idx]))
-            for idx, key in enumerate(self.species_network.species_names)
+            for idx, key in enumerate(self.species_collection.species_names)
             if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
@@ -1135,7 +1238,7 @@ class Parameters(eqx.Module):
     """Parameters
 
     Args:
-        species: Species network
+        species: Species collection
         state: Thermodynamic state
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
@@ -1143,8 +1246,8 @@ class Parameters(eqx.Module):
         batch_size: Batch size. Defaults to ``1``.
     """
 
-    species_network: SpeciesNetwork
-    """Species"""
+    species_collection: SpeciesCollection
+    """Species collection"""
     state: ThermodynamicStateProtocol
     """Thermodynamic state"""
     fugacity_constraints: FugacityConstraintSet
@@ -1156,10 +1259,15 @@ class Parameters(eqx.Module):
     batch_size: int = 1
     """Batch size"""
 
+    @property
+    def species_network(self) -> SpeciesNetwork:
+        """Species network"""
+        return self.species_collection.species_network
+
     @classmethod
     def create(
         cls,
-        species_network: SpeciesNetwork,
+        species_collection: SpeciesCollection,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
@@ -1168,7 +1276,7 @@ class Parameters(eqx.Module):
         """Creates an instance
 
         Args:
-            species_network: Species network
+            species_collection: Species collection
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
@@ -1182,10 +1290,10 @@ class Parameters(eqx.Module):
         """
         state_: ThermodynamicStateProtocol = Planet() if state is None else state
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
-            species_network, fugacity_constraints
+            species_collection, fugacity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            species_network, mass_constraints
+            species_collection.species_network, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
@@ -1203,7 +1311,7 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(
-            species_network,
+            species_collection,
             state_,
             fugacity_constraints_,
             mass_constraints_,
