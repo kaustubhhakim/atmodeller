@@ -79,7 +79,7 @@ def solve_single_system(
         throw=parameters.solver_parameters.throw,
         max_steps=parameters.solver_parameters.max_steps,
         options=parameters.solver_parameters.get_options(
-            parameters.species_collection.number_species
+            parameters.species_collection.data.number_species
         ),
     )
 

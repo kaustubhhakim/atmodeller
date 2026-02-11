@@ -68,19 +68,21 @@ class ChemicalSpeciesData(eqx.Module):
 
 
 @runtime_checkable
+class ActivityProtocol(Protocol):
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+
+@runtime_checkable
 class SpeciesProtocol(Protocol):
+    @property
+    def activity(self) -> ActivityProtocol: ...
     @property
     def data(self) -> ChemicalSpeciesData: ...
 
     @property
     def number_solution(self) -> int: ...
-
-
-@runtime_checkable
-class ActivityProtocol(Protocol):
-    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
-
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 @runtime_checkable

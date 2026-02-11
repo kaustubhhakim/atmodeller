@@ -93,7 +93,7 @@ class EquilibriumModel:
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
-            self.species_collection.number_species,
+            self.species_collection.data.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
@@ -145,7 +145,7 @@ class EquilibriumModel:
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.species_collection.number_species,
+            self.species_collection.data.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)

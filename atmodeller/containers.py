@@ -19,7 +19,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Literal, Optional
+from typing import Any, Generic, Literal, Optional, TypeVar
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -236,19 +236,32 @@ class ReservoirSpecies(eqx.Module):
         return cls(species_data, activity, solubility, number_solution)
 
 
-class SpeciesCollectionData(eqx.Module):
+TSpecies = TypeVar("TSpecies", bound=SpeciesProtocol)
+
+
+class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
     """Data container for a species collection
 
     Args:
         species: An iterable of species
     """
 
-    species: tuple[SpeciesProtocol, ...]
+    species: tuple[TSpecies, ...]
     """Species in the collection"""
     species_names: tuple[str, ...]
     """Unique names of all species"""
+    gas_species_names: tuple[str, ...]
+    """Gas species names"""
+    condensed_species_names: tuple[str, ...]
+    """Condensed species names"""
     gas_species_mask: NpBool
     """Gas species mask"""
+    reaction_species: tuple[ChemicalSpecies, ...]
+    """Chemical species that participate in reactions"""
+    reservoir_species: tuple[ReservoirSpecies, ...]
+    """Reservoir species that do not participate in reactions"""
+    reaction_species_mask: NpBool
+    """Mask for reaction species in the full species list"""
     molar_masses: NpFloat
     """Molar masses"""
     unique_elements: tuple[str, ...]
@@ -262,12 +275,38 @@ class SpeciesCollectionData(eqx.Module):
     number_solution: int
     """Number of solution quantities that cannot depend on traced quantities"""
 
-    def __init__(self, species: Iterable[SpeciesProtocol]):
+    def __init__(self, species: Iterable[TSpecies]):
         self.species = tuple(species)
         self.species_names = tuple([species_.data.name for species_ in self.species])
+        self.gas_species_names = tuple(
+            [species.data.name for species in self.species if species.data.state == GAS_STATE]
+        )
+        self.condensed_species_names = tuple(
+            [species.data.name for species in self.species if species.data.state != GAS_STATE]
+        )
         self.gas_species_mask = np.array(
             [species.data.state == GAS_STATE for species in self.species], dtype=bool
         )
+
+        reaction_species: list[ChemicalSpecies] = []
+        reaction_mask_list: list[bool] = []
+        reservoir_species: list[ReservoirSpecies] = []
+        for species_ in self.species:
+            if isinstance(species_, ChemicalSpecies):
+                reaction_species.append(species_)
+                reaction_mask_list.append(True)
+            elif isinstance(species_, ReservoirSpecies):
+                reservoir_species.append(species_)
+                reaction_mask_list.append(False)
+            else:
+                raise TypeError(
+                    "Species must be either ChemicalSpecies or ReservoirSpecies, "
+                    f"got {type(species_)}"
+                )
+        self.reaction_species = tuple(reaction_species)
+        self.reservoir_species = tuple(reservoir_species)
+        self.reaction_species_mask = np.array(reaction_mask_list, dtype=bool)
+
         self.molar_masses = np.array([species_.data.molar_mass for species_ in self.species])
 
         # Unique elements
@@ -296,6 +335,11 @@ class SpeciesCollectionData(eqx.Module):
     def number_species(self) -> int:
         """Number of species"""
         return len(self.species)
+
+    @property
+    def reservoir_species_mask(self) -> NpBool:
+        """Mask for reservoir species in the full species list"""
+        return ~self.reaction_species_mask
 
     def get_diatomic_oxygen_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
@@ -359,64 +403,25 @@ class SpeciesNetwork(eqx.Module):
         species: An iterable of chemical species
     """
 
-    data: tuple[ChemicalSpecies, ...]
-    """Chemical species data"""
+    data: SpeciesCollectionData[ChemicalSpecies]
+    """Species collection data"""
     active_stability: NpBool
     """Active stability mask"""
-    species_names: tuple[str, ...]
-    """Unique names of all species"""
-    gas_species_names: tuple[str, ...]
-    """Gas species names"""
-    condensed_species_names: tuple[str, ...]
-    """Condensed species names"""
-    unique_elements: tuple[str, ...]
-    """Unique elements in species in alphabetical order"""
-    element_molar_masses: NpFloat
-    """Molar masses of the ordered elements"""
-    diatomic_oxygen_index: NpFloat
-    """Index of diatomic oxygen or np.nan if not present"""
     number_reactions: int
     """Number of reactions"""
-    formula_matrix: NpInt
-    """Formula matrix"""
     reaction_matrix: NpFloat
     """Reaction matrix"""
     active_reactions: NpBool
     """Active reactions"""
 
-    def __init__(self, data: Iterable[ChemicalSpecies]):
-        self.data = tuple(data)
+    def __init__(self, species: Iterable[ChemicalSpecies]):
+        self.data = SpeciesCollectionData(species)
 
-        active_stability: list[bool] = [species.solve_for_stability for species in self.data]
+        active_stability: list[bool] = [
+            species.solve_for_stability for species in self.data.species
+        ]
         self.active_stability = np.array(active_stability)
-        self.species_names = tuple([species_.data.name for species_ in self.data])
-        self.gas_species_names = tuple(
-            [species.data.name for species in self.data if species.data.state == GAS_STATE]
-        )
-        self.condensed_species_names = tuple(
-            [species.data.name for species in self.data if species.data.state != GAS_STATE]
-        )
-
-        # Unique elements
-        elements: list[str] = []
-        for species_ in self.data:
-            elements.extend(species_.data.elements)
-        unique_elements: list[str] = list(set(elements))
-        self.unique_elements = tuple(sorted(unique_elements))
-
-        # Element molar masses
-        element_molar_masses: list[float] = []
-        for element_ in self.unique_elements:
-            mformula: Formula = Formula(element_)
-            molar_mass: float = mformula.mass * unit_conversion.g_to_kg
-            element_molar_masses.append(molar_mass)
-        self.element_molar_masses = np.array(element_molar_masses)
-
-        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
-
-        # Reactions
-        self.number_reactions = max(0, self.number_reaction_species - len(self.unique_elements))
-        self.formula_matrix = self.get_formula_matrix()
+        self.number_reactions = max(0, self.data.number_species - len(self.data.unique_elements))
         self.reaction_matrix = self.get_reaction_matrix()
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
 
@@ -431,48 +436,6 @@ class SpeciesNetwork(eqx.Module):
     #     """Checks if a gas-only network"""
     #     return len(self.data) == len(self.gas_species_mask)
 
-    @property
-    def number_reaction_species(self) -> int:
-        """Number of reaction species"""
-        return len(self.data)
-
-    def get_diatomic_oxygen_index(self) -> NpFloat:
-        """Gets the species index corresponding to diatomic oxygen.
-
-        Note:
-            This returns a float array for type consistency.
-
-        Returns:
-            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
-        """
-        return get_diatomic_oxygen_index(self.data)
-
-    def get_formula_matrix(self) -> NpInt:
-        """Gets the formula matrix.
-
-        Elements are given in rows and species in columns following the convention in
-        :cite:t:`LKS17`.
-
-        Returns:
-            Formula matrix
-        """
-        formula_matrix: NpInt = np.zeros(
-            (len(self.unique_elements), self.number_reaction_species), dtype=np.int_
-        )
-
-        for element_index, element in enumerate(self.unique_elements):
-            for species_index, species_ in enumerate(self):
-                count: int = 0
-                try:
-                    count = species_.data.composition[element][0]
-                except KeyError:
-                    count = 0
-                formula_matrix[element_index, species_index] = count
-
-        # logger.debug("formula_matrix = %s", formula_matrix)
-
-        return formula_matrix
-
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.
 
@@ -486,7 +449,7 @@ class SpeciesNetwork(eqx.Module):
             for reaction_index in range(reaction_matrix.shape[0]):
                 reactants: str = ""
                 products: str = ""
-                for species_index, name in enumerate(self.species_names):
+                for species_index, name in enumerate(self.data.species_names):
                     coeff: float = reaction_matrix[reaction_index, species_index].item()
                     if coeff != 0:
                         if coeff < 0:
@@ -507,7 +470,7 @@ class SpeciesNetwork(eqx.Module):
         Returns:
             A matrix of linearly independent reactions or an empty array if no reactions
         """
-        transpose_formula_matrix: NpInt = self.get_formula_matrix().T
+        transpose_formula_matrix: NpInt = self.data.get_formula_matrix().T
         reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
         # logger.debug("reaction_matrix = %s", reaction_matrix)
 
@@ -519,64 +482,23 @@ class SpeciesNetwork(eqx.Module):
         Returns:
             Minimum and maximum temperature that is valid for the species
         """
-        temperature_min: list[float] = [min(species.thermo.T_min) for species in self.data]
-        temperature_max: list[float] = [max(species.thermo.T_max) for species in self.data]
+        temperature_min: list[float] = [min(species.thermo.T_min) for species in self.data.species]
+        temperature_max: list[float] = [max(species.thermo.T_max) for species in self.data.species]
 
         return max(temperature_min), min(temperature_max)
-
-    def __getitem__(self, index: int) -> ChemicalSpecies:
-        return self.data[index]
-
-    def __iter__(self) -> Iterator[ChemicalSpecies]:
-        return iter(self.data)
-
-    def __len__(self) -> int:
-        return len(self.data)
-
-    def __str__(self) -> str:
-        return str(tuple(str(species) for species in self.data))
 
 
 class SpeciesCollection(eqx.Module):
     """A collection of species that can include both reactive and reservoir species"""
 
-    data: SpeciesCollectionData
+    data: SpeciesCollectionData[SpeciesProtocol]
     """Species collection data"""
-    reaction_species: tuple[ChemicalSpecies, ...]
-    """Chemical species that participate in reactions"""
-    reservoir_species: tuple[ReservoirSpecies, ...]
-    """Reservoir species that do not participate in reactions"""
-    reaction_species_mask: NpBool
-    """Mask for reaction species in the full species list"""
     species_network: SpeciesNetwork
     """Network of species and their interactions"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.data = SpeciesCollectionData(species)
-        reaction_species: list[ChemicalSpecies] = []
-        reaction_mask_list: list[bool] = []
-        reservoir_species: list[ReservoirSpecies] = []
-        for species_ in self.data.species:
-            if isinstance(species_, ChemicalSpecies):
-                reaction_species.append(species_)
-                reaction_mask_list.append(True)
-            elif isinstance(species_, ReservoirSpecies):
-                reservoir_species.append(species_)
-                reaction_mask_list.append(False)
-            else:
-                raise TypeError(
-                    "Species must be either ChemicalSpecies or ReservoirSpecies, "
-                    f"got {type(species_)}"
-                )
-        self.reaction_species = tuple(reaction_species)
-        self.reservoir_species = tuple(reservoir_species)
-        self.reaction_species_mask = np.array(reaction_mask_list, dtype=bool)
-        self.species_network = SpeciesNetwork(self.reaction_species)
-
-    @property
-    def reservoir_species_mask(self) -> NpBool:
-        """Mask for reservoir species in the full species list"""
-        return ~self.reaction_species_mask
+        self.species_network = SpeciesNetwork(self.data.reaction_species)
 
     @classmethod
     def create(cls, species: Iterable[str]) -> "SpeciesCollection":
@@ -906,7 +828,7 @@ class FugacityConstraintSet(eqx.Module):
 
         constraints: list[FugacityConstraintProtocol] = []
 
-        for species_name in species_collection.species_names:
+        for species_name in species_collection.data.species_names:
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
@@ -945,7 +867,7 @@ class FugacityConstraintSet(eqx.Module):
         out: dict[str, NpArray] = {
             # Subtle, but np.exp will collapse scalar array to 0-D, violating the type hint.
             f"{key}_fugacity": np.exp(np.atleast_1d(log_fugacity_list[idx]))
-            for idx, key in enumerate(self.species_collection.species_names)
+            for idx, key in enumerate(self.species_collection.data.species_names)
             if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
@@ -993,14 +915,14 @@ class MassConstraintSet(eqx.Module):
 
     Args:
         abundance: Abundance
-        species: Species
+        species_collection: Species collection
         units: Units of the abundance. Defaults to ``mass``.
     """
 
     abundance: Float[Array, "..."] = eqx.field(converter=as_j64)
     """Abundance"""
-    species_network: SpeciesNetwork
-    """Species network"""
+    species_collection: SpeciesCollection
+    """Species collection"""
     units: Literal["mass", "moles"] = "mass"
     """Units of the abundance"""
     oxygen_column_index: Optional[int] = None
@@ -1009,14 +931,14 @@ class MassConstraintSet(eqx.Module):
     @classmethod
     def create(
         cls,
-        species_network: SpeciesNetwork,
+        species_collection: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
     ) -> "MassConstraintSet":
         """Creates an instance
 
         Args:
-            species_network: Species network
+            species_collection: Species collection
             mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
                 ``None``.
             units: Units of the abundance. Defaults to ``mass``.
@@ -1033,12 +955,12 @@ class MassConstraintSet(eqx.Module):
 
         # Initialise to all nans assuming that there are no mass constraints
         abundance: NpFloat = np.full(
-            (max_len, len(species_network.unique_elements)), np.nan, dtype=np.float64
+            (max_len, len(species_collection.data.unique_elements)), np.nan, dtype=np.float64
         )
 
         # Populate mass constraints. This accommodates mass constraints given as mass or moles of
         # species as well as elements
-        for nn, element in enumerate(species_network.unique_elements):
+        for nn, element in enumerate(species_collection.data.unique_elements):
             element_sum: ArrayLike = 0
             for species_, value_ in mass_constraints_.items():
                 try:
@@ -1059,7 +981,7 @@ class MassConstraintSet(eqx.Module):
 
         # jax.debug.print("abundance = {out}", out=abundance)
 
-        return cls(abundance, species_network, units)
+        return cls(abundance, species_collection, units)
 
     def abundance_mol(self) -> Float[Array, "..."]:
         """Abundance by moles for all elements
@@ -1068,7 +990,7 @@ class MassConstraintSet(eqx.Module):
             Abundance by moles for all elements
         """
         if self.units == "mass":
-            return self.abundance / self.species_network.element_molar_masses
+            return self.abundance / self.species_collection.data.element_molar_masses
         elif self.units == "moles":
             return self.abundance
         else:
@@ -1083,7 +1005,7 @@ class MassConstraintSet(eqx.Module):
         if self.units == "mass":
             return self.abundance
         elif self.units == "moles":
-            return self.abundance * self.species_network.element_molar_masses
+            return self.abundance * self.species_collection.data.element_molar_masses
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
@@ -1127,7 +1049,7 @@ class MassConstraintSet(eqx.Module):
         out: dict[str, NpArray] = {}
 
         for label, arr in [("number", abundance_mol), ("mass", abundance_mass)]:
-            for idx, element in enumerate(self.species_network.unique_elements):
+            for idx, element in enumerate(self.species_collection.data.unique_elements):
                 col = arr[:, idx]
                 if not np.all(np.isnan(col)):
                     out[f"{element}_{label}"] = col
@@ -1293,7 +1215,7 @@ class Parameters(eqx.Module):
             species_collection, fugacity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            species_collection.species_network, mass_constraints
+            species_collection, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
