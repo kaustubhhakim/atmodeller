@@ -24,7 +24,7 @@ from molmass import Formula
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ChemicalSpecies, Planet, SpeciesNetwork, ThermodynamicState
+from atmodeller.containers import ChemicalSpecies, Planet, SpeciesCollection, ThermodynamicState
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.thermodata import IronWustiteBuffer
@@ -40,7 +40,7 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
 
-species: SpeciesNetwork = SpeciesNetwork.create(
+species: SpeciesCollection = SpeciesCollection.create(
     ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g", "C_cd")
 )
 CHO_model: EquilibriumModel = EquilibriumModel(species)
@@ -118,7 +118,7 @@ def test_graphite_unstable(helper) -> None:
 def test_water_stable(helper) -> None:
     """Condensed water at 10 bar"""
 
-    species: SpeciesNetwork = SpeciesNetwork.create(("H2_g", "H2O_g", "O2_g", "H2O_cd"))
+    species: SpeciesCollection = SpeciesCollection.create(("H2_g", "H2O_g", "O2_g", "H2O_cd"))
     planet: Planet = Planet(temperature=411.75)
     model: EquilibriumModel = EquilibriumModel(species)
 
@@ -145,7 +145,7 @@ def test_water_stable(helper) -> None:
 def test_graphite_water_stable(helper) -> None:
     """Tests C and water in equilibrium at 430 K and 10 bar"""
 
-    species: SpeciesNetwork = SpeciesNetwork.create(
+    species: SpeciesCollection = SpeciesCollection.create(
         ("H2O_g", "H2_g", "O2_g", "CO_g", "CO2_g", "CH4_g", "H2O_cd", "C_cd")
     )
     planet: Planet = Planet(temperature=430)
@@ -191,7 +191,7 @@ def test_impose_stable(helper) -> None:
     CHN_g = ChemicalSpecies.create_gas("CHN")
     H_g = ChemicalSpecies.create_gas("H")
 
-    species = SpeciesNetwork((C_cr, H2_g, N2_g, CH4_g, CHN_g, H_g))
+    species = SpeciesCollection((C_cr, H2_g, N2_g, CH4_g, CHN_g, H_g))
 
     model = EquilibriumModel(species)
 

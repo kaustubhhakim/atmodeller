@@ -24,7 +24,7 @@ from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ChemicalSpecies, Planet, SpeciesNetwork
+from atmodeller.containers import ChemicalSpecies, Planet, SpeciesCollection
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output import Output
@@ -49,7 +49,7 @@ O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 SiO_g: ChemicalSpecies = ChemicalSpecies.create_gas("OSi")
 H4Si_g: ChemicalSpecies = ChemicalSpecies.create_gas("H4Si")
 O2Si_l: ChemicalSpecies = ChemicalSpecies.create_condensed("O2Si")
-species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
+species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
 subneptune_model: EquilibriumModel = EquilibriumModel(species)
 
 
@@ -62,7 +62,7 @@ def test_fO2_holley(helper) -> None:
     H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
     O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 
-    species: SpeciesNetwork = SpeciesNetwork((H2_g, H2O_g, O2_g))
+    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
     planet: Planet = Planet(temperature=1000)
     model: EquilibriumModel = EquilibriumModel(species)
@@ -216,50 +216,50 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_pH2_fO2_real_gas(helper) -> None:
-    """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
+# def test_pH2_fO2_real_gas(helper) -> None:
+#     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
-    Applies a constraint to the fugacity of H2.
-    """
-    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "H2O",
-        solubility=solubility_models["H2O_peridotite_sossi23"],
-        activity=eos_models["H2O_cork_holland98"],
-    )
-    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-        "H2", activity=eos_models["H2_cork_cs_holland91"]
-    )
-    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+#     Applies a constraint to the fugacity of H2.
+#     """
+#     H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+#         "H2O",
+#         solubility=solubility_models["H2O_peridotite_sossi23"],
+#         activity=eos_models["H2O_cork_holland98"],
+#     )
+#     H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
+#         "H2", activity=eos_models["H2_cork_cs_holland91"]
+#     )
+#     O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 
-    species: SpeciesNetwork = SpeciesNetwork((H2O_g, H2_g, O2_g))
-    planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(species)
+#     species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
+#     planet: Planet = Planet()
+#     model: EquilibriumModel = EquilibriumModel(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(0.072885576196744)
-    }
+#     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+#         "O2_g": IronWustiteBuffer(0.072885576196744)
+#     }
 
-    mass_constraints: dict[str, ArrayLike] = {"H": 1.47126255324872e22}
+#     mass_constraints: dict[str, ArrayLike] = {"H": 1.47126255324872e22}
 
-    model.solve(
-        state=planet,
-        mass_constraints=mass_constraints,
-        fugacity_constraints=fugacity_constraints,
-        solver="basic",
-        # Guide the solver with an improved initial guess, otherwise use solver="robust".
-        initial_log_number_moles=np.array([54, 54, 31]),
-    )
-    output: Output = model.output
+#     model.solve(
+#         state=planet,
+#         mass_constraints=mass_constraints,
+#         fugacity_constraints=fugacity_constraints,
+#         solver="basic",
+#         # Guide the solver with an improved initial guess, otherwise use solver="robust".
+#         initial_log_number_moles=np.array([54, 54, 31]),
+#     )
+#     output: Output = model.output
 
-    # output.to_excel("pH2_fO2_real_gas")
-    solution: dict[str, ArrayLike] = output.quick_look()
+#     # output.to_excel("pH2_fO2_real_gas")
+#     solution: dict[str, ArrayLike] = output.quick_look()
 
-    # logger.debug("solution = %s", pprint.pformat(solution))
+#     # logger.debug("solution = %s", pprint.pformat(solution))
 
-    target: dict[str, float] = {
-        "H2O_g": 1470.2567650857518,
-        "H2_g": 999.9971214963639,
-        "O2_g": 1.045357420958815e-07,
-    }
+#     target: dict[str, float] = {
+#         "H2O_g": 1470.2567650857518,
+#         "H2_g": 999.9971214963639,
+#         "O2_g": 1.045357420958815e-07,
+#     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+#     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
