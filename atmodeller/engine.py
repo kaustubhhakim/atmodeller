@@ -607,7 +607,7 @@ def objective_function(
     # Need to get just the log_activity of species involved in reactions
     log_activity_reaction_indices: Integer[Array, "..."] = jnp.where(
         parameters.species_collection.data.reaction_species_mask,
-        size=len(parameters.species_collection.data.reaction_species),
+        size=parameters.species_collection.reaction_network.data.number_species,
     )[0]
     jax.debug.print("log_activity_reaction_indices = {out}", out=log_activity_reaction_indices)
     log_activity_reaction: Float[Array, " reaction_species"] = jnp.take(
