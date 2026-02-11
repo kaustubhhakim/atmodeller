@@ -22,7 +22,55 @@ expected interfaces for different thermodynamic components.
 
 from typing import Optional, Protocol, runtime_checkable
 
+import equinox as eqx
+from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool
+from molmass import Formula
+from xmmutablemap import ImmutableMap
+
+
+class ChemicalSpeciesData(eqx.Module):
+    """General data container for an individual species
+
+    Args:
+        formula: Formula
+        state: State of aggregation, typically as defined by JANAF
+    """
+
+    formula: str
+    """Formula"""
+    state: str
+    """State of aggregation"""
+    composition: ImmutableMap[str, tuple[int, float, float]]
+    """Composition"""
+    hill_formula: str
+    """Hill formula"""
+    molar_mass: float = eqx.field(converter=float)
+    """Molar mass"""
+
+    def __init__(self, formula: str, state: str):
+        self.formula = formula
+        self.state = state
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
+
+
+@runtime_checkable
+class SpeciesProtocol(Protocol):
+    @property
+    def data(self) -> ChemicalSpeciesData: ...
 
 
 @runtime_checkable

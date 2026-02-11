@@ -22,6 +22,7 @@ lightweight also helps avoid circular imports.
 """
 
 import logging
+from collections.abc import Iterable
 from typing import Optional
 
 import equinox as eqx
@@ -29,7 +30,8 @@ import numpy as np
 from jaxmod.constants import OCEAN_MASS_H2
 from jaxtyping import ArrayLike
 
-from atmodeller.type_aliases import Scalar
+from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.type_aliases import NpFloat, Scalar
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -117,3 +119,20 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     h_kg: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
 
     return h_kg
+
+
+def get_diatomic_oxygen_index(species: Iterable[SpeciesProtocol]) -> NpFloat:
+    """Gets the species index corresponding to diatomic oxygen.
+
+    Note:
+        This returns a float array for type consistency.
+
+    Returns:
+        Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
+    """
+    for nn, species_ in enumerate(species):
+        if species_.data.hill_formula == "O2":
+            # logger.debug("Found O2 at index = %d", nn)
+            return np.array(nn, dtype=float)
+
+    return np.array(np.nan, dtype=float)

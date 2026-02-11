@@ -31,7 +31,6 @@ from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
-from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import (
     CONDENSED_STATE,
@@ -46,8 +45,10 @@ from atmodeller.constants import (
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import (
     ActivityProtocol,
+    ChemicalSpeciesData,
     FugacityConstraintProtocol,
     SolubilityProtocol,
+    SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
 from atmodeller.solubility.core import NoSolubility
@@ -57,46 +58,9 @@ from atmodeller.thermodata.core import (
     thermodynamic_coefficients_dictionary,
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
+from atmodeller.utilities import get_diatomic_oxygen_index
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class ChemicalSpeciesData(eqx.Module):
-    """General data container for an individual species
-
-    Args:
-        formula: Formula
-        state: State of aggregation, typically as defined by JANAF
-    """
-
-    formula: str
-    """Formula"""
-    state: str
-    """State of aggregation"""
-    composition: ImmutableMap[str, tuple[int, float, float]]
-    """Composition"""
-    hill_formula: str
-    """Hill formula"""
-    molar_mass: float = eqx.field(converter=float)
-    """Molar mass"""
-
-    def __init__(self, formula: str, state: str):
-        self.formula = formula
-        self.state = state
-        mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
-        self.hill_formula = mformula.formula
-        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-
-    @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and state of aggregation"""
-        return f"{self.hill_formula}_{self.state}"
 
 
 class ChemicalSpecies(eqx.Module):
@@ -315,7 +279,6 @@ class SpeciesNetwork(eqx.Module):
         self.data = tuple(data)
 
         # Ensure number_solution is static
-        # TODO: Could include dissolution (ReservoirSpecies)
         self.number_solution = sum([species.number_solution for species in self.data])
         active_stability: list[bool] = [species.solve_for_stability for species in self.data]
         self.active_stability = np.array(active_stability)
@@ -349,36 +312,10 @@ class SpeciesNetwork(eqx.Module):
         self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
 
         # Reactions
-        self.number_reactions = max(0, self.number_species - len(self.unique_elements))
+        self.number_reactions = max(0, self.number_reaction_species - len(self.unique_elements))
         self.formula_matrix = self.get_formula_matrix()
         self.reaction_matrix = self.get_reaction_matrix()
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
-
-    @classmethod
-    def create(cls, species_names: Iterable[str]) -> "SpeciesNetwork":
-        """Creates an instance
-
-        Args:
-            species_names: A list or tuple of species names
-
-        Returns
-            An instance
-        """
-        species_list: list[ChemicalSpecies] = []
-        for species_ in species_names:
-            formula, state = species_.split("_")
-            hill_formula = Formula(formula).formula
-            if state == GAS_STATE:
-                species_to_add: ChemicalSpecies = ChemicalSpecies.create_gas(
-                    hill_formula, state=state
-                )
-            else:
-                species_to_add: ChemicalSpecies = ChemicalSpecies.create_condensed(
-                    hill_formula, state=state
-                )
-            species_list.append(species_to_add)
-
-        return cls(species_list)
 
     @classmethod
     def available_species(cls) -> tuple[str, ...]:
@@ -390,8 +327,8 @@ class SpeciesNetwork(eqx.Module):
         return len(self.data) == len(self.gas_species_mask)
 
     @property
-    def number_species(self) -> int:
-        """Number of species"""
+    def number_reaction_species(self) -> int:
+        """Number of reaction species"""
         return len(self.data)
 
     def get_diatomic_oxygen_index(self) -> NpFloat:
@@ -403,12 +340,7 @@ class SpeciesNetwork(eqx.Module):
         Returns:
             Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
         """
-        for nn, species_ in enumerate(self.data):
-            if species_.data.hill_formula == "O2":
-                # logger.debug("Found O2 at index = %d", nn)
-                return np.array(nn, dtype=float)
-
-        return np.array(np.nan, dtype=float)
+        return get_diatomic_oxygen_index(self.data)
 
     def get_formula_matrix(self) -> NpInt:
         """Gets the formula matrix.
@@ -420,7 +352,7 @@ class SpeciesNetwork(eqx.Module):
             Formula matrix
         """
         formula_matrix: NpInt = np.zeros(
-            (len(self.unique_elements), self.number_species), dtype=np.int_
+            (len(self.unique_elements), self.number_reaction_species), dtype=np.int_
         )
 
         for element_index, element in enumerate(self.unique_elements):
@@ -498,6 +430,81 @@ class SpeciesNetwork(eqx.Module):
 
     def __str__(self) -> str:
         return str(tuple(str(species) for species in self.data))
+
+
+class SpeciesCollection(eqx.Module):
+    """A collection of species that can include both reactive and reservoir species"""
+
+    species: tuple[SpeciesProtocol, ...]
+    reaction_species: tuple[ChemicalSpecies, ...]
+    reservoir_species: tuple[ReservoirSpecies, ...]
+    species_network: SpeciesNetwork
+
+    def __init__(self, species: Iterable[SpeciesProtocol]):
+        self.species = tuple(species)
+        reaction_species: list[ChemicalSpecies] = []
+        reservoir_species: list[ReservoirSpecies] = []
+        for species_ in self.species:
+            if isinstance(species_, ChemicalSpecies):
+                reaction_species.append(species_)
+            elif isinstance(species_, ReservoirSpecies):
+                reservoir_species.append(species_)
+            else:
+                raise TypeError(
+                    "Species must be either ChemicalSpecies or ReservoirSpecies, "
+                    f"got {type(species_)}"
+                )
+        self.reaction_species = tuple(reaction_species)
+        self.reservoir_species = tuple(reservoir_species)
+        self.species_network = SpeciesNetwork(self.reaction_species)
+
+    @property
+    def number_species(self) -> int:
+        """Number of species"""
+        return len(self.species)
+
+    @classmethod
+    def create(cls, species: Iterable[str]) -> "SpeciesCollection":
+        """Creates an instance
+
+        Args:
+            species: A list or tuple of species names with a state suffix
+
+        Returns
+            An instance
+        """
+        species_list: list[SpeciesProtocol] = []
+
+        for species_ in species:
+            formula, state = species_.split("_")
+            hill_formula = Formula(formula).formula
+            if state == GAS_STATE:
+                species_to_add: SpeciesProtocol = ChemicalSpecies.create_gas(
+                    hill_formula, state=state
+                )
+            elif state == CONDENSED_STATE:
+                species_to_add = ChemicalSpecies.create_condensed(hill_formula, state=state)
+            elif state == DISSOLVED_STATE:
+                species_to_add = ReservoirSpecies.create_dissolved(hill_formula, state=state)
+            else:
+                raise ValueError(
+                    f"State must be '{GAS_STATE}', '{CONDENSED_STATE}' or '{DISSOLVED_STATE}', "
+                    f"got {state}"
+                )
+            species_list.append(species_to_add)
+
+        return cls(species_list)
+
+    def get_diatomic_oxygen_index(self) -> NpFloat:
+        """Gets the species index corresponding to diatomic oxygen.
+
+        Note:
+            This returns a float array for type consistency.
+
+        Returns:
+            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
+        """
+        return get_diatomic_oxygen_index(self.species)
 
 
 class ThermodynamicState(eqx.Module):

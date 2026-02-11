@@ -132,7 +132,9 @@ from atmodeller.containers import (  # noqa: E402, F401
     ChemicalSpecies,
     FixedFugacityConstraint,
     Planet,
+    ReservoirSpecies,
     SolverParameters,
+    SpeciesCollection,
     SpeciesNetwork,
     ThermodynamicState,
 )

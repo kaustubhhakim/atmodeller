@@ -27,7 +27,7 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import Parameters, SolverParameters, SpeciesNetwork
+from atmodeller.containers import Parameters, SolverParameters, SpeciesCollection, SpeciesNetwork
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
@@ -43,15 +43,16 @@ class EquilibriumModel:
     and retrieve the results.
 
     Args:
-        species_network: Species network
+        species_collection: Species collection
     """
 
+    species_collection: SpeciesCollection
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
-    def __init__(self, species_network: SpeciesNetwork):
-        self.species_network: SpeciesNetwork = species_network
+    def __init__(self, species_collection: SpeciesCollection):
+        self.species_collection: SpeciesCollection = species_collection
         logger.info("species_network = %s", str(self.species_network))
         temperature_min, temperature_max = self.species_network.get_temperature_range()
         logger.info(
@@ -70,6 +71,10 @@ class EquilibriumModel:
 
         return self._output
 
+    @property
+    def species_network(self) -> SpeciesNetwork:
+        return self.species_collection.species_network
+
     def calculate_disequilibrium(
         self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike
     ) -> None:
@@ -86,7 +91,10 @@ class EquilibriumModel:
         """
         parameters: Parameters = Parameters.create(self.species_network, state)
         solution_array: Array = broadcast_initial_solution(
-            log_number_moles, None, self.species_network.number_species, parameters.batch_size
+            log_number_moles,
+            None,
+            self.species_network.number_reaction_species,
+            parameters.batch_size,
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
 
@@ -133,7 +141,7 @@ class EquilibriumModel:
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.species_network.number_species,
+            self.species_network.number_reaction_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
