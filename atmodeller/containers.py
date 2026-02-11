@@ -31,6 +31,7 @@ from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
+from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import (
     CONDENSED_STATE,
@@ -48,38 +49,110 @@ from atmodeller.interfaces import (
     SolubilityProtocol,
     ThermodynamicStateProtocol,
 )
-from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import (
-    ChemicalSpeciesData,
-    CondensateActivity,
-    thermodynamic_data_source,
+from atmodeller.thermodata import CondensateActivity, thermodynamic_data_source
+from atmodeller.thermodata.core import (
+    ThermodynamicCoefficients,
+    thermodynamic_coefficients_dictionary,
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+class ChemicalSpeciesData(eqx.Module):
+    """General data container for an individual species
+
+    Args:
+        formula: Formula
+        state: State of aggregation, typically as defined by JANAF
+    """
+
+    formula: str
+    """Formula"""
+    state: str
+    """State of aggregation"""
+    composition: ImmutableMap[str, tuple[int, float, float]]
+    """Composition"""
+    hill_formula: str
+    """Hill formula"""
+    molar_mass: float = eqx.field(converter=float)
+    """Molar mass"""
+
+    def __init__(self, formula: str, state: str):
+        self.formula = formula
+        self.state = state
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
+
+
 class ChemicalSpecies(eqx.Module):
-    """Chemical species
+    """Chemical species that participate in reactions
 
     Args:
         data: Chemical species data
         activity: Activity
-        solubility: Solubility
         solve_for_stability: Solve for stability
         number_solution: Number of solution quantities
+        thermo: Thermodynamic coefficients
     """
 
     data: ChemicalSpeciesData
     activity: ActivityProtocol
-    solubility: SolubilityProtocol
     solve_for_stability: bool
     number_solution: int
+    thermo: ThermodynamicCoefficients
 
     @property
     def name(self) -> str:
         """Unique name by combining Hill notation and state"""
         return self.data.name
+
+    @classmethod
+    def create(
+        cls,
+        formula: str,
+        state: str,
+        activity: ActivityProtocol,
+        solve_for_stability: bool,
+        number_solution: int,
+    ) -> "ChemicalSpecies":
+        """Creates an instance.
+
+        Args:
+            formula: Formula
+            state: State of aggregation, as typically defined by JANAF
+            activity: Activity
+            solve_for_stability. Solve for stability.
+            number_solution: Number of solution quantities
+
+        Returns:
+            An instance
+        """
+        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
+
+        try:
+            thermo: ThermodynamicCoefficients = thermodynamic_coefficients_dictionary[
+                species_data.name
+            ]
+        except KeyError:
+            raise KeyError(
+                f"{species_data.name} not available. "
+                f"Available species are {thermodynamic_data_source.available_species()}"
+            )
+
+        return cls(species_data, activity, solve_for_stability, number_solution, thermo)
 
     @classmethod
     def create_condensed(
@@ -90,7 +163,7 @@ class ChemicalSpecies(eqx.Module):
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
     ) -> "ChemicalSpecies":
-        """Creates a condensate
+        """Creates a condensate with some default values.
 
         Args:
             formula: Formula
@@ -102,17 +175,12 @@ class ChemicalSpecies(eqx.Module):
         Returns:
             A condensed species
         """
-        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
-
-        # For a condensate, either both a number of moles and stability are solved for, or
-        # alternatively stability can be enforced in which case the number of moles is
-        # irrelevant and there is nothing to solve for.
-        # TODO: Theoretically the scenario could be accommodated whereby a user enforces stability
-        # and wants to solve for the number of moles. But this could give rise to strange
-        # inconsistencies so this scenario is not accommodated.
+        # Either both the number of moles and stability are solved for, or alternatively stability
+        # can be enforced in which case the number of moles is irrelevant and there is nothing to
+        # solve for.
         number_solution: int = 2 if solve_for_stability else 0
 
-        return cls(species_data, activity, NoSolubility(), solve_for_stability, number_solution)
+        return cls.create(formula, state, activity, solve_for_stability, number_solution)
 
     @classmethod
     def create_gas(
@@ -121,28 +189,38 @@ class ChemicalSpecies(eqx.Module):
         *,
         state: str = GAS_STATE,
         activity: ActivityProtocol = IdealGas(),
-        solubility: SolubilityProtocol = NoSolubility(),
         solve_for_stability: bool = False,
     ) -> "ChemicalSpecies":
-        """Creates a gas species
+        """Creates a gas species with some default values.
 
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to
                 :const:`~atmodeller.constants.GAS_STATE`
             activity: Activity. Defaults to an ideal gas.
-            solubility: Solubility. Defaults to no solubility.
             solve_for_stability. Solve for stability. Defaults to ``False``.
 
         Returns:
             A gas species
         """
-        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
-
-        # For a gas, the number of moles is always solved for, and stability can be if desired
+        # The number of moles is always solved for, and stability can be if desired, although
+        # this is not typically done for gas species because they are usually stable over the range
+        # of conditions considered and truncating the abundance can severely distort the results,
+        # notably for O2.
         number_solution: int = 2 if solve_for_stability else 1
 
-        return cls(species_data, activity, solubility, solve_for_stability, number_solution)
+        return cls.create(formula, state, activity, solve_for_stability, number_solution)
+
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gibbs energy over RT
+        """
+        return self.thermo.get_gibbs_over_RT(temperature)
 
     def __str__(self) -> str:
         return f"{self.name}: {self.activity.__class__.__name__}, {self.solubility.__class__.__name__}"
@@ -356,8 +434,8 @@ class SpeciesNetwork(eqx.Module):
         Returns:
             Minimum and maximum temperature that is valid for the species
         """
-        temperature_min: list[float] = [min(species.data.thermo.T_min) for species in self.data]
-        temperature_max: list[float] = [max(species.data.thermo.T_max) for species in self.data]
+        temperature_min: list[float] = [min(species.thermo.T_min) for species in self.data]
+        temperature_max: list[float] = [max(species.thermo.T_max) for species in self.data]
 
         return max(temperature_min), min(temperature_max)
 

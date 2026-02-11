@@ -27,11 +27,8 @@ import equinox as eqx
 import jax.numpy as jnp
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT
-from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, to_native_floats
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
-from molmass import Formula
-from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import TEMPERATURE_REFERENCE
 
@@ -570,61 +567,3 @@ critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_
 
 :meta private:
 """
-
-
-class ChemicalSpeciesData(eqx.Module):
-    """Individual species data
-
-    Args:
-        formula: Formula
-        state: State of aggregation as defined by JANAF
-    """
-
-    formula: str
-    """Formula"""
-    state: str
-    """State of aggregation"""
-    thermo: ThermodynamicCoefficients
-    """Thermodynamic coefficient and methods"""
-    composition: ImmutableMap[str, tuple[int, float, float]]
-    """Composition"""
-    hill_formula: str
-    """Hill formula"""
-    molar_mass: float = eqx.field(converter=float)
-    """Molar mass"""
-
-    def __init__(self, formula: str, state: str):
-        self.formula = formula
-        self.state = state
-        mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
-        self.hill_formula = mformula.formula
-        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-        try:
-            self.thermo = thermodynamic_coefficients_dictionary[self.name]
-        except KeyError:
-            raise KeyError(
-                f"{self.name} not available. "
-                f"Available species are {thermodynamic_data_source.available_species()}"
-            )
-
-    @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and state of aggregation"""
-        return f"{self.hill_formula}_{self.state}"
-
-    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
-        """Gets Gibbs energy over RT
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            Gibbs energy over RT
-        """
-        return self.thermo.get_gibbs_over_RT(temperature)
