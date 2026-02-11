@@ -56,6 +56,7 @@ class Output:
         log_number_moles, log_stability = np.split(self.solution, 2, axis=1)
         self.log_number_moles: NpFloat = log_number_moles  # 2-D
         # Mask stabilities that are not solved
+        # FIXME: This will probably break when dissolved species are added.
         self.log_stability: NpFloat = np.where(
             parameters.reaction_network.active_stability, log_stability, np.nan
         )  # 2-D
