@@ -27,7 +27,7 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import Parameters, SolverParameters, SpeciesCollection, SpeciesNetwork
+from atmodeller.containers import Parameters, ReactionNetwork, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
@@ -53,15 +53,15 @@ class EquilibriumModel:
 
     def __init__(self, species_collection: SpeciesCollection):
         self.species_collection = species_collection
-        logger.info("species_network = %s", str(self.species_network))
-        temperature_min, temperature_max = self.species_network.get_temperature_range()
+        logger.info("reaction_network = %s", str(self.reaction_network))
+        temperature_min, temperature_max = self.reaction_network.get_temperature_range()
         logger.info(
             "Thermodynamic data requires temperatures between %d K and %d K",
             np.ceil(temperature_min),
             np.floor(temperature_max),
         )
         logger.info(
-            "reactions = %s", pprint.pformat(self.species_network.get_reaction_dictionary())
+            "reactions = %s", pprint.pformat(self.reaction_network.get_reaction_dictionary())
         )
 
     @property
@@ -72,8 +72,8 @@ class EquilibriumModel:
         return self._output
 
     @property
-    def species_network(self) -> SpeciesNetwork:
-        return self.species_collection.species_network
+    def reaction_network(self) -> ReactionNetwork:
+        return self.species_collection.reaction_network
 
     def calculate_disequilibrium(
         self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike

@@ -29,7 +29,7 @@ from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 
-from atmodeller.containers import Parameters, SpeciesNetwork
+from atmodeller.containers import Parameters, SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
 from atmodeller.thermodata import IronWustiteBuffer
@@ -57,7 +57,7 @@ class Output:
         self.log_number_moles: NpFloat = log_number_moles  # 2-D
         # Mask stabilities that are not solved
         self.log_stability: NpFloat = np.where(
-            parameters.species_network.active_stability, log_stability, np.nan
+            parameters.reaction_network.active_stability, log_stability, np.nan
         )  # 2-D
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
@@ -66,17 +66,17 @@ class Output:
     @property
     def condensed_species_mask(self) -> NpBool:  # 1-D
         """Mask of condensed species"""
-        return np.invert(self.parameters.species_network.gas_species_mask)
+        return np.invert(self.species_collection.data.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:  # 1-D
         """Mask of gas species"""
-        return self.parameters.species_network.gas_species_mask
+        return self.species_collection.data.gas_species_mask
 
     @property
     def molar_mass(self) -> NpFloat:  # 1-D
         """Molar mass of all species"""
-        return self.parameters.species_network.molar_masses
+        return self.species_collection.data.molar_masses
 
     @property
     def number_moles(self) -> NpFloat:  # 2-D
@@ -94,9 +94,9 @@ class Output:
         return self.parameters.state
 
     @property
-    def species(self) -> SpeciesNetwork:
-        """Species"""
-        return self.parameters.species_network
+    def species_collection(self) -> SpeciesCollection:
+        """Species collection"""
+        return self.parameters.species_collection
 
     @property
     def temperature(self) -> NpFloat:  # Must return 1-D for shape consistency
@@ -277,7 +277,7 @@ class Output:
         number_moles = number_moles[:, self.condensed_species_mask]  # 2-D
         activity = activity[:, self.condensed_species_mask]  # 2-D
 
-        condensed_species: tuple[str, ...] = self.species.condensed_species_names
+        condensed_species: tuple[str, ...] = self.species_collection.data.condensed_species_names
 
         out: dict[str, NpArray] = self._get_number_moles_output(number_moles, molar_mass, "total_")
         out["molar_mass"] = molar_mass
@@ -317,7 +317,7 @@ class Output:
         )
         out["gas_mass_fraction"] = out["gas_mass"] / np.sum(out["gas_mass"], axis=1, keepdims=True)
 
-        unique_elements: tuple[str, ...] = self.species.unique_elements
+        unique_elements: tuple[str, ...] = self.species_collection.data.unique_elements
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
             H_total_moles: NpArray = out["total_number"][:, index]
@@ -381,7 +381,7 @@ class Output:
         Returns:
             Molar mass of elements
         """
-        unique_elements: tuple[str, ...] = self.species.unique_elements
+        unique_elements: tuple[str, ...] = self.species_collection.data.unique_elements
         molar_mass: NpFloat = np.array([Formula(element).mass for element in unique_elements])
         molar_mass = unit_conversion.g_to_kg * molar_mass
 
@@ -429,7 +429,7 @@ class Output:
         total_number_moles: NpArray = number_moles + dissolved_number_moles  # 2-D
         pressure: NpArray = self.pressure()[:, self.gas_species_mask]  # 2-D
 
-        gas_species: tuple[str, ...] = self.species.gas_species_names
+        gas_species: tuple[str, ...] = self.species_collection.data.gas_species_names
 
         out: dict[str, NpArray] = {}
         out |= self._get_number_moles_output(number_moles, molar_mass, "gas_")
@@ -467,7 +467,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self.parameters.species_network.active_stability, log_activity_without_stability.shape
+            self.parameters.reaction_network.active_stability, log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
@@ -533,7 +533,7 @@ class Output:
         """
         out: dict[str, ArrayLike] = {}
 
-        for nn, species_ in enumerate(self.species):
+        for nn, species_ in enumerate(self.species_collection.data):
             pressure: NpArray = self.pressure()[:, nn]
             activity: NpArray = self.activity()[:, nn]
             out[species_.data.name] = pressure
@@ -549,7 +549,7 @@ class Output:
         """
         raw_solution: dict[str, NpArray] = {}
 
-        species_names: tuple[str, ...] = self.species.species_names
+        species_names: tuple[str, ...] = self.species_collection.data.species_names
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_moles[:, ii]

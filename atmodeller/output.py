@@ -88,7 +88,7 @@ class OutputDisequilibrium(Output):
             self.number_moles, axis=1, keepdims=True
         )
         # logger.debug("number_fraction = %s", number_fraction)
-        reaction_matrix: NpFloat = self.parameters.species_network.reaction_matrix
+        reaction_matrix: NpFloat = self.parameters.reaction_network.reaction_matrix
         # logger.debug("reaction_matrix = %s", reaction_matrix)
 
         out: dict[str, NpArray] = {}
@@ -127,7 +127,9 @@ class OutputDisequilibrium(Output):
                 min_idx_global: NpInt = sub_cols[min_idx_within]
                 # Get the actual species names
                 for row_idx, species_idx in zip(np.where(mask_back)[0], min_idx_global):
-                    limiting_species_names[row_idx] = self.species.species_names[species_idx]
+                    limiting_species_names[row_idx] = self.species_collection.data.species_names[
+                        species_idx
+                    ]
                     limiting_species_type[row_idx] = "Product"
                 # logger.debug("limiting_species_names (back) = %s", limiting_species_names)
 
@@ -144,7 +146,9 @@ class OutputDisequilibrium(Output):
                 max_idx_global: NpInt = sub_cols[max_idx_within]
                 # Get the actual species names
                 for row_idx, species_idx in zip(np.where(mask_fwd)[0], max_idx_global):
-                    limiting_species_names[row_idx] = self.species.species_names[species_idx]
+                    limiting_species_names[row_idx] = self.species_collection.data.species_names[
+                        species_idx
+                    ]
                     limiting_species_type[row_idx] = "Reactant"
                 # logger.debug("limiting_species_names (fwd) = %s", limiting_species_names)
 
@@ -154,10 +158,11 @@ class OutputDisequilibrium(Output):
 
             out[f"Reaction_{jj}"] = per_mole_of_reaction
 
-            if self.species.gas_only:
-                out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
-                out[f"Reaction_{jj}_limiting_species"] = np.array(limiting_species_names)
-                out[f"Reaction_{jj}_limiting_species_role"] = np.array(limiting_species_type)
+            # TODO: To reinstate?
+            # if self.species.gas_only:
+            #     out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
+            #     out[f"Reaction_{jj}_limiting_species"] = np.array(limiting_species_names)
+            #     out[f"Reaction_{jj}_limiting_species_role"] = np.array(limiting_species_type)
 
         return out
 

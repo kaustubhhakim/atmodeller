@@ -41,7 +41,7 @@ print("Atmodeller initialized with double precision (float64)")
 # For debugging
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", True)
-# jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
 
 # This prevents error_if from throwing an error when encountering nan or inf values. To actually
@@ -132,10 +132,10 @@ from atmodeller.containers import (  # noqa: E402, F401
     ChemicalSpecies,
     FixedFugacityConstraint,
     Planet,
+    ReactionNetwork,
     ReservoirSpecies,
     SolverParameters,
     SpeciesCollection,
-    SpeciesNetwork,
     ThermodynamicState,
 )
 from atmodeller.utilities import (  # noqa: E402, F401

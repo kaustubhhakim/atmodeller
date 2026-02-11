@@ -282,7 +282,11 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
             [species.data.name for species in self.species if species.data.state == GAS_STATE]
         )
         self.condensed_species_names = tuple(
-            [species.data.name for species in self.species if species.data.state != GAS_STATE]
+            [
+                species.data.name
+                for species in self.species
+                if species.data.state == CONDENSED_STATE
+            ]
         )
         self.gas_species_mask = np.array(
             [species.data.state == GAS_STATE for species in self.species], dtype=bool
@@ -396,8 +400,8 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
         return str(tuple(str(species) for species in self.species))
 
 
-class SpeciesNetwork(eqx.Module):
-    """A network of species
+class ReactionNetwork(eqx.Module):
+    """A reaction network
 
     Args:
         species: An iterable of chemical species
@@ -487,18 +491,21 @@ class SpeciesNetwork(eqx.Module):
 
         return max(temperature_min), min(temperature_max)
 
+    def __iter__(self) -> Iterator[ChemicalSpecies]:
+        return iter(self.data.species)
+
 
 class SpeciesCollection(eqx.Module):
     """A collection of species that can include both reactive and reservoir species"""
 
     data: SpeciesCollectionData[SpeciesProtocol]
     """Species collection data"""
-    species_network: SpeciesNetwork
-    """Network of species and their interactions"""
+    reaction_network: ReactionNetwork
+    """Reaction network"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.data = SpeciesCollectionData(species)
-        self.species_network = SpeciesNetwork(self.data.reaction_species)
+        self.reaction_network = ReactionNetwork(self.data.reaction_species)
 
     @classmethod
     def create(cls, species: Iterable[str]) -> "SpeciesCollection":
@@ -1182,9 +1189,9 @@ class Parameters(eqx.Module):
     """Batch size"""
 
     @property
-    def species_network(self) -> SpeciesNetwork:
+    def reaction_network(self) -> ReactionNetwork:
         """Species network"""
-        return self.species_collection.species_network
+        return self.species_collection.reaction_network
 
     @classmethod
     def create(
