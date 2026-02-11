@@ -536,8 +536,8 @@ class Output:
         for nn, species_ in enumerate(self.species):
             pressure: NpArray = self.pressure()[:, nn]
             activity: NpArray = self.activity()[:, nn]
-            out[species_.name] = pressure
-            out[f"{species_.name}_activity"] = activity
+            out[species_.data.name] = pressure
+            out[f"{species_.data.name}_activity"] = activity
 
         return {key: np.squeeze(value) for key, value in out.items()}
 

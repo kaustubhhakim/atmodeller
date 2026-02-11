@@ -35,6 +35,7 @@ from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import (
     CONDENSED_STATE,
+    DISSOLVED_STATE,
     GAS_STATE,
     LOG_NUMBER_MOLES_LOWER,
     LOG_NUMBER_MOLES_UPPER,
@@ -49,6 +50,7 @@ from atmodeller.interfaces import (
     SolubilityProtocol,
     ThermodynamicStateProtocol,
 )
+from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import CondensateActivity, thermodynamic_data_source
 from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
@@ -113,11 +115,6 @@ class ChemicalSpecies(eqx.Module):
     solve_for_stability: bool
     number_solution: int
     thermo: ThermodynamicCoefficients
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and state"""
-        return self.data.name
 
     @classmethod
     def create(
@@ -223,7 +220,57 @@ class ChemicalSpecies(eqx.Module):
         return self.thermo.get_gibbs_over_RT(temperature)
 
     def __str__(self) -> str:
-        return f"{self.name}: {self.activity.__class__.__name__}, {self.solubility.__class__.__name__}"
+        return f"{self.data.name}: {self.activity.__class__.__name__}"
+
+
+class ReservoirSpecies(eqx.Module):
+    """Reservoir species
+
+    A species that is not part of the reaction network but can exchange with it. For example, this
+    could represent a volatile species dissolved in a melt that can exchange with the gas phase but
+    is not explicitly included in the reaction network.
+
+    Args:
+        data: Chemical species data
+        solubility: Solubility
+        number_solution: Number of solution quantities
+    """
+
+    data: ChemicalSpeciesData
+    solubility: SolubilityProtocol
+    number_solution: int
+
+    @classmethod
+    def create_dissolved(
+        cls,
+        formula: str,
+        *,
+        state=DISSOLVED_STATE,
+        solubility: Optional[SolubilityProtocol] = None,
+    ) -> "ReservoirSpecies":
+        """Creates a dissolved species with some default values.
+
+        Args:
+            formula: Formula
+            state: State of aggregation. Defaults to :const:`~atmodeller.constants.DISSOLVED_STATE`
+            solubility: Solubility. Defaults to no solubility.
+
+        Returns:
+            A dissolved species
+        """
+        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
+
+        # For dissolved species, we maintain the same convention of number of moles and stability
+        # as for reactive species to allow subsequent easier array manipulation in the "engine",
+        # particularly to allow splitting arrays symmetrically (i.e. by 2). However, the stability
+        # is not meaningful for a reservoir species and is effectively ignored.
+        if solubility is None:
+            solubility = NoSolubility()
+            number_solution: int = 0
+        else:
+            number_solution = 2
+
+        return cls(species_data, solubility, number_solution)
 
 
 class SpeciesNetwork(eqx.Module):
@@ -268,18 +315,19 @@ class SpeciesNetwork(eqx.Module):
         self.data = tuple(data)
 
         # Ensure number_solution is static
+        # TODO: Could include dissolution (ReservoirSpecies)
         self.number_solution = sum([species.number_solution for species in self.data])
         active_stability: list[bool] = [species.solve_for_stability for species in self.data]
         self.active_stability = np.array(active_stability)
         self.gas_species_mask = np.array(
             [species.data.state == GAS_STATE for species in self.data], dtype=bool
         )
-        self.species_names = tuple([species_.name for species_ in self.data])
+        self.species_names = tuple([species_.data.name for species_ in self.data])
         self.gas_species_names = tuple(
-            [species.name for species in self.data if species.data.state == GAS_STATE]
+            [species.data.name for species in self.data if species.data.state == GAS_STATE]
         )
         self.condensed_species_names = tuple(
-            [species.name for species in self.data if species.data.state != GAS_STATE]
+            [species.data.name for species in self.data if species.data.state != GAS_STATE]
         )
         self.molar_masses = np.array([species_.data.molar_mass for species_ in self.data])
 

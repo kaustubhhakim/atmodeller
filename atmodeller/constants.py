@@ -32,6 +32,8 @@ GAS_STATE: str = "g"
 """Suffix to identify gases as per JANAF convention for the state of aggregation"""
 CONDENSED_STATE: str = "cd"
 """Suffix to identify condensed phases as per JANAF convention for the state of aggregation"""
+DISSOLVED_STATE: str = "di"
+"""Suffix to identify dissolved species"""
 
 # Initial solution guess
 INITIAL_LOG_NUMBER_MOLES: float = 50.0
