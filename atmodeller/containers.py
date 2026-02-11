@@ -262,6 +262,8 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
     """Reservoir species that do not participate in reactions"""
     reaction_species_mask: NpBool
     """Mask for reaction species in the full species list"""
+    reservoir_species_mask: NpBool
+    """Mask for reservoir species in the full species list"""
     molar_masses: NpFloat
     """Molar masses"""
     unique_elements: tuple[str, ...]
@@ -310,6 +312,7 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
         self.reaction_species = tuple(reaction_species)
         self.reservoir_species = tuple(reservoir_species)
         self.reaction_species_mask = np.array(reaction_mask_list, dtype=bool)
+        self.reservoir_species_mask = ~self.reaction_species_mask
 
         self.molar_masses = np.array([species_.data.molar_mass for species_ in self.species])
 
@@ -339,11 +342,6 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
     def number_species(self) -> int:
         """Number of species"""
         return len(self.species)
-
-    @property
-    def reservoir_species_mask(self) -> NpBool:
-        """Mask for reservoir species in the full species list"""
-        return ~self.reaction_species_mask
 
     def get_diatomic_oxygen_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
