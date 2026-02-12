@@ -260,6 +260,8 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
     """Chemical species that participate in reactions"""
     reservoir_species: tuple[ReservoirSpecies, ...]
     """Reservoir species that do not participate in reactions"""
+    reservoir_species_map: NpInt
+    """Mapping from reservoir species to the corresponding gas species index"""
     reaction_species_mask: NpBool
     """Mask for reaction species in the full species list"""
     reservoir_species_mask: NpBool
@@ -334,6 +336,14 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
         self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
 
         self.formula_matrix = self.get_formula_matrix()
+
+        # For each reservoir species, get the index of the corresponding gas species
+        reservoir_species_map_list: list[int] = []
+        for reservoir_species_ in self.reservoir_species:
+            name: str = f"{reservoir_species_.data.hill_formula}_{GAS_STATE}"
+            reservoir_species_map_list.append(self.species_names.index(name))
+
+        self.reservoir_species_map = np.array(reservoir_species_map_list, dtype=int)
 
         # Ensure number_solution is static
         self.number_solution = sum([species.number_solution for species in self.species])
@@ -1171,6 +1181,7 @@ class Parameters(eqx.Module):
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
         batch_size: Batch size. Defaults to ``1``.
+        dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
     species_collection: SpeciesCollection
@@ -1185,6 +1196,8 @@ class Parameters(eqx.Module):
     """Solver parameters"""
     batch_size: int = 1
     """Batch size"""
+    dilute_limit: bool = True
+    """Whether to treat dissolution in the dilute limit"""
 
     @property
     def reaction_network(self) -> ReactionNetwork:
