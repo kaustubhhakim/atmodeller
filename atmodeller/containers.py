@@ -29,7 +29,7 @@ from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
@@ -418,7 +418,7 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
 
 
 class ReactionNetwork(eqx.Module):
-    """A reaction network
+    """Handles core chemical reactions.
 
     Args:
         species: An iterable of chemical species
@@ -449,6 +449,33 @@ class ReactionNetwork(eqx.Module):
     # def gas_only(self) -> bool:
     #     """Checks if a gas-only network"""
     #     return len(self.data) == len(self.gas_species_mask)
+
+    def get_log_Kp(self, temperature: Float[Array, "..."]) -> Float[Array, " reactions"]:
+        """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Log of the equilibrium constant of each reaction in terms of partial pressures
+        """
+        gibbs_funcs: list[Callable] = [
+            to_hashable(species_.get_gibbs_over_RT) for species_ in self.data.species
+        ]
+
+        def apply_gibbs(
+            index: Integer[Array, ""], temperature: Float[Array, "..."]
+        ) -> Float[Array, "..."]:
+            return lax.switch(index, gibbs_funcs, temperature)
+
+        indices: Integer[Array, " species"] = jnp.arange(self.data.number_species)
+        vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
+        gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, temperature)
+        # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
+        reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(self.reaction_matrix)
+        log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
+
+        return jnp.ravel(log_Kp)
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.

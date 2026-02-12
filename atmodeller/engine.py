@@ -337,37 +337,38 @@ def get_log_activity_pure_species(
     return log_activity_pure_species
 
 
-def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
-    """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
+# TODO: Remove. Now moved to ReactionNetwork
+# def get_log_Kp(parameters: Parameters) -> Float[Array, " reactions"]:
+#     """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
 
-    Args:
-        parameters: Parameters
+#     Args:
+#         parameters: Parameters
 
-    Returns:
-        Log of the equilibrium constant of each reaction in terms of partial pressures
-    """
-    gibbs_funcs: list[Callable] = [
-        to_hashable(species_.get_gibbs_over_RT)
-        for species_ in parameters.reaction_network.data.species
-    ]
+#     Returns:
+#         Log of the equilibrium constant of each reaction in terms of partial pressures
+#     """
+#     gibbs_funcs: list[Callable] = [
+#         to_hashable(species_.get_gibbs_over_RT)
+#         for species_ in parameters.reaction_network.data.species
+#     ]
 
-    def apply_gibbs(
-        index: Integer[Array, ""], temperature: Float[Array, "..."]
-    ) -> Float[Array, "..."]:
-        return lax.switch(index, gibbs_funcs, temperature)
+#     def apply_gibbs(
+#         index: Integer[Array, ""], temperature: Float[Array, "..."]
+#     ) -> Float[Array, "..."]:
+#         return lax.switch(index, gibbs_funcs, temperature)
 
-    indices: Integer[Array, " species"] = jnp.arange(
-        parameters.reaction_network.data.number_species
-    )
-    vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-    gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.state.temperature)
-    # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-        parameters.reaction_network.reaction_matrix
-    )
-    log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
+#     indices: Integer[Array, " species"] = jnp.arange(
+#         parameters.reaction_network.data.number_species
+#     )
+#     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
+#     gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, parameters.state.temperature)
+#     # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
+#     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
+#         parameters.reaction_network.reaction_matrix
+#     )
+#     log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
 
-    return jnp.ravel(log_Kp)
+#     return jnp.ravel(log_Kp)
 
 
 def get_min_log_elemental_abundance_per_species(
@@ -652,7 +653,9 @@ def objective_function(
         parameters.reaction_network.reaction_matrix
     )
 
-    log_reaction_equilibrium_constant: Float[Array, " reactions"] = get_log_Kp(parameters)
+    log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
+        parameters.reaction_network.get_log_Kp(parameters.state.temperature)
+    )
     # jax.debug.print(
     #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant.shape
     # )
