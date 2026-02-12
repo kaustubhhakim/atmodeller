@@ -22,6 +22,7 @@ lightweight also helps avoid circular imports.
 """
 
 import logging
+from collections.abc import Iterable
 from typing import Optional
 
 import equinox as eqx
@@ -29,7 +30,7 @@ import numpy as np
 from jaxmod.constants import OCEAN_MASS_H2
 from jaxtyping import ArrayLike
 
-from atmodeller.type_aliases import Scalar
+from atmodeller.type_aliases import NpFloat, Scalar
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -117,3 +118,37 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     h_kg: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
 
     return h_kg
+
+
+def get_reaction_dictionary(
+    reaction_matrix: NpFloat, species_names: Iterable[str]
+) -> dict[int, str]:
+    """Gets reactions as a dictionary.
+
+    Args:
+        reaction_matrix: Reaction matrix of shape (number_reactions, number_species)
+        species_names: Species names corresponding to the columns of the reaction matrix
+
+    Returns:
+        Reactions as a dictionary
+    """
+    reactions: dict[int, str] = {}
+
+    if reaction_matrix.size != 0:
+        for reaction_index in range(reaction_matrix.shape[0]):
+            reactants: str = ""
+            products: str = ""
+            for species_index, name in enumerate(species_names):
+                coeff: float = reaction_matrix[reaction_index, species_index].item()
+                if coeff != 0:
+                    if coeff < 0:
+                        reactants += f"{abs(coeff)} {name} + "
+                    else:
+                        products += f"{coeff} {name} + "
+
+            reactants = reactants.rstrip(" + ")
+            products = products.rstrip(" + ")
+            reaction: str = f"{reactants} = {products}"
+            reactions[reaction_index] = reaction
+
+    return reactions
