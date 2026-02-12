@@ -63,7 +63,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     )
     reactions_mask: ArrayLike = parameters.reaction_network.active_reactions
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
-    stability_mask: ArrayLike = parameters.reaction_network.active_stability
+    stability_mask: ArrayLike = parameters.reaction_network.data.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -475,6 +475,10 @@ def get_species_ppmw_in_melt(
     """
     species_collection: SpeciesCollection = parameters.species_collection
 
+    # Return empty array if no reservoir species
+    if len(species_collection.data.reservoir_species) == 0:
+        return jnp.array([], dtype=jnp.float32)
+
     # Could be an integer (but represented as a float) or np.nan
     diatomic_oxygen_index: Float[Array, ""] = jnp.array(
         species_collection.data.diatomic_oxygen_index
@@ -486,13 +490,12 @@ def get_species_ppmw_in_melt(
     fugacity: Float[Array, " species"] = safe_exp(log_activity)
 
     # Need just the fugacity of the gas species associated with the (dissolved) reservoir species.
-    fugacity = jnp.take(
+    fugacity_reservoir_species: Float[Array, " reservoir_species"] = jnp.take(
         fugacity,
         indices=species_collection.data.reservoir_species_map,
         unique_indices=True,
         indices_are_sorted=True,
     )
-    jax.debug.print("fugacity = {out}", out=fugacity)
 
     # For type consistency, convert to integer array with nan as 0
     diatomic_oxygen_index_: Integer[Array, ""] = jnp.nan_to_num(
@@ -522,11 +525,10 @@ def get_species_ppmw_in_melt(
     indices: Integer[Array, " reservoir_species"] = jnp.arange(
         len(species_collection.data.reservoir_species)
     )
-    jax.debug.print("indices = {out}", out=indices)
 
     vmap_solubility: Callable = eqx.filter_vmap(apply_solubility, in_axes=(0, 0, None, None, None))
     species_ppmw: Float[Array, " reservoir_species"] = vmap_solubility(
-        indices, fugacity, temperature, total_pressure, diatomic_oxygen_fugacity
+        indices, fugacity_reservoir_species, temperature, total_pressure, diatomic_oxygen_fugacity
     )
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
@@ -674,7 +676,7 @@ def objective_function(
     )
     jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
     reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
-        parameters.reaction_network.active_stability, reaction_matrix.shape
+        parameters.reaction_network.data.active_stability, reaction_matrix.shape
     )
     reaction_stability_matrix: Float[Array, "reactions species"] = (
         reaction_matrix * reaction_stability_mask

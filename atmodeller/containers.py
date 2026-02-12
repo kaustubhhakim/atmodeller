@@ -235,6 +235,10 @@ class ReservoirSpecies(eqx.Module):
 
         return cls(species_data, activity, solubility, number_solution)
 
+    @property
+    def solve_for_stability(self) -> bool:
+        return False
+
 
 TSpecies = TypeVar("TSpecies", bound=SpeciesProtocol)
 
@@ -256,6 +260,8 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
     """Condensed species names"""
     gas_species_mask: NpBool
     """Gas species mask"""
+    active_stability: NpBool
+    """Active stability mask"""
     reaction_species: tuple[ChemicalSpecies, ...]
     """Chemical species that participate in reactions"""
     reservoir_species: tuple[ReservoirSpecies, ...]
@@ -295,6 +301,9 @@ class SpeciesCollectionData(eqx.Module, Generic[TSpecies]):
         self.gas_species_mask = np.array(
             [species.data.state == GAS_STATE for species in self.species], dtype=bool
         )
+
+        active_stability: list[bool] = [species.solve_for_stability for species in self.species]
+        self.active_stability = np.array(active_stability)
 
         reaction_species: list[ChemicalSpecies] = []
         reaction_mask_list: list[bool] = []
@@ -417,8 +426,6 @@ class ReactionNetwork(eqx.Module):
 
     data: SpeciesCollectionData[ChemicalSpecies]
     """Species collection data"""
-    active_stability: NpBool
-    """Active stability mask"""
     number_reactions: int
     """Number of reactions"""
     reaction_matrix: NpFloat
@@ -428,11 +435,6 @@ class ReactionNetwork(eqx.Module):
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.data = SpeciesCollectionData(species)
-
-        active_stability: list[bool] = [
-            species.solve_for_stability for species in self.data.species
-        ]
-        self.active_stability = np.array(active_stability)
         self.number_reactions = max(0, self.data.number_species - len(self.data.unique_elements))
         self.reaction_matrix = self.get_reaction_matrix()
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)

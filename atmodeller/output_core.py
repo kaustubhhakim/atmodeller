@@ -54,12 +54,12 @@ class Output:
 
         # np.split retains dimensions
         log_number_moles, log_stability = np.split(self.solution, 2, axis=1)
+
         self.log_number_moles: NpFloat = log_number_moles  # 2-D
-        # Mask stabilities that are not solved
-        # FIXME: This will probably break when dissolved species are added.
-        self.log_stability: NpFloat = np.where(
-            parameters.reaction_network.active_stability, log_stability, np.nan
-        )  # 2-D
+        # Mask stabilities that are not solved for by the model
+        active_stability_mask: NpBool = parameters.species_collection.data.active_stability
+        self.log_stability = np.where(active_stability_mask, log_stability, np.nan)
+
         # Caching output to avoid recomputation
         self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
         self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
@@ -468,7 +468,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self.parameters.reaction_network.active_stability, log_activity_without_stability.shape
+            self.species_collection.data.active_stability, log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 

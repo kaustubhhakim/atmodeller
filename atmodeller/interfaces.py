@@ -84,6 +84,9 @@ class SpeciesProtocol(Protocol):
     @property
     def number_solution(self) -> int: ...
 
+    @property
+    def solve_for_stability(self) -> bool: ...
+
 
 @runtime_checkable
 class FugacityConstraintProtocol(Protocol):
