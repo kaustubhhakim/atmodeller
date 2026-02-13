@@ -48,7 +48,7 @@ class ReactionNetwork(eqx.Module):
     """Species collection"""
     reaction_species: SpeciesCollection[ChemicalSpecies]
     """Reaction species collection"""
-    reaction_indices: NpInt
+    reaction_species_indices: NpInt
     """Indices of reaction species in the full species collection"""
     number_reactions: int
     """Number of reactions"""
@@ -57,9 +57,9 @@ class ReactionNetwork(eqx.Module):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        reaction_species, reaction_indices = self.species.extract_reaction_species()
+        reaction_species, reaction_species_indices = self.species.extract_reaction_species()
         self.reaction_species = reaction_species
-        self.reaction_indices = reaction_indices
+        self.reaction_species_indices = reaction_species_indices
         self.number_reactions = max(
             0, reaction_species.number_species - len(reaction_species.unique_elements)
         )
@@ -91,7 +91,9 @@ class ReactionNetwork(eqx.Module):
     def reaction_mask(self) -> Bool[Array, " species"]:
         """Boolean mask of reaction species in the full species collection"""
         return (
-            jnp.zeros(self.species.number_species, dtype=bool).at[self.reaction_indices].set(True)
+            jnp.zeros(self.species.number_species, dtype=bool)
+            .at[self.reaction_species_indices]
+            .set(True)
         )
 
     # TODO: Only used to determine output. Relevant for gas only or should be gas only AND no
@@ -167,7 +169,7 @@ class DissolutionNetwork(eqx.Module):
     """Species collection"""
     dissolution_species: SpeciesCollection[ReservoirSpecies]
     """Dissolution species collection"""
-    dissolution_indices: NpInt
+    dissolution_species_indices: NpInt
     """Indices of dissolution species in the full species collection"""
     reaction_indices_map: NpInt
     """Mapping of dissolution species to corresponding reaction species"""
@@ -180,9 +182,11 @@ class DissolutionNetwork(eqx.Module):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        dissolution_species, dissolution_indices = self.species.extract_dissolution_species()
+        dissolution_species, dissolution_species_indices = (
+            self.species.extract_dissolution_species()
+        )
         self.dissolution_species = dissolution_species
-        self.dissolution_indices = dissolution_indices
+        self.dissolution_species_indices = dissolution_species_indices
         # All dissolution reactions are active by default
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
 
@@ -203,7 +207,9 @@ class DissolutionNetwork(eqx.Module):
         for reaction_index in range(self.number_reactions):
             # TODO: check sign convention for reactants and products
             dissolution_matrix[reaction_index, self.reaction_indices_map[reaction_index]] = -1.0
-            dissolution_matrix[reaction_index, self.dissolution_indices[reaction_index]] = 1.0
+            dissolution_matrix[
+                reaction_index, self.dissolution_species_indices[reaction_index]
+            ] = 1.0
 
         self.dissolution_matrix = dissolution_matrix
 
@@ -220,7 +226,7 @@ class DissolutionNetwork(eqx.Module):
         """Boolean mask of dissolution species in the full species collection"""
         return (
             jnp.zeros(self.species.number_species, dtype=bool)
-            .at[self.dissolution_indices]
+            .at[self.dissolution_species_indices]
             .set(True)
         )
 
@@ -332,7 +338,9 @@ class FullNetwork(eqx.Module):
             (self.reaction.number_reactions, self.species.number_species), dtype=float
         )
         # Insert reduced matrix into correct columns
-        reaction_matrix_padded[:, self.reaction.reaction_indices] = self.reaction.reaction_matrix
+        reaction_matrix_padded[:, self.reaction.reaction_species_indices] = (
+            self.reaction.reaction_matrix
+        )
 
         self.full_matrix = np.vstack([reaction_matrix_padded, self.dissolution.dissolution_matrix])
 

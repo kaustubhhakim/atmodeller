@@ -596,7 +596,7 @@ def objective_function(
     # jax.debug.print("log_activity_reservoir_indices = {out}", out=log_activity_reservoir_indices)
     log_activity_reservoir: Float[Array, " reservoir_species"] = jnp.take(
         log_activity,
-        indices=parameters.full_network.dissolution.dissolution_indices,
+        indices=parameters.dissolution_species_indices,
         unique_indices=True,
         indices_are_sorted=True,
     )
@@ -611,7 +611,7 @@ def objective_function(
     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
         parameters.full_network.reaction.reaction_matrix
     )
-
+    # jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
     log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
         parameters.full_network.reaction.get_log_Kp(parameters.state.temperature)
     )
@@ -627,7 +627,7 @@ def objective_function(
     # jax.debug.print("log_activity_reaction_indices = {out}", out=log_activity_reaction_indices)
     log_activity_reaction: Float[Array, " reaction_species"] = jnp.take(
         log_activity,
-        indices=parameters.full_network.reaction.reaction_indices,
+        indices=parameters.reaction_species_indices,
         unique_indices=True,
         indices_are_sorted=True,
     )
@@ -649,7 +649,7 @@ def objective_function(
     # Need to get just the log_stability of species involved in reactions
     log_stability_reaction: Float[Array, " reaction_species"] = jnp.take(
         log_stability,
-        indices=parameters.full_network.reaction.reaction_indices,
+        indices=parameters.reaction_species_indices,
         unique_indices=True,
         indices_are_sorted=True,
     )
