@@ -459,60 +459,12 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
-    # Solubility residual (dimensionless)
-    # species_ppmw = get_species_ppmw_in_melt(parameters, log_number_moles)
-    # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
-
-    # Need to get just the log_activity of reservoir species
-    # log_activity_reservoir: Float[Array, " reservoir_species"] = jnp.take(
-    #    log_activity,
-    #    indices=parameters.dissolution_species_indices,
-    #    unique_indices=True,
-    #    indices_are_sorted=True,
-    # )
-    # jax.debug.print("log_activity_reservoir = {out}", out=log_activity_reservoir)
-
-    # solubility_residual: Float[Array, " reservoir_species"] = log_activity_reservoir - jnp.log(
-    #   species_ppmw
-    # )
-    # jax.debug.print("solubility_residual = {out}", out=solubility_residual)
-
-    # Reaction network residual
-    # reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-    #    parameters.full_network.reaction.reaction_matrix
-    # )
-    # jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
-    # log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
-    #    parameters.full_network.reaction.get_log_Kp(temperature)
-    # )
-    # jax.debug.print(
-    #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
-    # )
-
-    # Need to get just the log_activity of species involved in reactions
-    # log_activity_reaction: Float[Array, " reaction_species"] = jnp.take(
-    #    log_activity,
-    #    indices=parameters.reaction_species_indices,
-    #    unique_indices=True,
-    #    indices_are_sorted=True,
-    # )
-    # jax.debug.print("log_activity_reaction = {out}", out=log_activity_reaction)
-
-    # reaction_residual: Float[Array, " reactions"] = (
-    #    reaction_matrix.dot(log_activity_reaction) - log_reaction_equilibrium_constant
-    # )
-    # jax.debug.print("solubility_residual = {out}", out=solubility_residual)
-
-    ##########
-    # TODO: Testing log_Kp assembly
-    # test = parameters.full_network.get_log_Kp(log_activity, temperature, total_pressure)
-    # jax.debug.print("test log_Kp = {out}", out=test)
     reaction_residual = parameters.full_network.get_residual(
         log_activity, temperature, total_pressure
     )
-    jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
+    # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
 
-    # TODO: Need to reinstate stability
+    # FIXME: Need to reinstate stability
     # reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
     #     parameters.full_network.reaction.reaction_species.active_stability,
     #     reaction_matrix.shape,
@@ -562,10 +514,15 @@ def objective_function(
     log_target_moles: Float[Array, " elements"] = parameters.mass_constraints.log_abundance()
     # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
 
+    # TODO: remove this old ratio error metric once testing complete
     # Dimensionless (ratio error - 1)
-    mass_residual: Float[Array, " elements"] = (
-        safe_exp(log_element_moles_total - log_target_moles) - 1
-    )
+    # mass_residual: Float[Array, " elements"] = (
+    #    safe_exp(log_element_moles_total - log_target_moles) - 1
+    # )
+
+    # TODO: Testing different error metric for mass. Seems to work better.
+    mass_residual: Float[Array, " elements"] = log_element_moles_total - log_target_moles
+
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
     #     "mass_residual min/max: {out}/{out2}",
