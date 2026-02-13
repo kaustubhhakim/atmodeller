@@ -29,9 +29,10 @@ from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 
-from atmodeller.containers import Parameters, SpeciesCollection
+from atmodeller.containers import SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
+from atmodeller.parameters import Parameters
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat
 

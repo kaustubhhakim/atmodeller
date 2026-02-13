@@ -17,8 +17,7 @@
 """Classes"""
 
 import logging
-import pprint
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import Literal, Optional
 
 import jax
@@ -27,10 +26,18 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import Parameters, SolverParameters, SpeciesCollection
-from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
+from atmodeller.containers import (
+    SolverParameters,
+    SpeciesCollection,
+)
+from atmodeller.interfaces import (
+    FugacityConstraintProtocol,
+    SpeciesProtocol,
+    ThermodynamicStateProtocol,
+)
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
-from atmodeller.reactions import ReactionNetwork
+from atmodeller.parameters import Parameters
+from atmodeller.reactions import FullReactionNetwork
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
@@ -44,26 +51,18 @@ class EquilibriumModel:
     and retrieve the results.
 
     Args:
-        species_collection: Species collection
+        species: An iterable of species
     """
 
-    species_collection: SpeciesCollection
+    species: SpeciesCollection
+    full_reaction_network: FullReactionNetwork
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
-    def __init__(self, species_collection: SpeciesCollection):
-        self.species_collection = species_collection
-        logger.info("reaction_network = %s", str(self.reaction_network))
-        temperature_min, temperature_max = self.reaction_network.get_temperature_range()
-        logger.info(
-            "Thermodynamic data requires temperatures between %d K and %d K",
-            np.ceil(temperature_min),
-            np.floor(temperature_max),
-        )
-        logger.info(
-            "reactions = %s", pprint.pformat(self.reaction_network.get_reaction_dictionary())
-        )
+    def __init__(self, species: Iterable[SpeciesProtocol]):
+        self.species = SpeciesCollection(species)
+        self.full_reaction_network = FullReactionNetwork(species)
 
     @property
     def output(self) -> Output:
@@ -71,10 +70,6 @@ class EquilibriumModel:
             raise AttributeError("Output has not been set.")
 
         return self._output
-
-    @property
-    def reaction_network(self) -> ReactionNetwork:
-        return self.species_collection.reaction_network
 
     def calculate_disequilibrium(
         self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike
@@ -90,11 +85,11 @@ class EquilibriumModel:
             state: Thermodynamic state
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.species_collection, state)
+        parameters: Parameters = Parameters.create(self.full_reaction_network, state)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
-            self.species_collection.data.number_species,
+            self.species.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
@@ -137,7 +132,7 @@ class EquilibriumModel:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.species_collection,
+            self.full_reaction_network,
             state,
             fugacity_constraints,
             mass_constraints,
@@ -146,7 +141,7 @@ class EquilibriumModel:
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.species_collection.data.number_species,
+            self.full_reaction_network.species.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)

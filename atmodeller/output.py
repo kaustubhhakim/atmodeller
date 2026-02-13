@@ -30,8 +30,8 @@ from jaxtyping import Array, Float
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
-from atmodeller.containers import Parameters
 from atmodeller.output_core import Output, broadcast_arrays_in_dict
+from atmodeller.parameters import Parameters
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
 
 logger: logging.Logger = logging.getLogger(__name__)
