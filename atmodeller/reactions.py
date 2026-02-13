@@ -237,7 +237,7 @@ class DissolutionNetwork(eqx.Module):
         pressure: Float[Array, ""],
         fO2: Float[Array, ""],
     ) -> Float[Array, " reactions"]:
-        """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
+        """Gets log of the equilibrium constant of each reaction.
 
         Args:
             fugacity: Fugacity in bar
@@ -246,35 +246,11 @@ class DissolutionNetwork(eqx.Module):
             fO2: Oxygen fugacity in bar
 
         Returns:
-            Log of the equilibrium constant of each reaction in terms of partial pressures
+            Log of the equilibrium constant of each reaction
         """
         # Return empty array if no reservoir species
         if self.number_reactions == 0:
             return jnp.array([], dtype=jnp.float32)
-
-        # Could be an integer (but represented as a float) or np.nan
-        # diatomic_oxygen_index: NpFloat = self.species.diatomic_oxygen_index
-
-        # log_activity: Float[Array, " species"] = get_log_activity(parameters, log_number_moles)
-        # fugacity: Float[Array, " species"] = safe_exp(log_activity)
-
-        # Need just the fugacity of the gas species associated with the (dissolved) reservoir species.
-        # fugacity_reservoir_species: Float[Array, " reservoir_species"] = jnp.take(
-        #    fugacity,
-        #    indices=species_collection.data.reservoir_species_map,
-        #    unique_indices=True,
-        #   indices_are_sorted=True,
-        # )
-
-        # For type consistency, convert to integer array with nan as 0
-        # diatomic_oxygen_index_: Integer[Array, ""] = jnp.nan_to_num(
-        #    diatomic_oxygen_index, nan=0
-        # ).astype(jnp.int_)
-
-        # Get fO2, or nan if not present
-        # diatomic_oxygen_fugacity: Float[Array, ""] = jnp.where(
-        #    jnp.isnan(diatomic_oxygen_index), jnp.nan, jnp.take(fugacity, diatomic_oxygen_index_)
-        # )
 
         # NOTE: All solubility formulations must return a JAX array to allow vmap
         solubility_funcs: list[Callable] = [
@@ -291,21 +267,20 @@ class DissolutionNetwork(eqx.Module):
         ) -> Float[Array, ""]:
             return lax.switch(index, solubility_funcs, fugacity_val, temp, press, o2_fug)
 
-        indices: Integer[Array, " dissolution_species"] = jnp.arange(
-            self.dissolution_species.number_species
-        )
+        indices: Integer[Array, " num_dissolution_species"] = jnp.arange(self.number_reactions)
 
         vmap_solubility: Callable = eqx.filter_vmap(
             apply_solubility, in_axes=(0, 0, None, None, None)
         )
-        species_ppmw: Float[Array, " dissolution_species"] = vmap_solubility(
+        species_ppmw: Float[Array, " num_dissolution_species"] = vmap_solubility(
             indices, fugacity, temperature, pressure, fO2
         )
-        # jax.debug.print("ppmw = {out}", out=ppmw)
+        # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
 
-        # FIXME: Divide by fugacity (and return log)?
+        # TODO: Check standard state and sign
+        log_Kp: Float[Array, " num_reactions"] = jnp.log(species_ppmw) - jnp.log(fugacity)
 
-        return species_ppmw
+        return log_Kp
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets dissolution reactions as a dictionary.
@@ -351,16 +326,61 @@ class FullNetwork(eqx.Module):
     def number_reactions(self) -> int:
         return self.reaction.number_reactions + self.dissolution.number_reactions
 
-    def get_log_Kp(self, temperature: Float[Array, "..."]):  # -> Float[Array, " reactions"]:
-        """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
+    def get_log_Kp(
+        self,
+        log_activity: Float[Array, " species"],
+        temperature: Float[Array, "..."],
+        pressure: Float[Array, ""],
+    ):  # -> Float[Array, " reactions"]:
+        """Gets log of the equilibrium constant of each reaction.
 
         Args:
+            log_activity: Log activity of each species
             temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Log of the equilibrium constant of each reaction in terms of partial pressures
+            Log of the equilibrium constant of each reaction
         """
-        # TODO: Assemble log Kps from the reaction and dissolution networks
+        # Assemble log Kps from the reaction and dissolution networks
+        log_Kp_reaction: Float[Array, " num_core_reactions"] = self.reaction.get_log_Kp(
+            temperature
+        )
+
+        # Need to get just the log_activity of reservoir species
+        log_activity_dissolution: Float[Array, " num_dissolution_species"] = jnp.take(
+            log_activity,
+            indices=self.dissolution.dissolution_species_indices,
+            unique_indices=True,
+            indices_are_sorted=True,
+        )
+        # jax.debug.print("log_activity_dissolution = {out}", out=log_activity_dissolution)
+
+        activity_dissolution: Float[Array, " num_dissolution_species"] = jnp.exp(
+            log_activity_dissolution
+        )
+
+        # Could be an integer (but represented as a float) or np.nan
+        O2_index: Float[Array, ""] = jnp.array(self.species.O2_index)
+
+        # For type consistency, convert to integer array with nan as 0
+        O2_index_: Integer[Array, ""] = jnp.nan_to_num(O2_index, nan=0).astype(jnp.int_)
+
+        # Get fO2, or nan if not present
+        fO2: Float[Array, ""] = jnp.where(
+            jnp.isnan(O2_index), jnp.nan, jnp.take(activity_dissolution, O2_index_)
+        )
+
+        log_Kp_dissolution: Float[Array, " num_dissolution_reactions"] = (
+            self.dissolution.get_log_Kp(
+                fugacity=jnp.exp(log_activity_dissolution),
+                temperature=temperature,
+                pressure=pressure,
+                fO2=fO2,
+            )
+        )
+
+        return jnp.concatenate([log_Kp_reaction, log_Kp_dissolution])
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.

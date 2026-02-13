@@ -268,8 +268,8 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
     """Unique elements in species in alphabetical order"""
     element_molar_masses: NpFloat
     """Molar masses of the ordered elements"""
-    diatomic_oxygen_index: NpFloat
-    """Index of diatomic oxygen or np.nan if not present"""
+    O2_index: NpFloat
+    """Index of O2 or np.nan if not present"""
     formula_matrix: NpInt
     """Formula matrix"""
     number_solution: int
@@ -306,7 +306,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
             element_molar_masses.append(molar_mass)
         self.element_molar_masses = np.array(element_molar_masses, dtype=float)
 
-        self.diatomic_oxygen_index = self.get_diatomic_oxygen_index()
+        self.O2_index = self.get_O2_index()
 
         self.formula_matrix = self.get_formula_matrix()
 
@@ -388,7 +388,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
         """
         return self._extract_species_by_type(ReservoirSpecies)
 
-    def get_diatomic_oxygen_index(self) -> NpFloat:
+    def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
 
         Note:
