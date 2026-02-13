@@ -372,7 +372,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
 
         return SpeciesCollection(extracted), indices_array
 
-    def extract_chemical_species(self) -> tuple["SpeciesCollection[ChemicalSpecies]", NpInt]:
+    def extract_reaction_species(self) -> tuple["SpeciesCollection[ChemicalSpecies]", NpInt]:
         """Extracts chemical species.
 
         Returns:
@@ -380,7 +380,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
         """
         return self._extract_species_by_type(ChemicalSpecies)
 
-    def extract_reservoir_species(self) -> tuple["SpeciesCollection[ReservoirSpecies]", NpInt]:
+    def extract_dissolution_species(self) -> tuple["SpeciesCollection[ReservoirSpecies]", NpInt]:
         """Extracts reservoir species.
 
         Returns:

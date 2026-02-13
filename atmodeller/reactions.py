@@ -17,6 +17,7 @@
 """Reactions"""
 
 import logging
+import pprint
 from collections.abc import Callable, Iterable
 
 import equinox as eqx
@@ -53,12 +54,10 @@ class ReactionNetwork(eqx.Module):
     """Number of reactions"""
     reaction_matrix: NpFloat
     """Reaction matrix"""
-    active_reactions: NpBool
-    """Active reactions"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        reaction_species, reaction_indices = self.species.extract_chemical_species()
+        reaction_species, reaction_indices = self.species.extract_reaction_species()
         self.reaction_species = reaction_species
         self.reaction_indices = reaction_indices
         self.number_reactions = max(
@@ -67,22 +66,10 @@ class ReactionNetwork(eqx.Module):
 
         # Reaction matrix of linearly independent reactions
         transpose_formula_matrix: NpInt = reaction_species.get_formula_matrix().T
-        core_matrix_small: NpFloat = partial_rref(transpose_formula_matrix)
+        self.reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
 
-        # TODO: Swap in eventually
-        if 0:
-            # Expand to full species space
-            reaction_matrix_full: NpFloat = np.zeros(
-                (self.number_reactions, self.species.number_species), dtype=float
-            )
-            # Insert reduced matrix into correct columns
-            reaction_matrix_full[:, self.reaction_indices] = core_matrix_small
-            self.reaction_matrix = reaction_matrix_full
-        else:
-            self.reaction_matrix = core_matrix_small
-
-        # All core reactions are active by default
-        self.active_reactions = np.ones(self.number_reactions, dtype=bool)
+        logger.debug("reaction_matrix = %s", self.reaction_matrix)
+        logger.info("Reaction network = %s", pprint.pformat(self.get_reaction_dictionary()))
 
         temperature_min, temperature_max = self.get_temperature_range()
         logger.info(
@@ -94,6 +81,11 @@ class ReactionNetwork(eqx.Module):
     @classmethod
     def available_species(cls) -> tuple[str, ...]:
         return thermodynamic_data_source.available_species()
+
+    @property
+    def active_reactions(self) -> Bool[Array, " reactions"]:
+        """Boolean mask of active reactions in the reaction network"""
+        return jnp.ones(self.number_reactions, dtype=bool)
 
     @property
     def reaction_mask(self) -> Bool[Array, " species"]:
@@ -146,7 +138,7 @@ class ReactionNetwork(eqx.Module):
         Returns:
             Reactions as a dictionary
         """
-        return get_reaction_dictionary(self.reaction_matrix, self.species.species_names)
+        return get_reaction_dictionary(self.reaction_matrix, self.reaction_species.species_names)
 
     def get_temperature_range(self) -> tuple[float, float]:
         """Gets the temperature range of the thermodynamic data for the species
@@ -188,7 +180,7 @@ class DissolutionNetwork(eqx.Module):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        dissolution_species, dissolution_indices = self.species.extract_reservoir_species()
+        dissolution_species, dissolution_indices = self.species.extract_dissolution_species()
         self.dissolution_species = dissolution_species
         self.dissolution_indices = dissolution_indices
         # All dissolution reactions are active by default
@@ -196,7 +188,7 @@ class DissolutionNetwork(eqx.Module):
 
         # Construct dissolution reaction matrix
         # For each reservoir species, get the index of the corresponding reaction (gas) species
-        reaction_species, reaction_indices = self.species.extract_chemical_species()
+        reaction_species, reaction_indices = self.species.extract_reaction_species()
         reaction_indices_map: list[int] = []
         for dissolution_species_ in dissolution_species:
             name: str = f"{dissolution_species_.data.hill_formula}_{GAS_STATE}"
@@ -204,6 +196,7 @@ class DissolutionNetwork(eqx.Module):
             reaction_indices_map.append(reaction_indices[idx])
 
         self.reaction_indices_map = np.array(reaction_indices_map, dtype=int)
+        # Most direct to construct the dissolution matrix in full species space
         dissolution_matrix: NpFloat = np.zeros(
             (self.number_reactions, self.species.number_species), dtype=float
         )
@@ -213,6 +206,9 @@ class DissolutionNetwork(eqx.Module):
             dissolution_matrix[reaction_index, self.dissolution_indices[reaction_index]] = 1.0
 
         self.dissolution_matrix = dissolution_matrix
+
+        logger.debug("dissolution_matrix = %s", self.dissolution_matrix)
+        logger.info("Dissolution network = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
     def number_reactions(self) -> int:
@@ -324,23 +320,28 @@ class FullNetwork(eqx.Module):
     species: SpeciesCollection[SpeciesProtocol]
     reaction: ReactionNetwork
     dissolution: DissolutionNetwork
-    # full_matrix: NpFloat
+    full_matrix: NpFloat
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
         self.reaction = ReactionNetwork(species)
         self.dissolution = DissolutionNetwork(species)
 
-        # core_matrix = self.reaction.reaction_matrix
-        # diss_matrix = self.dissolution.dissolution_matrix
+        # Reaction matrix expanded to full species space
+        reaction_matrix_padded: NpFloat = np.zeros(
+            (self.reaction.number_reactions, self.species.number_species), dtype=float
+        )
+        # Insert reduced matrix into correct columns
+        reaction_matrix_padded[:, self.reaction.reaction_indices] = self.reaction.reaction_matrix
 
-        # FIXME: Currently breaks
-        # self.full_matrix = np.vstack([core_matrix, diss_matrix])
+        self.full_matrix = np.vstack([reaction_matrix_padded, self.dissolution.dissolution_matrix])
 
-        # logger.info("full_network = %s", str(self.full_network))
-        # logger.info(
-        #    "reactions = %s", pprint.pformat(self.full_network.get_reaction_dictionary())
-        # )
+        logger.debug("full_matrix = %s", str(self.full_matrix))
+        logger.info("All reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
+
+    @property
+    def number_reactions(self) -> int:
+        return self.reaction.number_reactions + self.dissolution.number_reactions
 
     def get_log_Kp(self, temperature: Float[Array, "..."]):  # -> Float[Array, " reactions"]:
         """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
@@ -351,6 +352,7 @@ class FullNetwork(eqx.Module):
         Returns:
             Log of the equilibrium constant of each reaction in terms of partial pressures
         """
+        # TODO: Assemble log Kps from the reaction and dissolution networks
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.

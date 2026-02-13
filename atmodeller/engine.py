@@ -671,23 +671,14 @@ def objective_function(
     #     out2=jnp.nanstd(reaction_residual),
     # )
 
-    # TODO: add solubility residual here
-    # solubility_residual = log_activity[idx_N2_melt] - jnp.log(S(fugacity_N2, melt_state))
-
     # Elemental mass balance residual
     # Number of moles of elements in the gas or condensed phase
     # TODO: Needs to include those in dissolved as well
     element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
     jax.debug.print("element_moles = {out}", out=element_moles)
 
-    # TODO: Make a solubility residual instead
-    # element_melt_moles: Float[Array, " elements"] = get_element_moles_in_melt(
-    #     parameters, log_number_moles
-    # )
-    # jax.debug.print("element_melt_moles = {out}", out=element_melt_moles)
-
     # Relative mass error, computed in log-space for numerical stability
-    element_moles_total: Float[Array, " elements"] = element_moles  # + element_melt_moles
+    element_moles_total: Float[Array, " elements"] = element_moles
     log_element_moles_total: Float[Array, " elements"] = jnp.log(element_moles_total)
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
