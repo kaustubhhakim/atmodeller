@@ -28,8 +28,8 @@ from jax import lax
 from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
 from jaxmod.units import unit_conversion
-from jaxmod.utils import as_j64, get_batch_size, partial_rref, to_hashable
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer
+from jaxmod.utils import as_j64, get_batch_size, to_hashable
+from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
@@ -58,7 +58,6 @@ from atmodeller.thermodata.core import (
     thermodynamic_coefficients_dictionary,
 )
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt
-from atmodeller.utilities import get_reaction_dictionary
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -316,6 +315,38 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
         # Ensure number_solution is static
         self.number_solution = sum([species.number_solution for species in self])
 
+    @classmethod
+    def create(cls, species: Iterable[str]) -> "SpeciesCollection[SpeciesProtocol]":
+        """Creates an instance
+
+        Args:
+            species: An iterable of species names with a state suffix
+
+        Returns
+            An instance
+        """
+        species_list: list[SpeciesProtocol] = []
+
+        for species_ in species:
+            formula, state = species_.split("_")
+            hill_formula = Formula(formula).formula
+            if state == GAS_STATE:
+                species_to_add: SpeciesProtocol = ChemicalSpecies.create_gas(
+                    hill_formula, state=state
+                )
+            elif state == CONDENSED_STATE:
+                species_to_add = ChemicalSpecies.create_condensed(hill_formula, state=state)
+            elif state == DISSOLVED_STATE:
+                species_to_add = ReservoirSpecies.create_dissolved(hill_formula, state=state)
+            else:
+                raise ValueError(
+                    f"State must be '{GAS_STATE}', '{CONDENSED_STATE}' or '{DISSOLVED_STATE}', "
+                    f"got {state}"
+                )
+            species_list.append(species_to_add)
+
+        return SpeciesCollection(species_list)
+
     @property
     def number_species(self) -> int:
         """Number of species"""
@@ -412,233 +443,6 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
 
     def __str__(self) -> str:
         return str(tuple(str(species) for species in self.species))
-
-
-class DissolutionReactionNetwork(eqx.Module):
-    """Handles all reactions where a reservoir species dissolves into or exchanges with a phase.
-
-    Args:
-        species: An iterable of species
-    """
-
-    species: SpeciesCollection[SpeciesProtocol]
-    """Species collection"""
-    indices: NpInt
-    """Indices of the reservoir species in the full species list"""
-    number_reactions: int
-    """Number of reactions"""
-    dissolution_matrix: NpFloat
-    """Dissolution reaction matrix"""
-    active_reactions: NpBool
-    """Active dissolution reactions"""
-
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = SpeciesCollection(species)
-        chemical_species, chemical_indices = self.species.extract_chemical_species()
-        reservoir_species, reservoir_indices = self.species.extract_reservoir_species()
-        self.indices = reservoir_indices
-        self.number_reactions = reservoir_species.number_species
-        # All dissolution reactions are active by default
-        self.active_reactions = np.ones(self.number_reactions, dtype=bool)
-
-        # Construct dissolution reaction matrix
-        # For each reservoir species, get the index of the corresponding gas species
-        gas_species_indices: list[int] = []
-        for reservoir_species_ in reservoir_species:
-            name: str = f"{reservoir_species_.data.hill_formula}_{GAS_STATE}"
-            idx: int = chemical_species.species_names.index(name)
-            gas_species_indices.append(chemical_indices[idx])
-
-        dissolution_matrix: NpFloat = np.zeros(
-            (self.number_reactions, self.species.number_species), dtype=float
-        )
-        for reaction_index in range(self.number_reactions):
-            # TODO: check sign convention for reactants and products
-            dissolution_matrix[reaction_index, gas_species_indices[reaction_index]] = -1.0
-            dissolution_matrix[reaction_index, reservoir_indices[reaction_index]] = 1.0
-
-        self.dissolution_matrix = dissolution_matrix
-
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
-
-        Returns:
-            Reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.dissolution_matrix, self.species.species_names)
-
-
-class ReactionNetwork(eqx.Module):
-    """Handles core chemical reactions.
-
-    Args:
-        species: An iterable of species
-    """
-
-    species: SpeciesCollection[SpeciesProtocol]
-    """Species collection"""
-    chemical_species: SpeciesCollection[ChemicalSpecies]
-    """Chemical species collection"""
-    number_reactions: int
-    """Number of reactions"""
-    reaction_matrix: NpFloat
-    """Reaction matrix"""
-    active_reactions: NpBool
-    """Active reactions"""
-
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = SpeciesCollection(species)
-        chemical_species, chemical_indices = self.species.extract_chemical_species()
-        self.chemical_species = chemical_species
-        self.number_reactions = max(
-            0, chemical_species.number_species - len(chemical_species.unique_elements)
-        )
-
-        # Reaction matrix of linearly independent reactions
-        transpose_formula_matrix: NpInt = chemical_species.get_formula_matrix().T
-        core_matrix_small: NpFloat = partial_rref(transpose_formula_matrix)
-
-        # Expand to full species space
-        reaction_matrix_full: NpFloat = np.zeros(
-            (self.number_reactions, self.species.number_species), dtype=float
-        )
-        # Insert reduced matrix into correct columns
-        reaction_matrix_full[:, chemical_indices] = core_matrix_small
-        self.reaction_matrix = reaction_matrix_full
-        # All core reactions are active by default
-        self.active_reactions = np.ones(self.number_reactions, dtype=bool)
-
-    @classmethod
-    def available_species(cls) -> tuple[str, ...]:
-        return thermodynamic_data_source.available_species()
-
-    # TODO: Only used to determine output. Relevant for gas only or should be gas only AND no
-    # solubility?
-    # @property
-    # def gas_only(self) -> bool:
-    #     """Checks if a gas-only network"""
-    #     return len(self.data) == len(self.gas_species_mask)
-
-    def get_log_Kp(self, temperature: Float[Array, "..."]) -> Float[Array, " reactions"]:
-        """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            Log of the equilibrium constant of each reaction in terms of partial pressures
-        """
-        gibbs_funcs: list[Callable] = [
-            to_hashable(species_.get_gibbs_over_RT) for species_ in self.chemical_species
-        ]
-
-        def apply_gibbs(
-            index: Integer[Array, ""], temperature: Float[Array, "..."]
-        ) -> Float[Array, "..."]:
-            return lax.switch(index, gibbs_funcs, temperature)
-
-        indices: Integer[Array, " species"] = jnp.arange(self.chemical_species.number_species)
-        vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-        gibbs_values: Float[Array, "species 1"] = vmap_gibbs(indices, temperature)
-        # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-        reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(self.reaction_matrix)
-        log_Kp: Float[Array, "reactions 1"] = -1.0 * reaction_matrix @ gibbs_values
-
-        return jnp.ravel(log_Kp)
-
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
-
-        Returns:
-            Reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.reaction_matrix, self.species.species_names)
-
-    def get_temperature_range(self) -> tuple[float, float]:
-        """Gets the temperature range of the thermodynamic data for the species
-
-        Returns:
-            Minimum and maximum temperature that is valid for the species
-        """
-        temperature_min: list[float] = [
-            min(species.thermo.T_min) for species in self.chemical_species
-        ]
-        temperature_max: list[float] = [
-            max(species.thermo.T_max) for species in self.chemical_species
-        ]
-
-        return max(temperature_min), min(temperature_max)
-
-
-class FullReactionNetwork(eqx.Module):
-    species: SpeciesCollection[SpeciesProtocol]
-    core_network: ReactionNetwork
-    dissolution_network: DissolutionReactionNetwork
-    full_matrix: NpFloat
-
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = SpeciesCollection(species)
-        self.core_network = ReactionNetwork(species)
-        self.dissolution_network = DissolutionReactionNetwork(species)
-
-        core_matrix = self.core_network.reaction_matrix
-        diss_matrix = self.dissolution_network.dissolution_matrix
-
-        self.full_matrix = np.vstack([core_matrix, diss_matrix])
-
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
-
-        Returns:
-            Reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.full_matrix, self.species.species_names)
-
-
-# TODO: remove once refactoring complete
-# class SpeciesCollection(eqx.Module):
-#     """A collection of species that can include both reactive and reservoir species"""
-
-#     data: SpeciesCollectionData[SpeciesProtocol]
-#     """Species collection data"""
-#     reaction_network: ReactionNetwork
-#     """Reaction network"""
-
-#     def __init__(self, species: Iterable[SpeciesProtocol]):
-#         self.data = SpeciesCollectionData(species)
-#         self.reaction_network = ReactionNetwork(self.data.reaction_species)
-
-#     @classmethod
-#     def create(cls, species: Iterable[str]) -> "SpeciesCollection":
-#         """Creates an instance
-
-#         Args:
-#             species: A list or tuple of species names with a state suffix
-
-#         Returns
-#             An instance
-#         """
-#         species_list: list[SpeciesProtocol] = []
-
-#         for species_ in species:
-#             formula, state = species_.split("_")
-#             hill_formula = Formula(formula).formula
-#             if state == GAS_STATE:
-#                 species_to_add: SpeciesProtocol = ChemicalSpecies.create_gas(
-#                     hill_formula, state=state
-#                 )
-#             elif state == CONDENSED_STATE:
-#                 species_to_add = ChemicalSpecies.create_condensed(hill_formula, state=state)
-#             elif state == DISSOLVED_STATE:
-#                 species_to_add = ReservoirSpecies.create_dissolved(hill_formula, state=state)
-#             else:
-#                 raise ValueError(
-#                     f"State must be '{GAS_STATE}', '{CONDENSED_STATE}' or '{DISSOLVED_STATE}', "
-#                     f"got {state}"
-#                 )
-#             species_list.append(species_to_add)
-
-#         return cls(species_list)
 
 
 class ThermodynamicState(eqx.Module):
@@ -1292,10 +1096,10 @@ class Parameters(eqx.Module):
     dilute_limit: bool = True
     """Whether to treat dissolution in the dilute limit"""
 
-    @property
-    def reaction_network(self) -> ReactionNetwork:
-        """Species network"""
-        return self.species_collection.reaction_network
+    # @property
+    # def reaction_network(self) -> ReactionNetwork:
+    #    """Species network"""
+    #    return self.species_collection.reaction_network
 
     @classmethod
     def create(

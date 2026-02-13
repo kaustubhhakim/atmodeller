@@ -132,11 +132,15 @@ from atmodeller.containers import (  # noqa: E402, F401
     ChemicalSpecies,
     FixedFugacityConstraint,
     Planet,
-    ReactionNetwork,
     ReservoirSpecies,
     SolverParameters,
     SpeciesCollection,
     ThermodynamicState,
+)
+from atmodeller.reactions import (  # noqa: E402, F401
+    DissolutionReactionNetwork,
+    FullReactionNetwork,
+    ReactionNetwork,
 )
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,

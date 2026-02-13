@@ -27,9 +27,10 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import Parameters, ReactionNetwork, SolverParameters, SpeciesCollection
+from atmodeller.containers import Parameters, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
+from atmodeller.reactions import ReactionNetwork
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
