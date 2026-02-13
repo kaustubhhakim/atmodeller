@@ -137,9 +137,10 @@ from atmodeller.containers import (  # noqa: E402, F401
     SpeciesCollection,
     ThermodynamicState,
 )
+from atmodeller.parameters import Parameters  # noqa: E402, F401
 from atmodeller.reactions import (  # noqa: E402, F401
-    DissolutionReactionNetwork,
-    FullReactionNetwork,
+    DissolutionNetwork,
+    FullNetwork,
     ReactionNetwork,
 )
 from atmodeller.utilities import (  # noqa: E402, F401

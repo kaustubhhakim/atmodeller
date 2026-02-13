@@ -109,7 +109,7 @@ class RealGasBase(eqx.Module):
         Returns:
             Log activity, which is dimensionless
         """
-        return self.log_fugacity(temperature, pressure) / STANDARD_FUGACITY
+        return self.log_fugacity(temperature, pressure) - jnp.log(STANDARD_FUGACITY)
 
     @eqx.filter_jit
     def pressure_from_fugacity(self, temperature: ArrayLike, fugacity: ArrayLike) -> Array:

@@ -28,6 +28,8 @@ STANDARD_PRESSURE: float = 1.0
 """Standard state pressure in bar"""
 STANDARD_FUGACITY: float = STANDARD_PRESSURE
 """Standard fugacity for gases in bar"""
+STANDARD_CONCENTRATION: float = 1.0
+"""Standard state concentration for dissolved species in ppmw"""
 GAS_STATE: str = "g"
 """Suffix to identify gases as per JANAF convention for the state of aggregation"""
 CONDENSED_STATE: str = "cd"
