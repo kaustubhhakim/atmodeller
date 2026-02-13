@@ -51,6 +51,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
+from atmodeller.reactions import FullReactionNetwork
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import CondensateActivity, thermodynamic_data_source
 from atmodeller.thermodata.core import (
@@ -710,24 +711,24 @@ class FugacityConstraintSet(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
-        species_collection: Species collection
+        species: Species collection
     """
 
     constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
-    species_collection: SpeciesCollection
+    species: SpeciesCollection
     """Species collection"""
 
     @classmethod
     def create(
         cls,
-        species_collection: SpeciesCollection,
+        species: SpeciesCollection,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
     ) -> "FugacityConstraintSet":
         """Creates an instance
 
         Args:
-            species_collection: Species collection
+            species: Species collection
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 ``None``.
 
@@ -740,7 +741,7 @@ class FugacityConstraintSet(eqx.Module):
 
         constraints: list[FugacityConstraintProtocol] = []
 
-        for species_name in species_collection.data.species_names:
+        for species_name in species.species_names:
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
@@ -748,7 +749,7 @@ class FugacityConstraintSet(eqx.Module):
                 # meaning no imposed activity/fugacity.
                 constraints.append(FixedFugacityConstraint())
 
-        return cls(tuple(constraints), species_collection)
+        return cls(tuple(constraints), species)
 
     def active(self) -> Bool[Array, "..."]:
         """Active fugacity constraints
@@ -779,7 +780,7 @@ class FugacityConstraintSet(eqx.Module):
         out: dict[str, NpArray] = {
             # Subtle, but np.exp will collapse scalar array to 0-D, violating the type hint.
             f"{key}_fugacity": np.exp(np.atleast_1d(log_fugacity_list[idx]))
-            for idx, key in enumerate(self.species_collection.data.species_names)
+            for idx, key in enumerate(self.species.species_names)
             if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
@@ -827,13 +828,13 @@ class MassConstraintSet(eqx.Module):
 
     Args:
         abundance: Abundance
-        species_collection: Species collection
+        species: Species collection
         units: Units of the abundance. Defaults to ``mass``.
     """
 
     abundance: Float[Array, "..."] = eqx.field(converter=as_j64)
     """Abundance"""
-    species_collection: SpeciesCollection
+    species: SpeciesCollection
     """Species collection"""
     units: Literal["mass", "moles"] = "mass"
     """Units of the abundance"""
@@ -843,14 +844,14 @@ class MassConstraintSet(eqx.Module):
     @classmethod
     def create(
         cls,
-        species_collection: SpeciesCollection,
+        species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
     ) -> "MassConstraintSet":
         """Creates an instance
 
         Args:
-            species_collection: Species collection
+            species: Species collection
             mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
                 ``None``.
             units: Units of the abundance. Defaults to ``mass``.
@@ -867,12 +868,12 @@ class MassConstraintSet(eqx.Module):
 
         # Initialise to all nans assuming that there are no mass constraints
         abundance: NpFloat = np.full(
-            (max_len, len(species_collection.data.unique_elements)), np.nan, dtype=np.float64
+            (max_len, len(species.unique_elements)), np.nan, dtype=np.float64
         )
 
         # Populate mass constraints. This accommodates mass constraints given as mass or moles of
         # species as well as elements
-        for nn, element in enumerate(species_collection.data.unique_elements):
+        for nn, element in enumerate(species.unique_elements):
             element_sum: ArrayLike = 0
             for species_, value_ in mass_constraints_.items():
                 try:
@@ -893,7 +894,7 @@ class MassConstraintSet(eqx.Module):
 
         # jax.debug.print("abundance = {out}", out=abundance)
 
-        return cls(abundance, species_collection, units)
+        return cls(abundance, species, units)
 
     def abundance_mol(self) -> Float[Array, "..."]:
         """Abundance by moles for all elements
@@ -902,7 +903,7 @@ class MassConstraintSet(eqx.Module):
             Abundance by moles for all elements
         """
         if self.units == "mass":
-            return self.abundance / self.species_collection.data.element_molar_masses
+            return self.abundance / self.species.element_molar_masses
         elif self.units == "moles":
             return self.abundance
         else:
@@ -917,7 +918,7 @@ class MassConstraintSet(eqx.Module):
         if self.units == "mass":
             return self.abundance
         elif self.units == "moles":
-            return self.abundance * self.species_collection.data.element_molar_masses
+            return self.abundance * self.species.element_molar_masses
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
@@ -961,7 +962,7 @@ class MassConstraintSet(eqx.Module):
         out: dict[str, NpArray] = {}
 
         for label, arr in [("number", abundance_mol), ("mass", abundance_mass)]:
-            for idx, element in enumerate(self.species_collection.data.unique_elements):
+            for idx, element in enumerate(self.species.unique_elements):
                 col = arr[:, idx]
                 if not np.all(np.isnan(col)):
                     out[f"{element}_{label}"] = col
@@ -1072,7 +1073,7 @@ class Parameters(eqx.Module):
     """Parameters
 
     Args:
-        species: Species collection
+        full_reaction_network: Full reaction network
         state: Thermodynamic state
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
@@ -1081,8 +1082,8 @@ class Parameters(eqx.Module):
         dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
-    species_collection: SpeciesCollection
-    """Species collection"""
+    full_reaction_network: FullReactionNetwork
+    """Full reaction network"""
     state: ThermodynamicStateProtocol
     """Thermodynamic state"""
     fugacity_constraints: FugacityConstraintSet
@@ -1093,18 +1094,11 @@ class Parameters(eqx.Module):
     """Solver parameters"""
     batch_size: int = 1
     """Batch size"""
-    dilute_limit: bool = True
-    """Whether to treat dissolution in the dilute limit"""
-
-    # @property
-    # def reaction_network(self) -> ReactionNetwork:
-    #    """Species network"""
-    #    return self.species_collection.reaction_network
 
     @classmethod
     def create(
         cls,
-        species_collection: SpeciesCollection,
+        full_reaction_network: FullReactionNetwork,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
@@ -1113,7 +1107,7 @@ class Parameters(eqx.Module):
         """Creates an instance
 
         Args:
-            species_collection: Species collection
+            full_reaction_network: Full reaction network
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
@@ -1127,10 +1121,10 @@ class Parameters(eqx.Module):
         """
         state_: ThermodynamicStateProtocol = Planet() if state is None else state
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
-            species_collection, fugacity_constraints
+            full_reaction_network.species, fugacity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            species_collection, mass_constraints
+            full_reaction_network.species, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
@@ -1148,7 +1142,7 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(
-            species_collection,
+            full_reaction_network,
             state_,
             fugacity_constraints_,
             mass_constraints_,
