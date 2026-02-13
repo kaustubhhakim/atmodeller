@@ -83,11 +83,6 @@ class ReactionNetwork(eqx.Module):
         return thermodynamic_data_source.available_species()
 
     @property
-    def active_reactions(self) -> Bool[Array, " reactions"]:
-        """Boolean mask of active reactions in the reaction network"""
-        return jnp.ones(self.number_reactions, dtype=bool)
-
-    @property
     def reaction_mask(self) -> Bool[Array, " species"]:
         """Boolean mask of reaction species in the full species collection"""
         return (
@@ -104,13 +99,13 @@ class ReactionNetwork(eqx.Module):
     #     return len(self.data) == len(self.gas_species_mask)
 
     def get_log_Kp(self, temperature: Float[Array, "..."]) -> Float[Array, " reactions"]:
-        """Gets log of the equilibrium constant of each reaction in terms of partial pressures.
+        """Gets log of the equilibrium constant of each reaction.
 
         Args:
             temperature: Temperature in K
 
         Returns:
-            Log of the equilibrium constant of each reaction in terms of partial pressures
+            Log of the equilibrium constant of each reaction
         """
         gibbs_funcs: list[Callable] = [
             to_hashable(species_.get_gibbs_over_RT) for species_ in self.reaction_species
@@ -171,12 +166,12 @@ class DissolutionNetwork(eqx.Module):
     """Dissolution species collection"""
     dissolution_species_indices: NpInt
     """Indices of dissolution species in the full species collection"""
+    dissolution_mask: NpBool
+    """Boolean mask of dissolution species in the full species collection"""
     reaction_indices_map: NpInt
     """Mapping of dissolution species to corresponding reaction species"""
     dissolution_matrix: NpFloat
     """Dissolution reaction matrix"""
-    active_reactions: NpBool
-    """Active dissolution reactions"""
     dilute_limit: bool = True
     """Whether to assume dilute limit for all dissolution reactions"""
 
@@ -187,8 +182,10 @@ class DissolutionNetwork(eqx.Module):
         )
         self.dissolution_species = dissolution_species
         self.dissolution_species_indices = dissolution_species_indices
-        # All dissolution reactions are active by default
-        self.active_reactions = np.ones(self.number_reactions, dtype=bool)
+
+        # Boolean mask of dissolution species in the full species collection
+        self.dissolution_mask: NpBool = np.zeros(self.species.number_species, dtype=bool)
+        self.dissolution_mask[self.dissolution_species_indices] = True
 
         # Construct dissolution reaction matrix
         # For each reservoir species, get the index of the corresponding reaction (gas) species
@@ -220,15 +217,6 @@ class DissolutionNetwork(eqx.Module):
     def number_reactions(self) -> int:
         """Number of dissolution reactions"""
         return self.dissolution_species.number_species
-
-    @property
-    def dissolution_mask(self) -> Bool[Array, " species"]:
-        """Boolean mask of dissolution species in the full species collection"""
-        return (
-            jnp.zeros(self.species.number_species, dtype=bool)
-            .at[self.dissolution_species_indices]
-            .set(True)
-        )
 
     def get_log_Kp(
         self,
@@ -323,16 +311,24 @@ class FullNetwork(eqx.Module):
         logger.info("All reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
+    def active_reactions(self) -> NpBool:
+        """Boolean mask of active reactions in the reaction network"""
+        return np.ones(self.number_reactions, dtype=bool)
+
+    @property
     def number_reactions(self) -> int:
         return self.reaction.number_reactions + self.dissolution.number_reactions
 
     def get_log_Kp(
         self,
-        log_activity: Float[Array, " species"],
+        log_activity: Float[Array, " num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, ""],
-    ):  # -> Float[Array, " reactions"]:
+    ) -> Float[Array, " num_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
+
+        Assembles the log Kps from the reaction and dissolution networks, which may require
+        different inputs.
 
         Args:
             log_activity: Log activity of each species
@@ -342,12 +338,11 @@ class FullNetwork(eqx.Module):
         Returns:
             Log of the equilibrium constant of each reaction
         """
-        # Assemble log Kps from the reaction and dissolution networks
         log_Kp_reaction: Float[Array, " num_core_reactions"] = self.reaction.get_log_Kp(
             temperature
         )
 
-        # Need to get just the log_activity of reservoir species
+        # Need to get just the log_activity of dissolution species
         log_activity_dissolution: Float[Array, " num_dissolution_species"] = jnp.take(
             log_activity,
             indices=self.dissolution.dissolution_species_indices,
@@ -366,17 +361,14 @@ class FullNetwork(eqx.Module):
         # For type consistency, convert to integer array with nan as 0
         O2_index_: Integer[Array, ""] = jnp.nan_to_num(O2_index, nan=0).astype(jnp.int_)
 
-        # Get fO2, or nan if not present
+        # Get fO2 or nan if not present
         fO2: Float[Array, ""] = jnp.where(
             jnp.isnan(O2_index), jnp.nan, jnp.take(activity_dissolution, O2_index_)
         )
 
         log_Kp_dissolution: Float[Array, " num_dissolution_reactions"] = (
             self.dissolution.get_log_Kp(
-                fugacity=jnp.exp(log_activity_dissolution),
-                temperature=temperature,
-                pressure=pressure,
-                fO2=fO2,
+                fugacity=activity_dissolution, temperature=temperature, pressure=pressure, fO2=fO2
             )
         )
 
@@ -389,3 +381,30 @@ class FullNetwork(eqx.Module):
             Reactions as a dictionary
         """
         return get_reaction_dictionary(self.full_matrix, self.species.species_names)
+
+    def get_residual(
+        self,
+        log_activity: Float[Array, " num_species"],
+        temperature: Float[Array, "..."],
+        pressure: Float[Array, ""],
+    ) -> Float[Array, " num_reactions"]:
+        """Gets the residual of the full reaction network.
+
+        Args:
+            log_activity: Log activity of each species
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Residual of the full reaction network
+        """
+        # Must convert to a JAX array
+        reaction_matrix: Float[Array, " num_reactions num_species"] = jnp.asarray(self.full_matrix)
+
+        log_Kp: Float[Array, " num_reactions"] = self.get_log_Kp(
+            log_activity=log_activity, temperature=temperature, pressure=pressure
+        )
+
+        residual: Float[Array, " num_reactions"] = reaction_matrix.dot(log_activity) - log_Kp
+
+        return residual
