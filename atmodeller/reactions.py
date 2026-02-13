@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jaxmod.utils import partial_rref, to_hashable
-from jaxtyping import Array, Bool, Float, Integer
+from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import GAS_STATE
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies, SpeciesCollection
@@ -50,8 +50,8 @@ class ReactionNetwork(eqx.Module):
     """Reaction species collection"""
     reaction_species_indices: NpInt
     """Indices of reaction species in the full species collection"""
-    number_reactions: int
-    """Number of reactions"""
+    reaction_mask: ArrayLike
+    """Boolean mask of reaction species in the full species collection"""
     reaction_matrix: NpFloat
     """Reaction matrix"""
 
@@ -60,9 +60,10 @@ class ReactionNetwork(eqx.Module):
         reaction_species, reaction_species_indices = self.species.extract_reaction_species()
         self.reaction_species = reaction_species
         self.reaction_species_indices = reaction_species_indices
-        self.number_reactions = max(
-            0, reaction_species.number_species - len(reaction_species.unique_elements)
-        )
+
+        # Boolean mask of reaction species in the full species collection
+        self.reaction_mask = np.zeros(self.species.number_species, dtype=bool)
+        self.reaction_mask[self.reaction_species_indices] = True
 
         # Reaction matrix of linearly independent reactions
         transpose_formula_matrix: NpInt = reaction_species.get_formula_matrix().T
@@ -83,12 +84,10 @@ class ReactionNetwork(eqx.Module):
         return thermodynamic_data_source.available_species()
 
     @property
-    def reaction_mask(self) -> Bool[Array, " species"]:
-        """Boolean mask of reaction species in the full species collection"""
-        return (
-            jnp.zeros(self.species.number_species, dtype=bool)
-            .at[self.reaction_species_indices]
-            .set(True)
+    def number_reactions(self) -> int:
+        """Number of core reactions"""
+        return max(
+            0, self.reaction_species.number_species - len(self.reaction_species.unique_elements)
         )
 
     # TODO: Only used to determine output. Relevant for gas only or should be gas only AND no
@@ -166,7 +165,7 @@ class DissolutionNetwork(eqx.Module):
     """Dissolution species collection"""
     dissolution_species_indices: NpInt
     """Indices of dissolution species in the full species collection"""
-    dissolution_mask: NpBool
+    dissolution_mask: ArrayLike
     """Boolean mask of dissolution species in the full species collection"""
     reaction_indices_map: NpInt
     """Mapping of dissolution species to corresponding reaction species"""
@@ -184,7 +183,7 @@ class DissolutionNetwork(eqx.Module):
         self.dissolution_species_indices = dissolution_species_indices
 
         # Boolean mask of dissolution species in the full species collection
-        self.dissolution_mask: NpBool = np.zeros(self.species.number_species, dtype=bool)
+        self.dissolution_mask = np.zeros(self.species.number_species, dtype=bool)
         self.dissolution_mask[self.dissolution_species_indices] = True
 
         # Construct dissolution reaction matrix
@@ -312,11 +311,12 @@ class FullNetwork(eqx.Module):
 
     @property
     def active_reactions(self) -> NpBool:
-        """Boolean mask of active reactions in the reaction network"""
+        """Boolean mask of active reactions in the full reaction network"""
         return np.ones(self.number_reactions, dtype=bool)
 
     @property
     def number_reactions(self) -> int:
+        """Number of reactions in the full reaction network"""
         return self.reaction.number_reactions + self.dissolution.number_reactions
 
     def get_log_Kp(
@@ -342,7 +342,7 @@ class FullNetwork(eqx.Module):
             temperature
         )
 
-        # Need to get just the log_activity of dissolution species
+        # Log activity of dissolution species
         log_activity_dissolution: Float[Array, " num_dissolution_species"] = jnp.take(
             log_activity,
             indices=self.dissolution.dissolution_species_indices,
@@ -363,7 +363,7 @@ class FullNetwork(eqx.Module):
 
         # Get fO2 or nan if not present
         fO2: Float[Array, ""] = jnp.where(
-            jnp.isnan(O2_index), jnp.nan, jnp.take(activity_dissolution, O2_index_)
+            jnp.isnan(O2_index), jnp.nan, jnp.take(jnp.exp(log_activity), O2_index_)
         )
 
         log_Kp_dissolution: Float[Array, " num_dissolution_reactions"] = (

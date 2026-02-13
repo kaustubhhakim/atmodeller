@@ -66,7 +66,6 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     stability_mask: ArrayLike = parameters.full_network.reaction.reaction_species.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
-    # jax.debug.print("dissolution_mask = {out}", out=dissolution_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
     # jax.debug.print("mass_mask = {out}", out=mass_mask)
     # jax.debug.print("stability_mask = {out}", out=stability_mask)
@@ -372,6 +371,7 @@ def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     return mask
 
 
+# TODO: Can remove. Now in reactions module
 def get_species_ppmw_in_melt(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " species"]:
@@ -491,7 +491,7 @@ def objective_function(
 
         1. Fugacity constraints - fixed target, well conditioned
         2. Reaction constraints - log-linear, physics-based coupling
-        3. Mass balance constraints - stiffer, depends on solubility
+        3. Mass balance constraints - stiffer
         4. Stability constraints - stiffer still
 
     Args:
@@ -531,56 +531,56 @@ def objective_function(
     # )
 
     # Solubility residual (dimensionless)
-    # species_ppmw = get_species_ppmw_in_melt(parameters, log_number_moles)
-    # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
+    species_ppmw = get_species_ppmw_in_melt(parameters, log_number_moles)
+    jax.debug.print("species_ppmw = {out}", out=species_ppmw)
 
     # Need to get just the log_activity of reservoir species
-    # log_activity_reservoir: Float[Array, " reservoir_species"] = jnp.take(
-    #    log_activity,
-    #    indices=parameters.dissolution_species_indices,
-    #    unique_indices=True,
-    #    indices_are_sorted=True,
-    # )
-    # jax.debug.print("log_activity_reservoir = {out}", out=log_activity_reservoir)
+    log_activity_reservoir: Float[Array, " reservoir_species"] = jnp.take(
+        log_activity,
+        indices=parameters.dissolution_species_indices,
+        unique_indices=True,
+        indices_are_sorted=True,
+    )
+    jax.debug.print("log_activity_reservoir = {out}", out=log_activity_reservoir)
 
-    # solubility_residual: Float[Array, " reservoir_species"] = log_activity_reservoir - jnp.log(
-    #    species_ppmw
-    # )
-    # jax.debug.print("solubility_residual = {out}", out=solubility_residual)
+    solubility_residual: Float[Array, " reservoir_species"] = log_activity_reservoir - jnp.log(
+        species_ppmw
+    )
+    jax.debug.print("solubility_residual = {out}", out=solubility_residual)
 
     # Reaction network residual
-    # reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
-    #    parameters.full_network.reaction.reaction_matrix
-    # )
-    # jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
-    # log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
-    #    parameters.full_network.reaction.get_log_Kp(temperature)
-    # )
-    # jax.debug.print(
-    #    "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
-    # )
+    reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
+        parameters.full_network.reaction.reaction_matrix
+    )
+    jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
+    log_reaction_equilibrium_constant: Float[Array, " reactions"] = (
+        parameters.full_network.reaction.get_log_Kp(temperature)
+    )
+    jax.debug.print(
+        "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
+    )
 
     ##########
     # TODO: Testing log_Kp assembly
     # test = parameters.full_network.get_log_Kp(log_activity, temperature, total_pressure)
     # jax.debug.print("test log_Kp = {out}", out=test)
-    reaction_residual = parameters.full_network.get_residual(
-        log_activity, temperature, total_pressure
-    )
+    # reaction_residual = parameters.full_network.get_residual(
+    #    log_activity, temperature, total_pressure
+    # )
     # jax.debug.print("test reaction residual = {out}", out=test2)
 
     # Need to get just the log_activity of species involved in reactions
-    # log_activity_reaction: Float[Array, " reaction_species"] = jnp.take(
-    #    log_activity,
-    #    indices=parameters.reaction_species_indices,
-    #    unique_indices=True,
-    #    indices_are_sorted=True,
-    # )
-    # jax.debug.print("log_activity_reaction = {out}", out=log_activity_reaction)
+    log_activity_reaction: Float[Array, " reaction_species"] = jnp.take(
+        log_activity,
+        indices=parameters.reaction_species_indices,
+        unique_indices=True,
+        indices_are_sorted=True,
+    )
+    jax.debug.print("log_activity_reaction = {out}", out=log_activity_reaction)
 
-    # reaction_residual: Float[Array, " reactions"] = (
-    #    reaction_matrix.dot(log_activity_reaction) - log_reaction_equilibrium_constant
-    # )
+    reaction_residual: Float[Array, " reactions"] = (
+        reaction_matrix.dot(log_activity_reaction) - log_reaction_equilibrium_constant
+    )
     jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
 
     # TODO: Need to reinstate stability
@@ -674,6 +674,8 @@ def objective_function(
     residual: Float[Array, " residual"] = jnp.concatenate(
         [
             fugacity_residual,
+            # TODO: remove
+            solubility_residual,
             reaction_residual,
             mass_residual,
             stability_residual,

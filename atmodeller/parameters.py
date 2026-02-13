@@ -23,7 +23,7 @@ from typing import Optional
 import equinox as eqx
 import jax.numpy as jnp
 from jaxmod.utils import get_batch_size
-from jaxtyping import Array, ArrayLike, Bool, Float, Int
+from jaxtyping import Array, ArrayLike, Float, Int
 
 from atmodeller.containers import (
     ChemicalSpecies,
@@ -141,7 +141,7 @@ class Parameters(eqx.Module):
         return self.full_network.reaction.reaction_species
 
     @property
-    def reaction_mask(self) -> Bool[Array, " num_species"]:
+    def reaction_mask(self) -> ArrayLike:
         """Reaction mask"""
         return self.full_network.reaction.reaction_mask
 
@@ -156,6 +156,6 @@ class Parameters(eqx.Module):
         return self.full_network.dissolution.dissolution_species
 
     @property
-    def dissolution_mask(self) -> Bool[Array, " num_species"]:
+    def dissolution_mask(self) -> ArrayLike:
         """Dissolution mask"""
         return self.full_network.dissolution.dissolution_mask

@@ -19,7 +19,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Generic, Literal, Optional, TypeVar
+from typing import Any, Generic, Literal, Optional, TypeVar, no_type_check
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -350,6 +350,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
         """Number of species"""
         return self.__len__()
 
+    @no_type_check
     def _extract_species_by_type(
         self, species_type: type[T_co]
     ) -> tuple["SpeciesCollection[T_co]", NpInt]:
@@ -372,6 +373,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
 
         return SpeciesCollection(extracted), indices_array
 
+    @no_type_check
     def extract_reaction_species(self) -> tuple["SpeciesCollection[ChemicalSpecies]", NpInt]:
         """Extracts chemical species.
 
@@ -380,6 +382,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies]):
         """
         return self._extract_species_by_type(ChemicalSpecies)
 
+    @no_type_check
     def extract_dissolution_species(self) -> tuple["SpeciesCollection[ReservoirSpecies]", NpInt]:
         """Extracts reservoir species.
 
