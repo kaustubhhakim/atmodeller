@@ -311,9 +311,7 @@ def make_solver(parameters: Parameters) -> Callable:
             :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
         # Define the condition to check if active stability is enabled
-        condition: Bool[Array, ""] = jnp.any(
-            parameters.full_reaction_network.species.active_stability
-        )
+        condition: Bool[Array, ""] = jnp.any(parameters.full_network.species.active_stability)
 
         def solve_with_stability_multistart(key):
             """Function for multistart with stability"""

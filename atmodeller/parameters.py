@@ -39,7 +39,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
-from atmodeller.reactions import FullReactionNetwork
+from atmodeller.reactions import FullNetwork
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class Parameters(eqx.Module):
     """Parameters
 
     Args:
-        full_reaction_network: Full reaction network
+        full_network: Full reaction network
         state: Thermodynamic state
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
@@ -57,7 +57,7 @@ class Parameters(eqx.Module):
         dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
-    full_reaction_network: FullReactionNetwork
+    full_network: FullNetwork
     """Full reaction network"""
     state: ThermodynamicStateProtocol
     """Thermodynamic state"""
@@ -73,7 +73,7 @@ class Parameters(eqx.Module):
     @classmethod
     def create(
         cls,
-        full_reaction_network: FullReactionNetwork,
+        full_network: FullNetwork,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
@@ -82,7 +82,7 @@ class Parameters(eqx.Module):
         """Creates an instance
 
         Args:
-            full_reaction_network: Full reaction network
+            full_network: Full reaction network
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
@@ -96,10 +96,10 @@ class Parameters(eqx.Module):
         """
         state_: ThermodynamicStateProtocol = Planet() if state is None else state
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
-            full_reaction_network.species, fugacity_constraints
+            full_network.species, fugacity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            full_reaction_network.species, mass_constraints
+            full_network.species, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
@@ -117,7 +117,7 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(
-            full_reaction_network,
+            full_network,
             state_,
             fugacity_constraints_,
             mass_constraints_,
@@ -128,24 +128,24 @@ class Parameters(eqx.Module):
     @property
     def species(self) -> SpeciesCollection[SpeciesProtocol]:
         """Species collection"""
-        return self.full_reaction_network.species
+        return self.full_network.species
 
     @property
     def reaction_species(self) -> SpeciesCollection[ChemicalSpecies]:
         """Reaction species collection"""
-        return self.full_reaction_network.core_network.reaction_species
-
-    @property
-    def dissolution_species(self) -> SpeciesCollection[ReservoirSpecies]:
-        """Dissolution species collection"""
-        return self.full_reaction_network.dissolution_network.reservoir_species
-
-    @property
-    def dissolution_mask(self) -> Bool[Array, " species"]:
-        """Dissolution mask"""
-        return self.full_reaction_network.dissolution_network.reservoir_mask
+        return self.full_network.reaction.reaction_species
 
     @property
     def reaction_mask(self) -> Bool[Array, " species"]:
         """Reaction mask"""
-        return self.full_reaction_network.core_network.reaction_mask
+        return self.full_network.reaction.reaction_mask
+
+    @property
+    def dissolution_species(self) -> SpeciesCollection[ReservoirSpecies]:
+        """Dissolution species collection"""
+        return self.full_network.dissolution.dissolution_species
+
+    @property
+    def dissolution_mask(self) -> Bool[Array, " species"]:
+        """Dissolution mask"""
+        return self.full_network.dissolution.dissolution_mask

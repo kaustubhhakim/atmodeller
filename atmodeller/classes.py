@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.parameters import Parameters
-from atmodeller.reactions import FullReactionNetwork
+from atmodeller.reactions import FullNetwork
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
@@ -55,14 +55,14 @@ class EquilibriumModel:
     """
 
     species: SpeciesCollection
-    full_reaction_network: FullReactionNetwork
+    full_network: FullNetwork
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.full_reaction_network = FullReactionNetwork(species)
+        self.full_network = FullNetwork(species)
 
     @property
     def output(self) -> Output:
@@ -85,7 +85,7 @@ class EquilibriumModel:
             state: Thermodynamic state
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.full_reaction_network, state)
+        parameters: Parameters = Parameters.create(self.full_network, state)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
@@ -132,7 +132,7 @@ class EquilibriumModel:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.full_reaction_network,
+            self.full_network,
             state,
             fugacity_constraints,
             mass_constraints,
@@ -141,7 +141,7 @@ class EquilibriumModel:
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.full_reaction_network.species.number_species,
+            self.full_network.species.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)

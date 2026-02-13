@@ -164,7 +164,7 @@ class ReactionNetwork(eqx.Module):
         return max(temperature_min), min(temperature_max)
 
 
-class DissolutionReactionNetwork(eqx.Module):
+class DissolutionNetwork(eqx.Module):
     """Handles all reactions where a reservoir species dissolves into or exchanges with a phase.
 
     Args:
@@ -173,14 +173,12 @@ class DissolutionReactionNetwork(eqx.Module):
 
     species: SpeciesCollection[SpeciesProtocol]
     """Species collection"""
-    reservoir_species: SpeciesCollection[ReservoirSpecies]
-    """Reservoir species collection"""
-    reservoir_indices: NpInt
-    """Indices of reservoir species in the full species collection"""
+    dissolution_species: SpeciesCollection[ReservoirSpecies]
+    """Dissolution species collection"""
+    dissolution_indices: NpInt
+    """Indices of dissolution species in the full species collection"""
     reaction_indices_map: NpInt
-    """Mapping of reservoir species to corresponding reaction species"""
-    number_reactions: int
-    """Number of reactions"""
+    """Mapping of dissolution species to corresponding reaction species"""
     dissolution_matrix: NpFloat
     """Dissolution reaction matrix"""
     active_reactions: NpBool
@@ -190,10 +188,9 @@ class DissolutionReactionNetwork(eqx.Module):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        reservoir_species, reservoir_indices = self.species.extract_reservoir_species()
-        self.reservoir_species = reservoir_species
-        self.reservoir_indices = reservoir_indices
-        self.number_reactions = reservoir_species.number_species
+        dissolution_species, dissolution_indices = self.species.extract_reservoir_species()
+        self.dissolution_species = dissolution_species
+        self.dissolution_indices = dissolution_indices
         # All dissolution reactions are active by default
         self.active_reactions = np.ones(self.number_reactions, dtype=bool)
 
@@ -201,8 +198,8 @@ class DissolutionReactionNetwork(eqx.Module):
         # For each reservoir species, get the index of the corresponding reaction (gas) species
         reaction_species, reaction_indices = self.species.extract_chemical_species()
         reaction_indices_map: list[int] = []
-        for reservoir_species_ in reservoir_species:
-            name: str = f"{reservoir_species_.data.hill_formula}_{GAS_STATE}"
+        for dissolution_species_ in dissolution_species:
+            name: str = f"{dissolution_species_.data.hill_formula}_{GAS_STATE}"
             idx: int = reaction_species.species_names.index(name)
             reaction_indices_map.append(reaction_indices[idx])
 
@@ -213,15 +210,22 @@ class DissolutionReactionNetwork(eqx.Module):
         for reaction_index in range(self.number_reactions):
             # TODO: check sign convention for reactants and products
             dissolution_matrix[reaction_index, self.reaction_indices_map[reaction_index]] = -1.0
-            dissolution_matrix[reaction_index, reservoir_indices[reaction_index]] = 1.0
+            dissolution_matrix[reaction_index, self.dissolution_indices[reaction_index]] = 1.0
 
         self.dissolution_matrix = dissolution_matrix
 
     @property
-    def reservoir_mask(self) -> Bool[Array, " species"]:
-        """Boolean mask of reservoir species in the full species collection"""
+    def number_reactions(self) -> int:
+        """Number of dissolution reactions"""
+        return self.dissolution_species.number_species
+
+    @property
+    def dissolution_mask(self) -> Bool[Array, " species"]:
+        """Boolean mask of dissolution species in the full species collection"""
         return (
-            jnp.zeros(self.species.number_species, dtype=bool).at[self.reservoir_indices].set(True)
+            jnp.zeros(self.species.number_species, dtype=bool)
+            .at[self.dissolution_indices]
+            .set(True)
         )
 
     def get_log_Kp(
@@ -273,7 +277,7 @@ class DissolutionReactionNetwork(eqx.Module):
         # NOTE: All solubility formulations must return a JAX array to allow vmap
         solubility_funcs: list[Callable] = [
             to_hashable(species_.solubility.jax_concentration)
-            for species_ in self.reservoir_species
+            for species_ in self.dissolution_species
         ]
 
         def apply_solubility(
@@ -285,14 +289,14 @@ class DissolutionReactionNetwork(eqx.Module):
         ) -> Float[Array, ""]:
             return lax.switch(index, solubility_funcs, fugacity_val, temp, press, o2_fug)
 
-        indices: Integer[Array, " reservoir_species"] = jnp.arange(
-            self.reservoir_species.number_species
+        indices: Integer[Array, " dissolution_species"] = jnp.arange(
+            self.dissolution_species.number_species
         )
 
         vmap_solubility: Callable = eqx.filter_vmap(
             apply_solubility, in_axes=(0, 0, None, None, None)
         )
-        species_ppmw: Float[Array, " reservoir_species"] = vmap_solubility(
+        species_ppmw: Float[Array, " dissolution_species"] = vmap_solubility(
             indices, fugacity, temperature, pressure, fO2
         )
         # jax.debug.print("ppmw = {out}", out=ppmw)
@@ -302,15 +306,15 @@ class DissolutionReactionNetwork(eqx.Module):
         return species_ppmw
 
     def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
+        """Gets dissolution reactions as a dictionary.
 
         Returns:
-            Reactions as a dictionary
+            Dissolution reactions as a dictionary
         """
         return get_reaction_dictionary(self.dissolution_matrix, self.species.species_names)
 
 
-class FullReactionNetwork(eqx.Module):
+class FullNetwork(eqx.Module):
     """Full reaction network that includes both core chemical reactions and dissolution reactions.
 
     Args:
@@ -318,24 +322,24 @@ class FullReactionNetwork(eqx.Module):
     """
 
     species: SpeciesCollection[SpeciesProtocol]
-    core_network: ReactionNetwork
-    dissolution_network: DissolutionReactionNetwork
+    reaction: ReactionNetwork
+    dissolution: DissolutionNetwork
     # full_matrix: NpFloat
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.core_network = ReactionNetwork(species)
-        self.dissolution_network = DissolutionReactionNetwork(species)
+        self.reaction = ReactionNetwork(species)
+        self.dissolution = DissolutionNetwork(species)
 
-        # core_matrix = self.core_network.reaction_matrix
-        # diss_matrix = self.dissolution_network.dissolution_matrix
+        # core_matrix = self.reaction.reaction_matrix
+        # diss_matrix = self.dissolution.dissolution_matrix
 
         # FIXME: Currently breaks
         # self.full_matrix = np.vstack([core_matrix, diss_matrix])
 
-        # logger.info("full_reaction_network = %s", str(self.full_reaction_network))
+        # logger.info("full_network = %s", str(self.full_network))
         # logger.info(
-        #    "reactions = %s", pprint.pformat(self.full_reaction_network.get_reaction_dictionary())
+        #    "reactions = %s", pprint.pformat(self.full_network.get_reaction_dictionary())
         # )
 
     def get_log_Kp(self, temperature: Float[Array, "..."]):  # -> Float[Array, " reactions"]:
