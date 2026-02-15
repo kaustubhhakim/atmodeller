@@ -108,6 +108,8 @@ class ReactionNetwork(BaseReactionBlock):
     """Stability mask for reaction matrix expanded to full species space"""
     reaction_stability_matrix_full: NpFloat
     """Reaction stability matrix expanded to full species space"""
+    vmap_gibbs: Callable
+    """Vectorised Gibbs free energy function for reaction species"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
@@ -136,6 +138,17 @@ class ReactionNetwork(BaseReactionBlock):
         self.reaction_stability_matrix_full = (
             self.reaction_matrix_full * self.reaction_stability_mask_full
         )
+
+        gibbs_funcs: list[Callable] = [
+            to_hashable(species_.get_gibbs_over_RT) for species_ in self.reaction_species
+        ]
+
+        def apply_gibbs(
+            index: Integer[Array, ""], temperature: Float[Array, "..."]
+        ) -> Float[Array, "..."]:
+            return lax.switch(index, gibbs_funcs, temperature)
+
+        self.vmap_gibbs = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
 
         self.output_to_logger()
 
@@ -173,20 +186,9 @@ class ReactionNetwork(BaseReactionBlock):
         Returns:
             Log of the equilibrium constant of each reaction
         """
-        gibbs_funcs: list[Callable] = [
-            to_hashable(species_.get_gibbs_over_RT) for species_ in self.reaction_species
-        ]
-
-        def apply_gibbs(
-            index: Integer[Array, ""], temperature: Float[Array, "..."]
-        ) -> Float[Array, "..."]:
-            return lax.switch(index, gibbs_funcs, temperature)
-
-        indices: Integer[Array, " reaction_species"] = jnp.arange(
-            self.reaction_species.number_species
+        gibbs_values: Float[Array, "reaction_species 1"] = self.vmap_gibbs(
+            jnp.arange(self.reaction_species.number_species), temperature
         )
-        vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-        gibbs_values: Float[Array, "reaction_species 1"] = vmap_gibbs(indices, temperature)
         # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
         reaction_matrix: Float[Array, "reactions reaction_species"] = jnp.asarray(
             self.reaction_matrix
@@ -236,6 +238,8 @@ class DissolutionNetwork(BaseReactionBlock):
     """Mapping of dissolution species to corresponding reaction species"""
     dissolution_matrix: NpFloat
     """Dissolution reaction matrix"""
+    vmap_solubility: Callable
+    """Vectorised solubility function for dissolution reactions"""
     dilute_limit: bool = True
     """Whether to assume dilute limit for all dissolution reactions"""
 
@@ -273,6 +277,24 @@ class DissolutionNetwork(BaseReactionBlock):
 
         self.dissolution_matrix = dissolution_matrix
 
+        solubility_funcs: list[Callable] = [
+            to_hashable(species_.solubility.jax_concentration)
+            for species_ in self.dissolution_species
+        ]
+
+        def apply_solubility(
+            index: Integer[Array, ""],
+            fugacity_val: Float[Array, ""],
+            temp: Float[Array, ""],
+            press: Float[Array, ""],
+            o2_fug: Float[Array, ""],
+        ) -> Float[Array, ""]:
+            return lax.switch(index, solubility_funcs, fugacity_val, temp, press, o2_fug)
+
+        self.vmap_solubility: Callable = eqx.filter_vmap(
+            apply_solubility, in_axes=(0, 0, None, None, None)
+        )
+
         self.output_to_logger()
 
     @property
@@ -302,28 +324,8 @@ class DissolutionNetwork(BaseReactionBlock):
         if self.number_reactions == 0:
             return jnp.array([], dtype=float)
 
-        # NOTE: All solubility formulations must return a JAX array to allow vmap
-        solubility_funcs: list[Callable] = [
-            to_hashable(species_.solubility.jax_concentration)
-            for species_ in self.dissolution_species
-        ]
-
-        def apply_solubility(
-            index: Integer[Array, ""],
-            fugacity_val: Float[Array, ""],
-            temp: Float[Array, ""],
-            press: Float[Array, ""],
-            o2_fug: Float[Array, ""],
-        ) -> Float[Array, ""]:
-            return lax.switch(index, solubility_funcs, fugacity_val, temp, press, o2_fug)
-
-        indices: Integer[Array, " num_dissolution_species"] = jnp.arange(self.number_reactions)
-
-        vmap_solubility: Callable = eqx.filter_vmap(
-            apply_solubility, in_axes=(0, 0, None, None, None)
-        )
-        species_ppmw: Float[Array, " num_dissolution_species"] = vmap_solubility(
-            indices, gas_species_activity, temperature, pressure, fO2
+        species_ppmw: Float[Array, " num_dissolution_species"] = self.vmap_solubility(
+            jnp.arange(self.number_reactions), gas_species_activity, temperature, pressure, fO2
         )
         # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
 
