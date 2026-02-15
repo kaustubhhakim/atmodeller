@@ -48,7 +48,7 @@ class Parameters(eqx.Module):
     """Parameters
 
     Args:
-        full_network: Full reaction network
+        reaction_system: Full reaction network
         state: Thermodynamic state
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
@@ -57,7 +57,7 @@ class Parameters(eqx.Module):
         dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
-    full_network: ReactionSystem
+    reaction_system: ReactionSystem
     """Full reaction network"""
     state: ThermodynamicStateProtocol
     """Thermodynamic state"""
@@ -73,7 +73,7 @@ class Parameters(eqx.Module):
     @classmethod
     def create(
         cls,
-        full_network: ReactionSystem,
+        reaction_system: ReactionSystem,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
@@ -82,7 +82,7 @@ class Parameters(eqx.Module):
         """Creates an instance
 
         Args:
-            full_network: Full reaction network
+            reaction_system: Full reaction network
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
@@ -96,10 +96,10 @@ class Parameters(eqx.Module):
         """
         state_: ThermodynamicStateProtocol = Planet() if state is None else state
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
-            full_network.species, fugacity_constraints
+            reaction_system.species, fugacity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            full_network.species, mass_constraints
+            reaction_system.species, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
@@ -117,7 +117,7 @@ class Parameters(eqx.Module):
         solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
 
         return cls(
-            full_network,
+            reaction_system,
             state_,
             fugacity_constraints_,
             mass_constraints_,
@@ -128,34 +128,34 @@ class Parameters(eqx.Module):
     @property
     def species(self) -> SpeciesCollection[SpeciesProtocol]:
         """Species collection"""
-        return self.full_network.species
+        return self.reaction_system.species
 
     @property
     def reaction_species_indices(self) -> Int[Array, " num_reaction_species"]:
         """Reaction species indices"""
-        return jnp.asarray(self.full_network.reaction.reaction_species_indices)
+        return jnp.asarray(self.reaction_system.reaction.reaction_species_indices)
 
     @property
     def reaction_species(self) -> SpeciesCollection[ChemicalSpecies]:
         """Reaction species collection"""
-        return self.full_network.reaction.reaction_species
+        return self.reaction_system.reaction.reaction_species
 
     @property
     def reaction_mask(self) -> ArrayLike:
         """Reaction mask"""
-        return self.full_network.reaction.reaction_mask
+        return self.reaction_system.reaction.reaction_mask
 
     @property
     def dissolution_species_indices(self) -> Int[Array, " num_dissolution_species"]:
         """Dissolution species indices"""
-        return jnp.asarray(self.full_network.dissolution.dissolution_species_indices)
+        return jnp.asarray(self.reaction_system.dissolution.dissolution_species_indices)
 
     @property
     def dissolution_species(self) -> SpeciesCollection[ReservoirSpecies]:
         """Dissolution species collection"""
-        return self.full_network.dissolution.dissolution_species
+        return self.reaction_system.dissolution.dissolution_species
 
     @property
     def dissolution_mask(self) -> ArrayLike:
         """Dissolution mask"""
-        return self.full_network.dissolution.dissolution_mask
+        return self.reaction_system.dissolution.dissolution_mask

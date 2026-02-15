@@ -55,14 +55,14 @@ class EquilibriumModel:
     """
 
     species: SpeciesCollection
-    full_network: ReactionSystem
+    reaction_system: ReactionSystem
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.full_network = ReactionSystem(species)
+        self.reaction_system = ReactionSystem(species)
 
     @property
     def output(self) -> Output:
@@ -85,7 +85,7 @@ class EquilibriumModel:
             state: Thermodynamic state
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.full_network, state)
+        parameters: Parameters = Parameters.create(self.reaction_system, state)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
@@ -132,7 +132,7 @@ class EquilibriumModel:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.full_network,
+            self.reaction_system,
             state,
             fugacity_constraints,
             mass_constraints,
@@ -141,7 +141,7 @@ class EquilibriumModel:
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,
             initial_log_stability,
-            self.full_network.species.number_species,
+            self.reaction_system.species.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("base_solution_array = {out}", out=base_solution_array)

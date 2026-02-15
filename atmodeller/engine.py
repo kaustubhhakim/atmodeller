@@ -60,9 +60,11 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         Active mask
     """
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
-    reactions_mask: ArrayLike = parameters.full_network.active_reactions
+    reactions_mask: ArrayLike = parameters.reaction_system.active_reactions
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
-    stability_mask: ArrayLike = parameters.full_network.reaction.reaction_species.active_stability
+    stability_mask: ArrayLike = (
+        parameters.reaction_system.reaction.reaction_species.active_stability
+    )
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -203,7 +205,7 @@ def get_log_mass_fraction_in_melt(
 
     log_background_melt_mass: Array = jnp.log(parameters.state.melt_mass)
 
-    if parameters.full_network.dissolution.dilute_limit:
+    if parameters.reaction_system.dissolution.dilute_limit:
         total_log_mass: Float[Array, ""] = log_background_melt_mass
     else:
         # Must account for a background (silicate) melt mass, given by the thermodynamic state
@@ -458,14 +460,14 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
-    reaction_residual = parameters.full_network.get_residual(
+    reaction_residual = parameters.reaction_system.get_residual(
         log_activity, log_stability, temperature, total_pressure
     )
     # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
 
     # FIXME: Need to reinstate stability
     # reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
-    #     parameters.full_network.reaction.reaction_species.active_stability,
+    #     parameters.reaction_system.reaction.reaction_species.active_stability,
     #     reaction_matrix.shape,
     # )
 
@@ -565,7 +567,7 @@ def objective_function(
 
     active_mask: Bool[Array, " dim"] = get_active_mask(parameters)
     # jax.debug.print("active_mask = {out}", out=active_mask)
-    size: int = parameters.full_network.species.number_solution
+    size: int = parameters.reaction_system.species.number_solution
     # jax.debug.print("size = {out}", out=size)
 
     active_indices: Integer[Array, "..."] = jnp.where(active_mask, size=size)[0]
