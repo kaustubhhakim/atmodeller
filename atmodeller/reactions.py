@@ -52,6 +52,11 @@ class BaseReactionBlock(eqx.Module):
     def number_reactions(self) -> int:  # pyright: ignore
         """Number of reactions in the reaction block"""
 
+    @property
+    def active_reactions(self) -> NpBool:
+        """Boolean mask of active reactions"""
+        return np.ones(self.number_reactions, dtype=bool)
+
     @abstractmethod
     def __init__(self, species: Iterable[SpeciesProtocol]):
         """Initializes the reaction block with the species collection"""
@@ -351,7 +356,8 @@ class ReactionSystem(BaseReactionBlock):
     """
 
     species: SpeciesCollection[SpeciesProtocol]
-    blocks: tuple[BaseReactionBlock, ...]
+    reaction: ReactionNetwork
+    dissolution: DissolutionNetwork
     matrix: NpFloat
     stability_matrix: NpFloat
     _O2_index: NpInt
@@ -359,9 +365,8 @@ class ReactionSystem(BaseReactionBlock):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        reaction = ReactionNetwork(self.species)
-        dissolution = DissolutionNetwork(self.species)
-        self.blocks = (reaction, dissolution)
+        self.reaction = ReactionNetwork(self.species)
+        self.dissolution = DissolutionNetwork(self.species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
@@ -372,22 +377,13 @@ class ReactionSystem(BaseReactionBlock):
         self.output_to_logger()
 
     @property
-    def reaction(self) -> ReactionNetwork:
-        """Reaction network block"""
-        return self.blocks[0]  # pyright: ignore
-
-    @property
-    def dissolution(self) -> DissolutionNetwork:
-        """Dissolution network block"""
-        return self.blocks[1]  # pyright: ignore
-
-    @property
-    def active_reactions(self) -> NpBool:
-        """Boolean mask of active reactions in the full reaction network"""
-        return np.ones(self.number_reactions, dtype=bool)
+    def blocks(self) -> tuple[BaseReactionBlock, ...]:
+        """Reaction blocks"""
+        return self.reaction, self.dissolution
 
     @property
     def number_reactions(self):
+        """Number of reactions"""
         return sum(block.number_reactions for block in self.blocks)
 
     def get_log_Kp(
@@ -431,33 +427,6 @@ class ReactionSystem(BaseReactionBlock):
             self._has_O2, jnp.take(jnp.exp(log_activity), self._O2_index), jnp.nan
         )
 
-        # log_Kp_funcs: list[Callable] = [to_hashable(block.get_log_Kp) for block in self.blocks]
-
-        # def apply_log_Kp(
-        #     index: Integer[Array, ""],
-        #     fugacity_val: Float[Array, ""],
-        #     temp: Float[Array, ""],
-        #     press: Float[Array, ""],
-        #     o2_fug: Float[Array, ""],
-        # ) -> Float[Array, ""]:
-        #     return lax.switch(index, log_Kp_funcs, fugacity_val, temp, press, o2_fug)
-
-        # indices: Integer[Array, " num"] = jnp.arange(len(self.blocks))
-
-        # vmap_log_Kp: Callable = eqx.filter_vmap(apply_log_Kp, in_axes=(0, 0, None, None, None))
-        # species_ppmw: Float[Array, " num_dissolution_species"] = vmap_log_Kp(
-        #     indices, gas_species_activity, temperature, pressure, fO2
-        # )
-        # # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
-
-        # log_Kp: Float[Array, " num_reactions"] = (
-        #     jnp.log(species_ppmw) - jnp.log(STANDARD_CONCENTRATION) - jnp.log(gas_species_activity)
-        # )
-
-        # log_Kp_reaction: Float[Array, " num_core_reactions"] = self.reaction.get_log_Kp(
-        #     temperature
-        # )
-
         log_Kp_dissolution: Float[Array, " num_dissolution_reactions"] = (
             self.dissolution.get_log_Kp(temperature, activity_dissolution, pressure, fO2)
         )
@@ -481,7 +450,7 @@ class ReactionSystem(BaseReactionBlock):
 
         Args:
             log_activity: Log activity of each species
-            log_stability_reaction: Log stability of each species for reactions
+            log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
 
