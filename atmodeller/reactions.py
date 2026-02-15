@@ -457,13 +457,14 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Residual of the reaction network
         """
-        # Reaction residual
         log_Kp: Float[Array, " num_reactions"] = self.get_log_Kp(
-            log_activity=log_activity, temperature=temperature, pressure=pressure
+            log_activity, temperature, pressure
         )
         residual: Float[Array, " num_reactions"] = jnp.dot(self.matrix, log_activity) - log_Kp
+        # jax.debug.print("reaction residual before stability = {out}", out=residual)
 
         # Account for species stability
         residual = residual - jnp.dot(self.stability_matrix, safe_exp(log_stability))
+        # jax.debug.print("reaction residual after stability = {out}", out=residual)
 
         return residual

@@ -463,33 +463,6 @@ def objective_function(
     reaction_residual = parameters.reaction_system.get_residual(
         log_activity, log_stability, temperature, total_pressure
     )
-    # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
-
-    # FIXME: Need to reinstate stability
-    # reaction_stability_mask: Bool[Array, "reactions species"] = jnp.broadcast_to(
-    #     parameters.reaction_system.reaction.reaction_species.active_stability,
-    #     reaction_matrix.shape,
-    # )
-
-    # reaction_stability_matrix: Float[Array, "reactions species"] = (
-    #     reaction_matrix * reaction_stability_mask
-    # )
-    # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix.shape)
-
-    # # Need to get just the log_stability of species involved in reactions
-    # log_stability_reaction: Float[Array, " reaction_species"] = jnp.take(
-    #     log_stability,
-    #     indices=parameters.reaction_species_indices,
-    #     unique_indices=True,
-    #     indices_are_sorted=True,
-    # )
-    # jax.debug.print("log_stability_reaction = {out}", out=log_stability_reaction)
-
-    # # Dimensionless (log K residual)
-    # reaction_residual = reaction_residual - reaction_stability_matrix.dot(
-    #     safe_exp(log_stability_reaction)
-    # )
-    # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
     # jax.debug.print(
     #     "reaction_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(reaction_residual),
@@ -503,7 +476,6 @@ def objective_function(
 
     # Elemental mass balance residual
     # Number of moles of elements in the gas or condensed phase
-    # TODO: Needs to include those in dissolved as well
     element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
     # jax.debug.print("element_moles = {out}", out=element_moles)
 
@@ -517,6 +489,7 @@ def objective_function(
 
     # TODO: remove this old ratio error metric once testing complete
     # Dimensionless (ratio error - 1)
+    # Performs better for subneptune models
     # mass_residual: Float[Array, " elements"] = (
     #    safe_exp(log_element_moles_total - log_target_moles) - 1
     # )

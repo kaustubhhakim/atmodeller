@@ -102,7 +102,16 @@ def test_chabrier_earth(helper) -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_model.solve(state=planet, mass_constraints=mass_constraints, solver="basic")
+    # Works
+    # log_number_moles = np.array([56.0, 55.0, 36.0, 57.0, 53.0, 58.0])
+    log_number_moles = np.array([50.0, 50.0, 36.0, 50.0, 50.0, 50.0])
+
+    subneptune_model.solve(
+        state=planet,
+        mass_constraints=mass_constraints,
+        solver="basic",
+        initial_log_number_moles=log_number_moles,
+    )
     output: Output = subneptune_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
@@ -120,6 +129,8 @@ def test_chabrier_earth(helper) -> None:
         "OSi_g": 6.302402285027329e02,
         "OSi_g_activity": 6.302402285027240e02,
     }
+
+    print(output.log_number_moles)
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
