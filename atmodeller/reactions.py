@@ -359,7 +359,6 @@ class ReactionSystem(BaseReactionBlock):
         self.species = SpeciesCollection(species)
         reaction = ReactionNetwork(self.species)
         dissolution = DissolutionNetwork(self.species)
-
         self.blocks = (reaction, dissolution)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
