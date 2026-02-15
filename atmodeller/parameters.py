@@ -39,7 +39,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
-from atmodeller.reactions import FullNetwork
+from atmodeller.reactions import ReactionSystem
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class Parameters(eqx.Module):
         dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
-    full_network: FullNetwork
+    full_network: ReactionSystem
     """Full reaction network"""
     state: ThermodynamicStateProtocol
     """Thermodynamic state"""
@@ -73,7 +73,7 @@ class Parameters(eqx.Module):
     @classmethod
     def create(
         cls,
-        full_network: FullNetwork,
+        full_network: ReactionSystem,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,

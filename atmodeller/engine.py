@@ -59,7 +59,6 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     Returns:
         Active mask
     """
-    # FIXME: Might be broken for stability mask
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
     reactions_mask: ArrayLike = parameters.full_network.active_reactions
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
@@ -460,7 +459,7 @@ def objective_function(
     # )
 
     reaction_residual = parameters.full_network.get_residual(
-        log_activity, temperature, total_pressure
+        log_activity, log_stability, temperature, total_pressure
     )
     # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
 
@@ -520,7 +519,6 @@ def objective_function(
     #    safe_exp(log_element_moles_total - log_target_moles) - 1
     # )
 
-    # TODO: Testing different error metric for mass. Seems to work better.
     mass_residual: Float[Array, " elements"] = log_element_moles_total - log_target_moles
 
     # jax.debug.print("mass_residual = {out}", out=mass_residual)

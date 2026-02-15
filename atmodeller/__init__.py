@@ -140,8 +140,8 @@ from atmodeller.containers import (  # noqa: E402, F401
 from atmodeller.parameters import Parameters  # noqa: E402, F401
 from atmodeller.reactions import (  # noqa: E402, F401
     DissolutionNetwork,
-    FullNetwork,
     ReactionNetwork,
+    ReactionSystem,
 )
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,

@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.parameters import Parameters
-from atmodeller.reactions import FullNetwork
+from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
 
@@ -55,14 +55,14 @@ class EquilibriumModel:
     """
 
     species: SpeciesCollection
-    full_network: FullNetwork
+    full_network: ReactionSystem
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.full_network = FullNetwork(species)
+        self.full_network = ReactionSystem(species)
 
     @property
     def output(self) -> Output:

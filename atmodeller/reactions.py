@@ -18,13 +18,14 @@
 
 import logging
 import pprint
+from abc import abstractmethod
 from collections.abc import Callable, Iterable
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jaxmod.utils import partial_rref, to_hashable
+from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
@@ -37,7 +38,54 @@ from atmodeller.utilities import get_reaction_dictionary
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ReactionNetwork(eqx.Module):
+class BaseReactionBlock(eqx.Module):
+    """Base reaction block
+
+    Args:
+        species: An iterable of species
+    """
+
+    species: SpeciesCollection[SpeciesProtocol]
+    """Species collection"""
+
+    @property
+    def number_reactions(self) -> int:  # pyright: ignore
+        """Number of reactions in the reaction block"""
+
+    @abstractmethod
+    def __init__(self, species: Iterable[SpeciesProtocol]):
+        """Initializes the reaction block with the species collection"""
+
+    @abstractmethod
+    def get_log_Kp(self, temperature: Float[Array, "..."], *args, **kwargs) -> Float[Array, "..."]:
+        """Gets log of the equilibrium constant of each reaction in the reaction block"""
+
+    @abstractmethod
+    def get_matrix(self) -> NpFloat:
+        """Gets the full reaction matrix of the reaction block"""
+
+    @abstractmethod
+    def get_stability_matrix(self) -> NpFloat:
+        """Gets the full stability matrix of the reaction block"""
+
+    def get_reaction_dictionary(self) -> dict[int, str]:
+        """Gets reactions as a dictionary.
+
+        Returns:
+            Reactions as a dictionary
+        """
+        return get_reaction_dictionary(self.get_matrix(), self.species.species_names)
+
+    def output_to_logger(self):
+        """Outputs the reaction block to the logger"""
+        logger.debug(f"{self.__class__.__name__} matrix = %s", self.get_matrix())
+        logger.info(
+            f"{self.__class__.__name__} network = %s",
+            pprint.pformat(self.get_reaction_dictionary()),
+        )
+
+
+class ReactionNetwork(BaseReactionBlock):
     """Handles core chemical reactions.
 
     Args:
@@ -56,6 +104,10 @@ class ReactionNetwork(eqx.Module):
     """Reaction matrix"""
     reaction_matrix_full: NpFloat
     """Reaction matrix expanded to full species space"""
+    reaction_stability_mask_full: NpBool
+    """Stability mask for reaction matrix expanded to full species space"""
+    reaction_stability_matrix_full: NpFloat
+    """Reaction stability matrix expanded to full species space"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
@@ -78,8 +130,14 @@ class ReactionNetwork(eqx.Module):
         # Insert reduced matrix into correct columns
         self.reaction_matrix_full[:, self.reaction_species_indices] = self.reaction_matrix
 
-        logger.debug("reaction_matrix = %s", self.reaction_matrix)
-        logger.info("Reaction network = %s", pprint.pformat(self.get_reaction_dictionary()))
+        self.reaction_stability_mask_full = np.broadcast_to(
+            self.species.active_stability, self.reaction_matrix_full.shape
+        )
+        self.reaction_stability_matrix_full = (
+            self.reaction_matrix_full * self.reaction_stability_mask_full
+        )
+
+        self.output_to_logger()
 
         temperature_min, temperature_max = self.get_temperature_range()
         logger.info(
@@ -137,13 +195,11 @@ class ReactionNetwork(eqx.Module):
 
         return jnp.ravel(log_Kp)
 
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
+    def get_matrix(self) -> NpFloat:
+        return self.reaction_matrix_full
 
-        Returns:
-            Reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.reaction_matrix, self.reaction_species.species_names)
+    def get_stability_matrix(self) -> NpFloat:
+        return self.reaction_stability_matrix_full
 
     def get_temperature_range(self) -> tuple[float, float]:
         """Gets the temperature range of the thermodynamic data for the species
@@ -161,7 +217,7 @@ class ReactionNetwork(eqx.Module):
         return max(temperature_min), min(temperature_max)
 
 
-class DissolutionNetwork(eqx.Module):
+class DissolutionNetwork(BaseReactionBlock):
     """Handles all reactions where a species dissolves into or exchanges with a phase.
 
     Args:
@@ -217,8 +273,7 @@ class DissolutionNetwork(eqx.Module):
 
         self.dissolution_matrix = dissolution_matrix
 
-        logger.debug("dissolution_matrix = %s", self.dissolution_matrix)
-        logger.info("Dissolution network = %s", pprint.pformat(self.get_reaction_dictionary()))
+        self.output_to_logger()
 
     @property
     def number_reactions(self) -> int:
@@ -227,16 +282,16 @@ class DissolutionNetwork(eqx.Module):
 
     def get_log_Kp(
         self,
-        gas_species_activity: Float[Array, "..."],
         temperature: Float[Array, "..."],
+        gas_species_activity: Float[Array, "..."],
         pressure: Float[Array, ""],
         fO2: Float[Array, ""],
     ) -> Float[Array, " reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
         Args:
-            gas_species_activity: Gas species activity regulating dissolution reactions
             temperature: Temperature in K
+            gas_species_activity: Gas species activity regulating dissolution reactions
             pressure: Pressure in bar
             fO2: Oxygen fugacity in bar
 
@@ -278,44 +333,52 @@ class DissolutionNetwork(eqx.Module):
 
         return log_Kp
 
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets dissolution reactions as a dictionary.
+    def get_matrix(self) -> NpFloat:
+        return self.dissolution_matrix
 
-        Returns:
-            Dissolution reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.dissolution_matrix, self.species.species_names)
+    def get_stability_matrix(self) -> NpFloat:
+        """Dissolution reactions do not directly affect stability, so return zero"""
+        return np.zeros_like(self.dissolution_matrix, dtype=float)
 
 
-class FullNetwork(eqx.Module):
-    """Full reaction network that includes both core chemical reactions and dissolution reactions.
+class ReactionSystem(BaseReactionBlock):
+    """Reaction system that includes both core chemical reactions and dissolution reactions.
 
     Args:
         species: An iterable of species
     """
 
     species: SpeciesCollection[SpeciesProtocol]
-    reaction: ReactionNetwork
-    dissolution: DissolutionNetwork
-    full_matrix: NpFloat
+    blocks: tuple[BaseReactionBlock, ...]
+    matrix: NpFloat
+    stability_matrix: NpFloat
     _O2_index: NpInt
     _has_O2: NpBool
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.reaction = ReactionNetwork(self.species)
-        self.dissolution = DissolutionNetwork(self.species)
+        reaction = ReactionNetwork(self.species)
+        dissolution = DissolutionNetwork(self.species)
+
+        self.blocks = (reaction, dissolution)
+        self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
+        self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
         # Could be an integer (but represented as a float) or np.nan
         self._O2_index = np.nan_to_num(self.species.O2_index, nan=0).astype(int)
         self._has_O2 = ~np.isnan(self.species.O2_index)
 
-        self.full_matrix = np.vstack(
-            [self.reaction.reaction_matrix_full, self.dissolution.dissolution_matrix]
-        )
+        self.output_to_logger()
 
-        logger.debug("full_matrix = %s", str(self.full_matrix))
-        logger.info("All reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
+    @property
+    def reaction(self) -> ReactionNetwork:
+        """Reaction network block"""
+        return self.blocks[0]  # pyright: ignore
+
+    @property
+    def dissolution(self) -> DissolutionNetwork:
+        """Dissolution network block"""
+        return self.blocks[1]  # pyright: ignore
 
     @property
     def active_reactions(self) -> NpBool:
@@ -323,9 +386,8 @@ class FullNetwork(eqx.Module):
         return np.ones(self.number_reactions, dtype=bool)
 
     @property
-    def number_reactions(self) -> int:
-        """Number of reactions in the full reaction network"""
-        return self.reaction.number_reactions + self.dissolution.number_reactions
+    def number_reactions(self):
+        return sum(block.number_reactions for block in self.blocks)
 
     def get_log_Kp(
         self,
@@ -368,39 +430,70 @@ class FullNetwork(eqx.Module):
             self._has_O2, jnp.take(jnp.exp(log_activity), self._O2_index), jnp.nan
         )
 
+        # log_Kp_funcs: list[Callable] = [to_hashable(block.get_log_Kp) for block in self.blocks]
+
+        # def apply_log_Kp(
+        #     index: Integer[Array, ""],
+        #     fugacity_val: Float[Array, ""],
+        #     temp: Float[Array, ""],
+        #     press: Float[Array, ""],
+        #     o2_fug: Float[Array, ""],
+        # ) -> Float[Array, ""]:
+        #     return lax.switch(index, log_Kp_funcs, fugacity_val, temp, press, o2_fug)
+
+        # indices: Integer[Array, " num"] = jnp.arange(len(self.blocks))
+
+        # vmap_log_Kp: Callable = eqx.filter_vmap(apply_log_Kp, in_axes=(0, 0, None, None, None))
+        # species_ppmw: Float[Array, " num_dissolution_species"] = vmap_log_Kp(
+        #     indices, gas_species_activity, temperature, pressure, fO2
+        # )
+        # # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
+
+        # log_Kp: Float[Array, " num_reactions"] = (
+        #     jnp.log(species_ppmw) - jnp.log(STANDARD_CONCENTRATION) - jnp.log(gas_species_activity)
+        # )
+
+        # log_Kp_reaction: Float[Array, " num_core_reactions"] = self.reaction.get_log_Kp(
+        #     temperature
+        # )
+
         log_Kp_dissolution: Float[Array, " num_dissolution_reactions"] = (
-            self.dissolution.get_log_Kp(activity_dissolution, temperature, pressure, fO2)
+            self.dissolution.get_log_Kp(temperature, activity_dissolution, pressure, fO2)
         )
 
         return jnp.concatenate([log_Kp_reaction, log_Kp_dissolution])
 
-    def get_reaction_dictionary(self) -> dict[int, str]:
-        """Gets reactions as a dictionary.
+    def get_matrix(self) -> NpFloat:
+        return self.matrix
 
-        Returns:
-            Reactions as a dictionary
-        """
-        return get_reaction_dictionary(self.full_matrix, self.species.species_names)
+    def get_stability_matrix(self) -> NpFloat:
+        return self.stability_matrix
 
     def get_residual(
         self,
         log_activity: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, ""],
     ) -> Float[Array, " num_reactions"]:
-        """Gets the residual of the full reaction network.
+        """Gets the residual of the reaction network.
 
         Args:
             log_activity: Log activity of each species
+            log_stability_reaction: Log stability of each species for reactions
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Residual of the full reaction network
+            Residual of the reaction network
         """
+        # Reaction residual
         log_Kp: Float[Array, " num_reactions"] = self.get_log_Kp(
             log_activity=log_activity, temperature=temperature, pressure=pressure
         )
-        residual: Float[Array, " num_reactions"] = jnp.dot(self.full_matrix, log_activity) - log_Kp
+        residual: Float[Array, " num_reactions"] = jnp.dot(self.matrix, log_activity) - log_Kp
+
+        # Account for species stability
+        residual = residual - jnp.dot(self.stability_matrix, safe_exp(log_stability))
 
         return residual
