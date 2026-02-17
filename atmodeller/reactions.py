@@ -26,11 +26,12 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
-from jaxtyping import Array, ArrayLike, Float, Integer
+from jaxtyping import Array, Float, Integer
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
-from atmodeller.containers import ChemicalSpecies, ReservoirSpecies, SpeciesCollection
+from atmodeller.containers import SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.type_aliases import NpBool, NpFloat, NpInt
 from atmodeller.utilities import get_reaction_dictionary
@@ -38,12 +39,37 @@ from atmodeller.utilities import get_reaction_dictionary
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class BaseReactionBlock(eqx.Module):
-    """Base reaction block
+def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
+    """Gets the formula matrix.
+
+    Elements are given in rows and species in columns following the convention in :cite:t:`LKS17`.
 
     Args:
-        species: An iterable of species
+        species: Species collection
+
+    Returns:
+        Formula matrix
     """
+    formula_matrix: NpInt = np.zeros(
+        (len(species.unique_elements), species.number_species), dtype=int
+    )
+
+    for element_index, element in enumerate(species.unique_elements):
+        for species_index, species_ in enumerate(species):
+            count: int = 0
+            try:
+                count = species_.data.composition[element][0]
+            except KeyError:
+                count = 0
+            formula_matrix[element_index, species_index] = count
+
+    # logger.debug("formula_matrix = %s", formula_matrix)
+
+    return formula_matrix
+
+
+class BaseReactionBlock(eqx.Module):
+    """Base reaction block"""
 
     species: SpeciesCollection[SpeciesProtocol]
     """Species collection"""
@@ -56,10 +82,6 @@ class BaseReactionBlock(eqx.Module):
     def active_reactions(self) -> NpBool:
         """Boolean mask of active reactions"""
         return np.ones(self.number_reactions, dtype=bool)
-
-    @abstractmethod
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        """Initializes the reaction block with the species collection"""
 
     @abstractmethod
     def get_log_Kp(self, temperature: Float[Array, "..."], *args, **kwargs) -> Float[Array, "..."]:
@@ -99,12 +121,6 @@ class ReactionNetwork(BaseReactionBlock):
 
     species: SpeciesCollection[SpeciesProtocol]
     """Species collection"""
-    reaction_species: SpeciesCollection[ChemicalSpecies]
-    """Reaction species collection"""
-    reaction_species_indices: NpInt
-    """Indices of reaction species in the full species collection"""
-    reaction_mask: ArrayLike
-    """Boolean mask of reaction species in the full species collection"""
     reaction_matrix: NpFloat
     """Reaction matrix"""
     reaction_matrix_full: NpFloat
@@ -118,16 +134,9 @@ class ReactionNetwork(BaseReactionBlock):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        reaction_species, reaction_species_indices = self.species.extract_reaction_species()
-        self.reaction_species = reaction_species
-        self.reaction_species_indices = reaction_species_indices
-
-        # Boolean mask of reaction species in the full species collection
-        self.reaction_mask = np.zeros(self.species.number_species, dtype=bool)
-        self.reaction_mask[self.reaction_species_indices] = True
 
         # Reaction matrix of linearly independent reactions
-        transpose_formula_matrix: NpInt = reaction_species.get_formula_matrix().T
+        transpose_formula_matrix: NpInt = get_formula_matrix(self.species.reaction_species).T
         self.reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
 
         # Reaction matrix expanded to full species space
@@ -135,7 +144,7 @@ class ReactionNetwork(BaseReactionBlock):
             (self.number_reactions, self.species.number_species), dtype=float
         )
         # Insert reduced matrix into correct columns
-        self.reaction_matrix_full[:, self.reaction_species_indices] = self.reaction_matrix
+        self.reaction_matrix_full[:, self.species.reaction_species_mask] = self.reaction_matrix
 
         self.reaction_stability_mask_full = np.broadcast_to(
             self.species.active_stability, self.reaction_matrix_full.shape
@@ -145,7 +154,7 @@ class ReactionNetwork(BaseReactionBlock):
         )
 
         gibbs_funcs: list[Callable] = [
-            to_hashable(species_.get_gibbs_over_RT) for species_ in self.reaction_species
+            to_hashable(species_.get_gibbs_over_RT) for species_ in self.species.reaction_species
         ]
 
         def apply_gibbs(
@@ -172,15 +181,10 @@ class ReactionNetwork(BaseReactionBlock):
     def number_reactions(self) -> int:
         """Number of core reactions"""
         return max(
-            0, self.reaction_species.number_species - len(self.reaction_species.unique_elements)
+            0,
+            self.species.reaction_species.number_species
+            - len(self.species.reaction_species.unique_elements),
         )
-
-    # TODO: Only used to determine output. Relevant for gas only or should be gas only AND no
-    # solubility?
-    # @property
-    # def gas_only(self) -> bool:
-    #     """Checks if a gas-only network"""
-    #     return len(self.data) == len(self.gas_species_mask)
 
     def get_log_Kp(self, temperature: Float[Array, "..."]) -> Float[Array, " reactions"]:
         """Gets log of the equilibrium constant of each reaction.
@@ -192,7 +196,7 @@ class ReactionNetwork(BaseReactionBlock):
             Log of the equilibrium constant of each reaction
         """
         gibbs_values: Float[Array, "reaction_species 1"] = self.vmap_gibbs(
-            jnp.arange(self.reaction_species.number_species), temperature
+            jnp.arange(self.species.reaction_species.number_species), temperature
         )
         # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
         reaction_matrix: Float[Array, "reactions reaction_species"] = jnp.asarray(
@@ -215,10 +219,10 @@ class ReactionNetwork(BaseReactionBlock):
             Minimum and maximum temperature that is valid for the species
         """
         temperature_min: list[float] = [
-            min(species.thermo.T_min) for species in self.reaction_species
+            min(species.thermo.T_min) for species in self.species.reaction_species
         ]
         temperature_max: list[float] = [
-            max(species.thermo.T_max) for species in self.reaction_species
+            max(species.thermo.T_max) for species in self.species.reaction_species
         ]
 
         return max(temperature_min), min(temperature_max)
@@ -233,12 +237,6 @@ class DissolutionNetwork(BaseReactionBlock):
 
     species: SpeciesCollection[SpeciesProtocol]
     """Species collection"""
-    dissolution_species: SpeciesCollection[ReservoirSpecies]
-    """Dissolution species collection"""
-    dissolution_species_indices: NpInt
-    """Indices of dissolution species in the full species collection"""
-    dissolution_mask: ArrayLike
-    """Boolean mask of dissolution species in the full species collection"""
     reaction_indices_map: NpInt
     """Mapping of dissolution species to corresponding reaction species"""
     dissolution_matrix: NpFloat
@@ -250,41 +248,36 @@ class DissolutionNetwork(BaseReactionBlock):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        dissolution_species, dissolution_species_indices = (
-            self.species.extract_dissolution_species()
-        )
-        self.dissolution_species = dissolution_species
-        self.dissolution_species_indices = dissolution_species_indices
 
-        # Boolean mask of dissolution species in the full species collection
-        self.dissolution_mask = np.zeros(self.species.number_species, dtype=bool)
-        self.dissolution_mask[self.dissolution_species_indices] = True
-
-        # Construct dissolution reaction matrix
-        # For each dissolution species, get the index of the corresponding reaction (gas) species
-        reaction_species, reaction_indices = self.species.extract_reaction_species()
-        reaction_indices_map: list[int] = []
-        for dissolution_species_ in dissolution_species:
-            name: str = f"{dissolution_species_.data.hill_formula}_{GAS_STATE}"
-            idx: int = reaction_species.species_names.index(name)
-            reaction_indices_map.append(reaction_indices[idx])
-
-        self.reaction_indices_map = np.array(reaction_indices_map, dtype=int)
         # Most direct to construct the dissolution matrix in full species space
         dissolution_matrix: NpFloat = np.zeros(
             (self.number_reactions, self.species.number_species), dtype=float
         )
-        for reaction_index in range(self.number_reactions):
-            dissolution_matrix[
-                reaction_index, self.dissolution_species_indices[reaction_index]
-            ] = 1.0
-            dissolution_matrix[reaction_index, self.reaction_indices_map[reaction_index]] = -1.0
 
+        # Gas indices in the full species collection corresponding to each dissolution species
+        reaction_indices_map: list[int] = []
+
+        for reaction_index, dissolution_species_ in enumerate(self.species.reservoir_species):
+            # Reservoir mask
+            reservoir_mask: NpBool = np.array(
+                [s is dissolution_species_ for s in self.species],
+                dtype=bool,
+            )
+            # Gas species index
+            name: str = f"{dissolution_species_.data.hill_formula}_{GAS_STATE}"
+            gas_idx: int = self.species.species_names.index(name)
+
+            reaction_indices_map.append(gas_idx)
+
+            dissolution_matrix[reaction_index, reservoir_mask] = 1.0
+            dissolution_matrix[reaction_index, gas_idx] = -1.0
+
+        self.reaction_indices_map = np.array(reaction_indices_map, dtype=int)
         self.dissolution_matrix = dissolution_matrix
 
         solubility_funcs: list[Callable] = [
             to_hashable(species_.solubility.jax_concentration)
-            for species_ in self.dissolution_species
+            for species_ in self.species.reservoir_species
         ]
 
         def apply_solubility(
@@ -305,7 +298,7 @@ class DissolutionNetwork(BaseReactionBlock):
     @property
     def number_reactions(self) -> int:
         """Number of dissolution reactions"""
-        return self.dissolution_species.number_species
+        return self.species.reservoir_species.number_species
 
     def get_log_Kp(
         self,
@@ -356,25 +349,50 @@ class ReactionSystem(BaseReactionBlock):
     """
 
     species: SpeciesCollection[SpeciesProtocol]
+    """All species"""
+    gas: GasPhase
+    """Gas"""
+    melt: MeltPhase
+    """Melt"""
+    formula_matrix: NpInt
+    """Formula matrix of the full species collection"""
     reaction: ReactionNetwork
+    """Core chemical reaction network"""
     dissolution: DissolutionNetwork
+    """Dissolution reaction network"""
     matrix: NpFloat
+    """Reaction matrix of the full reaction system"""
     stability_matrix: NpFloat
+    """Stability matrix of the full reaction system"""
     _O2_index: NpInt
     _has_O2: NpBool
 
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = SpeciesCollection(species)
+    def __init__(self, gas: GasPhase, melt: MeltPhase):
+        self.gas = gas
+        self.melt = melt
+        self.species = SpeciesCollection(gas.species + melt.species)
+        self.formula_matrix = get_formula_matrix(self.species)
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
         # Could be an integer (but represented as a float) or np.nan
-        self._O2_index = np.nan_to_num(self.species.O2_index, nan=0).astype(int)
-        self._has_O2 = ~np.isnan(self.species.O2_index)
+        self._O2_index = np.nan_to_num(gas.O2_index, nan=0).astype(int)
+        self._has_O2 = ~np.isnan(gas.O2_index)
 
         self.output_to_logger()
+
+    @property
+    def gas_species_mask(self) -> NpBool:
+        """Gas mask for the full species space"""
+        n_gas: int = self.gas.number_species
+        n_total: int = self.species.number_species
+
+        mask = np.zeros(n_total, dtype=bool)
+        mask[:n_gas] = True
+
+        return mask
 
     @property
     def blocks(self) -> tuple[BaseReactionBlock, ...]:

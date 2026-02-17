@@ -23,14 +23,12 @@ from typing import Optional
 import equinox as eqx
 import jax.numpy as jnp
 from jaxmod.utils import get_batch_size
-from jaxtyping import Array, ArrayLike, Float, Int
+from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller.containers import (
-    ChemicalSpecies,
     FugacityConstraintSet,
     MassConstraintSet,
     Planet,
-    ReservoirSpecies,
     SolverParameters,
     SpeciesCollection,
 )
@@ -129,33 +127,3 @@ class Parameters(eqx.Module):
     def species(self) -> SpeciesCollection[SpeciesProtocol]:
         """Species collection"""
         return self.reaction_system.species
-
-    @property
-    def reaction_species_indices(self) -> Int[Array, " num_reaction_species"]:
-        """Reaction species indices"""
-        return jnp.asarray(self.reaction_system.reaction.reaction_species_indices)
-
-    @property
-    def reaction_species(self) -> SpeciesCollection[ChemicalSpecies]:
-        """Reaction species collection"""
-        return self.reaction_system.reaction.reaction_species
-
-    @property
-    def reaction_mask(self) -> ArrayLike:
-        """Reaction mask"""
-        return self.reaction_system.reaction.reaction_mask
-
-    @property
-    def dissolution_species_indices(self) -> Int[Array, " num_dissolution_species"]:
-        """Dissolution species indices"""
-        return jnp.asarray(self.reaction_system.dissolution.dissolution_species_indices)
-
-    @property
-    def dissolution_species(self) -> SpeciesCollection[ReservoirSpecies]:
-        """Dissolution species collection"""
-        return self.reaction_system.dissolution.dissolution_species
-
-    @property
-    def dissolution_mask(self) -> ArrayLike:
-        """Dissolution mask"""
-        return self.reaction_system.dissolution.dissolution_mask

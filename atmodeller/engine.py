@@ -62,9 +62,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
     reactions_mask: ArrayLike = parameters.reaction_system.active_reactions
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
-    stability_mask: ArrayLike = (
-        parameters.reaction_system.reaction.reaction_species.active_stability
-    )
+    stability_mask: ArrayLike = parameters.reaction_system.species.active_stability
 
     # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
@@ -98,7 +96,7 @@ def get_atmosphere_log_molar_mass(
         parameters, parameters.species.molar_masses
     )
     molar_mass: Float[Array, ""] = logsumexp(gas_log_number_moles, b=gas_molar_mass) - logsumexp(
-        gas_log_number_moles, b=parameters.species.gas_species_mask
+        gas_log_number_moles, b=parameters.reaction_system.gas_species_mask
     )
     # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
@@ -111,7 +109,7 @@ def get_log_element_moles(
     log_number_moles: Float[Array, " species"],
 ) -> Float[Array, " elements"]:
 
-    formula_matrix = jnp.asarray(parameters.species.formula_matrix)
+    formula_matrix = jnp.asarray(parameters.reaction_system.formula_matrix)
 
     # mask zero stoichiometries
     mask = formula_matrix > 0
@@ -150,7 +148,7 @@ def get_element_moles(
     species_moles: Array = jnp.nan_to_num(safe_exp(log_number_moles), nan=0.0)
 
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.species.formula_matrix
+        parameters.reaction_system.formula_matrix
     )
     element_moles: Float[Array, " elements"] = formula_matrix @ species_moles
 
@@ -170,7 +168,7 @@ def get_gas_species_data(
         An array with gas species data from `some_array` and other entries zeroed
     """
     gas_data: Shaped[Array, " species"] = (
-        jnp.asarray(some_array) * parameters.species.gas_species_mask
+        jnp.asarray(some_array) * parameters.reaction_system.gas_species_mask
     )
 
     return gas_data
@@ -188,7 +186,9 @@ def get_log_mole_fraction_in_gas(
     Returns:
         Log mole fraction in the gas
     """
-    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
+    gas_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.reaction_system.gas_species_mask
+    )
 
     # Represent mask in log space: True -> 0, False -> -inf
     log_mask: Float[Array, " species"] = jnp.where(gas_species_mask, 0.0, -jnp.inf)
@@ -218,7 +218,9 @@ def get_log_mass_fraction_in_melt(
     Returns:
         Log mass fraction in the melt
     """
-    melt_species_mask: Bool[Array, " species"] = jnp.array(parameters.dissolution_mask)
+    melt_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.reaction_system.species.reservoir_species_mask
+    )
     # jax.debug.print("melt_species_mask = {out}", out=melt_species_mask)
 
     # Represent mask in log space: True -> 0, False -> -inf
@@ -268,9 +270,13 @@ def get_log_activity(
     Returns:
         Log activity
     """
-    gas_species_mask: Bool[Array, " species"] = jnp.array(parameters.species.gas_species_mask)
+    gas_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.reaction_system.gas_species_mask
+    )
 
-    melt_species_mask: Bool[Array, " species"] = jnp.array(parameters.dissolution_mask)
+    melt_species_mask: Bool[Array, " species"] = jnp.array(
+        parameters.reaction_system.species.reservoir_species_mask
+    )
 
     log_mole_fraction_in_gas: Float[Array, " species"] = get_log_mole_fraction_in_gas(
         parameters, log_number_moles
@@ -346,7 +352,7 @@ def get_min_log_elemental_abundance_per_species(
         A vector of the minimum log elemental abundance for each species
     """
     formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.species.formula_matrix
+        parameters.reaction_system.formula_matrix
     )
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
     mask: Integer[Array, "elements species"] = (formula_matrix != 0).astype(jnp.int_)

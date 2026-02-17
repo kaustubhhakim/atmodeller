@@ -68,12 +68,12 @@ class Output:
     @property
     def condensed_species_mask(self) -> NpBool:  # 1-D
         """Mask of condensed species"""
-        return np.invert(self.species.gas_species_mask)
+        return np.invert(self.parameters.reaction_system.gas_species_mask)
 
     @property
     def gas_species_mask(self) -> NpBool:  # 1-D
         """Mask of gas species"""
-        return self.species.gas_species_mask
+        return self.parameters.reaction_system.gas_species_mask
 
     @property
     def molar_mass(self) -> NpFloat:  # 1-D

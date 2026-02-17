@@ -17,7 +17,7 @@
 """Classes"""
 
 import logging
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from typing import Literal, Optional
 
 import jax
@@ -26,17 +26,11 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import (
-    SolverParameters,
-    SpeciesCollection,
-)
-from atmodeller.interfaces import (
-    FugacityConstraintProtocol,
-    SpeciesProtocol,
-    ThermodynamicStateProtocol,
-)
+from atmodeller.containers import SolverParameters
+from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.parameters import Parameters
+from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
@@ -51,18 +45,17 @@ class EquilibriumModel:
     and retrieve the results.
 
     Args:
-        species: An iterable of species
+        gas: Gas phase
+        melt: Melt phase
     """
 
-    species: SpeciesCollection
     reaction_system: ReactionSystem
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
-    def __init__(self, species: Iterable[SpeciesProtocol]):
-        self.species = SpeciesCollection(species)
-        self.reaction_system = ReactionSystem(species)
+    def __init__(self, gas: GasPhase, melt: MeltPhase):
+        self.reaction_system = ReactionSystem(gas, melt)
 
     @property
     def output(self) -> Output:
@@ -89,7 +82,7 @@ class EquilibriumModel:
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
-            self.species.number_species,
+            self.reaction_system.species.number_species,
             parameters.batch_size,
         )
         # jax.debug.print("solution_array = {out}", out=solution_array)
