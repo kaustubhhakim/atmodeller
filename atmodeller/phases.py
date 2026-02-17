@@ -14,10 +14,31 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Phases"""
+"""Phase container classes for thermodynamic equilibrium calculations.
+
+This module defines high-level phase abstractions used in the equilibrium solver, including gas
+mixtures, silicate melts, solids, and pure unity-activity phases.
+
+Each phase is represented as a `SpeciesCollection` of thermodynamic species (formula + state of
+aggregation). Species are constructed from their Hill formulas and assigned an aggregation state
+consistent with the JANAF/NASA convention:
+
+    - "g" : gas
+    - "l" : liquid
+    - "s" : solid
+
+These phase classes provide a structured interface for grouping species by thermodynamic role (gas,
+melt, solid, pure phase) while keeping the underlying species-level thermodynamic data separate.
+
+They are used by the equilibrium solver to:
+    - distinguish gas and condensed phases,
+    - apply appropriate activity conventions,
+    - track phase-specific properties (e.g., O2 index in the gas phase),
+    - manage multicomponent phase assemblages.
+"""
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import TypeVar
 
 import numpy as np
@@ -29,7 +50,25 @@ from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
+
 TSpecies = TypeVar("TSpecies", bound=SpeciesProtocol)
+
+
+def _build_species_list(
+    species: str | Iterable[str], factory: Callable[[str], ChemicalSpecies]
+) -> list[ChemicalSpecies]:
+    """Normalize input and build a species list using a factory."""
+
+    if isinstance(species, str):
+        species = [species]
+
+    species_list: list[ChemicalSpecies] = []
+
+    for species_ in species:
+        hill_formula: str = Formula(species_).formula
+        species_list.append(factory(hill_formula))
+
+    return species_list
 
 
 class GasPhase(SpeciesCollection[ChemicalSpecies]):
@@ -46,23 +85,18 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
         )
 
     @classmethod
-    def create(cls, species: Iterable[str]) -> "GasPhase":
+    def create(cls, species: str | Iterable[str]) -> "GasPhase":
         """Creates an instance
 
         Args:
-            species: An iterable of gas species names
+            species: A single gas species name or iterable of names
 
         Returns
             An instance
         """
-        species_list: list[ChemicalSpecies] = []
-
-        for species_ in species:
-            hill_formula = Formula(species_).formula
-            species_to_add: ChemicalSpecies = ChemicalSpecies.create_gas(
-                hill_formula, state=GAS_STATE
-            )
-            species_list.append(species_to_add)
+        species_list = _build_species_list(
+            species, lambda hill: ChemicalSpecies.create_gas(hill, state=GAS_STATE)
+        )
 
         return cls(species_list)
 
@@ -93,23 +127,18 @@ class MeltPhase(SpeciesCollection[SpeciesProtocol]):
         )
 
     @classmethod
-    def create(cls, species: Iterable[str]) -> "MeltPhase":
+    def create(cls, species: str | Iterable[str]) -> "MeltPhase":
         """Creates an instance
 
         Args:
-            species: An iterable of melt species names
+            species: A single melt species name or iterable of names
 
         Returns
             An instance
         """
-        species_list: list[ChemicalSpecies] = []
-
-        for species_ in species:
-            hill_formula = Formula(species_).formula
-            species_to_add: ChemicalSpecies = ChemicalSpecies.create_condensed(
-                hill_formula, state=LIQUID_STATE
-            )
-            species_list.append(species_to_add)
+        species_list = _build_species_list(
+            species, lambda hill: ChemicalSpecies.create_condensed(hill, state=LIQUID_STATE)
+        )
 
         return cls(species_list)
 
@@ -118,8 +147,26 @@ class SolidPhase(SpeciesCollection[ChemicalSpecies]):
     """Multicomponent silicate solid"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
-        del species
-        raise NotImplementedError("SolidPhase is not implemented yet")
+        super().__init__(species)
+        logger.info(
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+        )
+
+    @classmethod
+    def create(cls, species: str | Iterable[str]) -> "SolidPhase":
+        """Creates an instance
+
+        Args:
+            species: A single solid species name or iterable of names
+
+        Returns
+            An instance
+        """
+        species_list = _build_species_list(
+            species, lambda hill: ChemicalSpecies.create_condensed(hill, state=SOLID_STATE)
+        )
+
+        return cls(species_list)
 
 
 class PurePhase(SpeciesCollection[ChemicalSpecies]):
@@ -137,12 +184,13 @@ class PurePhase(SpeciesCollection[ChemicalSpecies]):
 
         Args:
             species: Species
-            state: State of aggregation. Defaults to SOLID_STATE.
+            state: State of aggregation. Defaults to :const:`~atmodeller.constants.SOLID_STATE`.
 
         Returns
             An instance
         """
-        hill_formula = Formula(species).formula
-        species_: ChemicalSpecies = ChemicalSpecies.create_condensed(hill_formula, state=state)
+        species_list = _build_species_list(
+            species, lambda hill: ChemicalSpecies.create_condensed(hill, state=state)
+        )
 
-        return cls((species_,))
+        return cls(species_list)
