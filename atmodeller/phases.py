@@ -33,7 +33,7 @@ TSpecies = TypeVar("TSpecies", bound=SpeciesProtocol)
 
 
 class GasPhase(SpeciesCollection[ChemicalSpecies]):
-    """Gas phase"""
+    """Multicomponent gas mixture"""
 
     O2_index: NpFloat
     """Index of O2 or np.nan if not present"""
@@ -84,9 +84,9 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
 
 
 class MeltPhase(SpeciesCollection[SpeciesProtocol]):
-    """Melt phase
+    """Multicomponent silicate melt (with optionally dissolved volatiles)
 
-    The melt phase can contain both condensed (liquid) and dissolved species.
+    The melt phase can contain both liquid and dissolved species.
     """
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
@@ -97,8 +97,18 @@ class MeltPhase(SpeciesCollection[SpeciesProtocol]):
 
 
 class SolidPhase(SpeciesCollection[ChemicalSpecies]):
-    """Solid phase"""
+    """Multicomponent silicate solid"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
         del species
         raise NotImplementedError("SolidPhase is not implemented yet")
+
+
+class CondensatePhase(SpeciesCollection[ChemicalSpecies]):
+    """Pure, unity-activity phases"""
+
+    def __init__(self, species: Iterable[ChemicalSpecies]):
+        super().__init__(species)
+        logger.info(
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+        )
