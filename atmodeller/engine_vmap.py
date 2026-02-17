@@ -1,19 +1,7 @@
+# SPDX-FileCopyrightText: 2024 Dan J. Bower <dbower@eaps.ethz.ch>
 #
-# Copyright 2024 Dan J. Bower
-#
-# This file is part of Atmodeller.
-#
-# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
-# General Public License as published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
-# see <https://www.gnu.org/licenses/>.
-#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Vmapped wrappers for core engine functions.
 
 This module provides a high-level container (:class:`VmappedFunctions`) that precompiles
@@ -31,18 +19,18 @@ from dataclasses import dataclass
 import equinox as eqx
 from jaxtyping import Array
 
-from atmodeller.containers import Parameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_element_moles,
-    get_element_moles_in_melt,
+    # get_element_moles_in_melt,
     get_log_activity,
     get_reactions_only_mask,
-    get_species_moles_in_melt,
-    get_species_ppmw_in_melt,
+    # get_species_moles_in_melt,
+    # get_species_ppmw_in_melt,
     get_total_pressure,
     objective_function,
 )
+from atmodeller.parameters import Parameters
 from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
 
 
@@ -97,10 +85,10 @@ class VmappedFunctions:
             in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
-        self._get_element_moles_in_melt = eqx.filter_vmap(
-            get_element_moles_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
+        # self._get_element_moles_in_melt = eqx.filter_vmap(
+        #     get_element_moles_in_melt,
+        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+        # )
 
         self._get_log_activity = eqx.filter_vmap(
             get_log_activity,
@@ -112,15 +100,15 @@ class VmappedFunctions:
             in_axes=(parameters_vmap_axes,),
         )
 
-        self._get_species_moles_in_melt = eqx.filter_vmap(
-            get_species_moles_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
+        # self._get_species_moles_in_melt = eqx.filter_vmap(
+        #     get_species_moles_in_melt,
+        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+        # )
 
-        self._get_species_ppmw_in_melt = eqx.filter_vmap(
-            get_species_ppmw_in_melt,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
+        # self._get_species_ppmw_in_melt = eqx.filter_vmap(
+        #     get_species_ppmw_in_melt,
+        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+        # )
 
         self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,

@@ -1,20 +1,26 @@
+# SPDX-FileCopyrightText: 2024 Dan J. Bower <dbower@eaps.ethz.ch>
 #
-# Copyright 2024 Dan J. Bower
-#
-# This file is part of Atmodeller.
-#
-# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
-# General Public License as published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
-# see <https://www.gnu.org/licenses/>.
-#
-"""Reactions"""
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Reaction network API.
+
+Defines reaction network components used to assemble the full thermodynamic equilibrium system.
+
+This module provides:
+
+- Construction of element-species formula matrices,
+- Core chemical reaction networks derived from elemental constraints,
+- Dissolution reaction networks coupling gas and condensed species,
+- Aggregation of reaction blocks into a unified :class:`ReactionSystem`,
+- Evaluation of equilibrium constants and nonlinear residuals.
+
+The reaction system combines stoichiometric matrices, thermodynamic data, and phase-specific
+constraints into a form suitable for JAX-compiled nonlinear solvers. Both core reactions and
+dissolution reactions are represented in a unified matrix form with associated stability handling.
+
+Primary entry point:
+    :class:`ReactionSystem`
+"""
 
 import logging
 import pprint
@@ -31,7 +37,7 @@ from jaxtyping import Array, Float, Integer
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.phases import GasPhase, MeltPhase, PurePhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.type_aliases import NpBool, NpFloat, NpInt
 from atmodeller.utilities import get_reaction_dictionary
@@ -354,6 +360,8 @@ class ReactionSystem(BaseReactionBlock):
     """Gas"""
     melt: MeltPhase
     """Melt"""
+    solid: SolidPhase
+    """Solid"""
     condensates: tuple[PurePhase, ...]
     """Pure condensates"""
     formula_matrix: NpInt
@@ -369,14 +377,24 @@ class ReactionSystem(BaseReactionBlock):
     _O2_index: NpInt
     _has_O2: NpBool
 
-    def __init__(self, gas: GasPhase, *, melt: MeltPhase, condensates: Iterable[PurePhase]):
+    def __init__(
+        self,
+        gas: GasPhase,
+        *,
+        melt: MeltPhase,
+        solid: SolidPhase,
+        condensates: Iterable[PurePhase],
+    ):
         self.gas = gas
         self.melt = melt
+        self.solid = solid
         self.condensates = tuple(condensates)
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
             species_ for condensate in condensates for species_ in condensate.species
         )
-        self.species = SpeciesCollection(gas.species + melt.species + condensate_species)
+        self.species = SpeciesCollection(
+            gas.species + melt.species + solid.species + condensate_species
+        )
         self.formula_matrix = get_formula_matrix(self.species)
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)

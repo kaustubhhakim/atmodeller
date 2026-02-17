@@ -1,20 +1,28 @@
+# SPDX-FileCopyrightText: 2024 Dan J. Bower <dbower@eaps.ethz.ch>
 #
-# Copyright 2024 Dan J. Bower
-#
-# This file is part of Atmodeller.
-#
-# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
-# General Public License as published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
-# see <https://www.gnu.org/licenses/>.
-#
-"""Classes"""
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Equilibrium model API.
+
+Provides the :class:`EquilibriumModel`, the primary entry point for constructing and solving t
+hermodynamic equilibrium problems.
+
+This module coordinates:
+
+- Phase definitions (gas, melt, solid, pure condensates),
+- Reaction system construction,
+- Nonlinear solver selection and execution (basic or robust),
+- Batched solution handling via JAX,
+- Post-processed results through :class:`Output`.
+
+Helper utilities are included to broadcast and standardize initial conditions for batched solves.
+
+Typical usage:
+
+    model = EquilibriumModel(gas, melt=..., solid=..., condensates=...)
+    model.solve(state=...)
+    results = model.output
+"""
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
@@ -30,7 +38,7 @@ from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, MeltPhase, PurePhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
@@ -46,8 +54,9 @@ class EquilibriumModel:
 
     Args:
         gas: Gas phase
-        melt: Melt phase
-        condensates: Pure condensate phases
+        melt: Melt phase. Defaults to an empty melt phase if not provided.
+        solid: Solid phase. Defaults to an empty solid phase if not provided.
+        condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
     """
 
     reaction_system: ReactionSystem
@@ -60,13 +69,16 @@ class EquilibriumModel:
         gas: GasPhase,
         *,
         melt: Optional[MeltPhase] = None,
+        solid: Optional[SolidPhase] = None,
         condensates: Optional[Iterable[PurePhase]] = None,
     ):
         if melt is None:
             melt = MeltPhase(())
+        if solid is None:
+            solid = SolidPhase(())
         if condensates is None:
             condensates = ()
-        self.reaction_system = ReactionSystem(gas, melt=melt, condensates=condensates)
+        self.reaction_system = ReactionSystem(gas, melt=melt, solid=solid, condensates=condensates)
 
     @property
     def output(self) -> Output:
