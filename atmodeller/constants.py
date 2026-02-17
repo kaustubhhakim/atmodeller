@@ -24,8 +24,8 @@ LIQUID_STATE: str = "l"
 """Suffix to identify liquids as per JANAF convention for the state of aggregation"""
 SOLID_STATE: str = "s"
 """Suffix to identify solids as per JANAF convention for the state of aggregation"""
-DISSOLVED_STATE: str = "di"
-"""Suffix to identify dissolved species"""
+DISSOLVED_STATE: str = "d"
+"""Suffix to identify dissolved species for output purposes"""
 
 # Initial solution guess
 INITIAL_LOG_NUMBER_MOLES: float = 50.0

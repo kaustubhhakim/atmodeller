@@ -83,7 +83,7 @@ class ChemicalSpecies(eqx.Module):
             formula: Formula
             state: State of aggregation, as typically defined by JANAF
             activity: Activity
-            solve_for_stability. Solve for stability.
+            solve_for_stability: Solve for stability
             number_solution: Number of solution quantities
 
         Returns:
@@ -119,7 +119,7 @@ class ChemicalSpecies(eqx.Module):
             state: State of aggregation as defined by JANAF. Defaults to
                 :const:`~atmodeller.constants.SOLID_STATE`.
             activity: Activity. Defaults to unity activity.
-            solve_for_stability. Solve for stability. Defaults to ``True``.
+            solve_for_stability: Solve for stability. Defaults to ``True``.
 
         Returns:
             A condensed species
@@ -147,7 +147,7 @@ class ChemicalSpecies(eqx.Module):
             state: State of aggregation as defined by JANAF. Defaults to
                 :const:`~atmodeller.constants.GAS_STATE`.
             activity: Activity. Defaults to an ideal gas.
-            solve_for_stability. Solve for stability. Defaults to ``False``.
+            solve_for_stability: Solve for stability. Defaults to ``False``.
 
         Returns:
             A gas species
@@ -199,7 +199,6 @@ class ReservoirSpecies(eqx.Module):
         cls,
         formula: str,
         *,
-        state=DISSOLVED_STATE,
         activity: ActivityProtocol = CondensateActivity(),
         solubility: Optional[SolubilityProtocol] = None,
     ) -> "ReservoirSpecies":
@@ -207,15 +206,13 @@ class ReservoirSpecies(eqx.Module):
 
         Args:
             formula: Formula
-            state: State of aggregation. Defaults to
-                :const:`~atmodeller.constants.DISSOLVED_STATE`.
             activity: Activity. Defaults to unity activity.
             solubility: Solubility. Defaults to no solubility.
 
         Returns:
             A dissolved species
         """
-        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state)
+        species_data: ChemicalSpeciesData = ChemicalSpeciesData(formula, state=DISSOLVED_STATE)
 
         if solubility is None:
             solubility = NoSolubility()
@@ -249,7 +246,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     reservoir_species_mask: NpBool
     """Mask for reservoir species in the collection"""
     number_solution: int
-    """Number of solution quantities that cannot depend on traced quantities"""
+    """Number of solution quantities, whch cannot depend on traced quantities"""
 
     def __init__(self, species: Iterable[TSpecies_co]):
         self.species = tuple(species)
@@ -274,7 +271,9 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
 
     @property
     def element_molar_masses(self) -> NpFloat:
+        """Element molar masses for the unique elements in the species"""
         element_molar_masses: list[float] = []
+
         for element_ in self.unique_elements:
             mformula: Formula = Formula(element_)
             molar_mass: float = mformula.mass * unit_conversion.g_to_kg

@@ -4,8 +4,8 @@
 
 """Equilibrium model API.
 
-Provides the :class:`EquilibriumModel`, the primary entry point for constructing and solving t
-hermodynamic equilibrium problems.
+Provides the :class:`EquilibriumModel`, the primary entry point for constructing and solving
+thermodynamic equilibrium problems.
 
 This module coordinates:
 

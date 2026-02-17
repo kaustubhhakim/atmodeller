@@ -22,13 +22,14 @@ class ChemicalSpeciesData(eqx.Module):
 
     Args:
         formula: Formula
-        state: State of aggregation, typically as defined by JANAF
+        state: State of aggregation, typically follows JANAF convention: 'g' for gas, 'l' for
+            liquid, 's' for solid.
     """
 
     formula: str
     """Formula"""
     state: str
-    """State of aggregation"""
+    """State of aggregation. Defaults to an empty string."""
     composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
     hill_formula: str
@@ -36,7 +37,7 @@ class ChemicalSpeciesData(eqx.Module):
     molar_mass: float = eqx.field(converter=float)
     """Molar mass"""
 
-    def __init__(self, formula: str, state: str):
+    def __init__(self, formula: str, state: str = ""):
         self.formula = formula
         self.state = state
         mformula: Formula = Formula(self.formula)

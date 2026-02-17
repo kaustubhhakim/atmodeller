@@ -7,9 +7,17 @@
 import logging
 from collections.abc import Mapping
 
+from jaxtyping import ArrayLike
+
 from atmodeller import debug_logger
-from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.classes import EquilibriumModel
+from atmodeller.containers import Planet, ReservoirSpecies
+from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.output_core import Output
+from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
+from atmodeller.thermodata import IronWustiteBuffer
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.WARNING)
@@ -23,55 +31,54 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-# species: SpeciesCollection = SpeciesCollection.create(
-#     ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
-# )
-# gas_CHO_model: EquilibriumModel = EquilibriumModel(species)
+gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
+gas_CHO_model: EquilibriumModel = EquilibriumModel(gas)
 
 
-# def test_H_and_C(helper) -> None:
-#     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
+def test_H_and_C(helper) -> None:
+    """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
-#     H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-#         "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
-#     )
-#     H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-#     O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-#     CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
-#     CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
-#         "CO2", solubility=solubility_models["CO2_basalt_dixon95"]
-#     )
+    gas: GasPhase = GasPhase.create(("H2O", "H2", "O2", "CO", "CO2"))
 
-#     species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g, CO_g, CO2_g))
-#     planet: Planet = Planet()
-#     model: EquilibriumModel = EquilibriumModel(species)
+    H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
+    )
+    CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+        "CO2", solubility=solubility_models["CO2_basalt_dixon95"]
+    )
+    melt: MeltPhase = MeltPhase((H2O_d, CO2_d))
 
-#     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    planet: Planet = Planet()
+    model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
 
-#     oceans: float = 1
-#     ch_ratio: float = 1
-#     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
-#     c_kg: ArrayLike = ch_ratio * h_kg
-#     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
-#     model.solve(
-#         state=planet,
-#         fugacity_constraints=fugacity_constraints,
-#         mass_constraints=mass_constraints,
-#         solver="basic",
-#     )
-#     output: Output = model.output
-#     solution: dict[str, ArrayLike] = output.quick_look()
+    oceans: float = 1
+    ch_ratio: float = 1
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = ch_ratio * h_kg
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-#     target: dict[str, float] = {
-#         "CO2_g": 13.43793686555727,
-#         "CO_g": 59.65835224848439,
-#         "H2O_g": 0.2582458752325180,
-#         "H2_g": 0.2502809714412906,
-#         "O2_g": 8.838513516896038e-08,
-#     }
+    model.solve(
+        state=planet,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+        solver="basic",
+    )
+    output: Output = model.output
+    solution: dict[str, ArrayLike] = output.quick_look()
 
-#     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    print(solution)
+
+    target: dict[str, float] = {
+        "CO2_g": 13.43793686555727,
+        "CO_g": 59.65835224848439,
+        "H2O_g": 0.2582458752325180,
+        "H2_g": 0.2502809714412906,
+        "O2_g": 8.838513516896038e-08,
+    }
+
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 # @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
