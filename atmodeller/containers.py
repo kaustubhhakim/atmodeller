@@ -245,7 +245,7 @@ class ReservoirSpecies(eqx.Module):
 
 
 class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
-    """Container of species and metadata."""
+    """Container of species and metadata"""
 
     species: tuple[TSpecies_co, ...]
     """Species in the collection"""
@@ -279,10 +279,8 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         # Ensure number_solution is static
         self.number_solution = sum([species.number_solution for species in self])
 
-        logger.info(
-            f"Creating {self.__class__.__name__} with species: {
-                ', '.join(str(species) for species in self)
-            }"
+        logger.debug(
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
         )
 
     @property

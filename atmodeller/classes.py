@@ -54,7 +54,9 @@ class EquilibriumModel:
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
-    def __init__(self, gas: GasPhase, melt: MeltPhase):
+    def __init__(self, gas: GasPhase, melt: Optional[MeltPhase] = None):
+        if melt is None:
+            melt = MeltPhase(())
         self.reaction_system = ReactionSystem(gas, melt)
 
     @property

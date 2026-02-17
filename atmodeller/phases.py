@@ -41,6 +41,9 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
     def __init__(self, species: Iterable[ChemicalSpecies]):
         super().__init__(species)
         self.O2_index = self.get_O2_index()
+        logger.info(
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+        )
 
     @classmethod
     def create(cls, species: Iterable[str]) -> "GasPhase":
@@ -88,6 +91,9 @@ class MeltPhase(SpeciesCollection[SpeciesProtocol]):
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         super().__init__(species)
+        logger.info(
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+        )
 
 
 class SolidPhase(SpeciesCollection[ChemicalSpecies]):

@@ -24,15 +24,10 @@ from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import (
-    ChemicalSpecies,
-    FixedFugacityConstraint,
-    Planet,
-    ReservoirSpecies,
-    SpeciesCollection,
-)
+from atmodeller.containers import FixedFugacityConstraint, Planet, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output import Output
+from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpFloat
@@ -50,15 +45,12 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
-H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+gas: GasPhase = GasPhase.create(("H2O", "H2", "O2"))
 H2O_di: ReservoirSpecies = ReservoirSpecies.create_dissolved(
     "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
 )
-species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g, H2O_di))
-
-gas_HO_model: EquilibriumModel = EquilibriumModel(species)
+melt: MeltPhase = MeltPhase((H2O_di,))
+gas_HO_model: EquilibriumModel = EquilibriumModel(gas, melt)
 
 
 def test_version():
@@ -69,9 +61,10 @@ def test_version():
 def test_H2O(helper) -> None:
     """Tests a single species (H2O)."""
 
-    species: SpeciesCollection = SpeciesCollection((H2O_g, H2O_di))
+    gas: GasPhase = GasPhase.create(("H2O",))
+    melt: MeltPhase = MeltPhase((H2O_di,))
     planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(species)
+    model: EquilibriumModel = EquilibriumModel(gas, melt)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -83,16 +76,17 @@ def test_H2O(helper) -> None:
 
     target: dict[str, float] = {"H2O_g": 1.0312913336898137}
 
+    # output.to_excel("test_H2O")
+
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_O(helper) -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
 
-    species: SpeciesCollection = SpeciesCollection.create(("H2_g", "H2O_g", "O2_g"))
-
+    gas: GasPhase = GasPhase.create(("H2", "H2O", "O2"))
     planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(species)
+    model: EquilibriumModel = EquilibriumModel(gas)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -118,9 +112,7 @@ def test_H_fO2(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility."""
 
     planet: Planet = Planet()
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(),
-    }
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
@@ -134,13 +126,13 @@ def test_H_fO2(helper) -> None:
     output: Output = gas_HO_model.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
-    print(solution)
-
     target: dict[str, float] = {
         "H2O_g": 0.2570800742364775,
         "H2_g": 0.2491511264610601,
         "O2_g": 8.838513516896038e-08,
     }
+
+    # output.to_excel("test_H_fO2")
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
@@ -168,6 +160,8 @@ def test_H_fO2_fH2(helper) -> None:
         "H2_g": np.array([1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]),
         "O2_g": np.array([8.838513516896060e-09, 8.838513516896038e-08, 8.838513516896018e-07]),
     }
+
+    # output.to_excel("test_H_fO2_fH2")
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
@@ -223,6 +217,8 @@ def test_H_fO2_batch_temperature(helper) -> None:
         ),
     }
 
+    # output.to_excel("test_H_fO2_batch_temperature")
+
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
@@ -277,6 +273,8 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
         ),
     }
 
+    # output.to_excel("test_H_fO2_batch_fO2_shift")
+
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
@@ -307,5 +305,7 @@ def test_H_fO2_batch_H_mass(helper) -> None:
         "H2_g": np.array([2.491511264610584e-01, 2.351283467393216e01, 1.560621626756960e03]),
         "O2_g": np.array([8.838513516896038e-08, 8.838513516896038e-08, 8.838513516896102e-08]),
     }
+
+    # output.to_excel("test_H_fO2_batch_H_mass")
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
