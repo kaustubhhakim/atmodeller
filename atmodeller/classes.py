@@ -17,7 +17,7 @@
 """Classes"""
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import Literal, Optional
 
 import jax
@@ -30,7 +30,7 @@ from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, MeltPhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
@@ -47,6 +47,7 @@ class EquilibriumModel:
     Args:
         gas: Gas phase
         melt: Melt phase
+        condensates: Pure condensate phases
     """
 
     reaction_system: ReactionSystem
@@ -54,10 +55,18 @@ class EquilibriumModel:
     _output: Optional[Output] = None
     _selected_solver: Literal["basic", "robust"] = "basic"
 
-    def __init__(self, gas: GasPhase, melt: Optional[MeltPhase] = None):
+    def __init__(
+        self,
+        gas: GasPhase,
+        *,
+        melt: Optional[MeltPhase] = None,
+        condensates: Optional[Iterable[PurePhase]] = None,
+    ):
         if melt is None:
             melt = MeltPhase(())
-        self.reaction_system = ReactionSystem(gas, melt)
+        if condensates is None:
+            condensates = ()
+        self.reaction_system = ReactionSystem(gas, melt=melt, condensates=condensates)
 
     @property
     def output(self) -> Output:

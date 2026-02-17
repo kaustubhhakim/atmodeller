@@ -23,7 +23,7 @@ from typing import TypeVar
 import numpy as np
 from molmass import Formula
 
-from atmodeller.constants import GAS_STATE
+from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.type_aliases import NpFloat
@@ -84,16 +84,34 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
 
 
 class MeltPhase(SpeciesCollection[SpeciesProtocol]):
-    """Multicomponent silicate melt (with optionally dissolved volatiles)
-
-    The melt phase can contain both liquid and dissolved species.
-    """
+    """Multicomponent silicate melt with optionally dissolved volatiles"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         super().__init__(species)
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
         )
+
+    @classmethod
+    def create(cls, species: Iterable[str]) -> "MeltPhase":
+        """Creates an instance
+
+        Args:
+            species: An iterable of melt species names
+
+        Returns
+            An instance
+        """
+        species_list: list[ChemicalSpecies] = []
+
+        for species_ in species:
+            hill_formula = Formula(species_).formula
+            species_to_add: ChemicalSpecies = ChemicalSpecies.create_condensed(
+                hill_formula, state=LIQUID_STATE
+            )
+            species_list.append(species_to_add)
+
+        return cls(species_list)
 
 
 class SolidPhase(SpeciesCollection[ChemicalSpecies]):
@@ -104,7 +122,7 @@ class SolidPhase(SpeciesCollection[ChemicalSpecies]):
         raise NotImplementedError("SolidPhase is not implemented yet")
 
 
-class CondensatePhase(SpeciesCollection[ChemicalSpecies]):
+class PurePhase(SpeciesCollection[ChemicalSpecies]):
     """Pure, unity-activity phases"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
@@ -112,3 +130,19 @@ class CondensatePhase(SpeciesCollection[ChemicalSpecies]):
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
         )
+
+    @classmethod
+    def create(cls, species: str, state: str = SOLID_STATE) -> "PurePhase":
+        """Creates an instance
+
+        Args:
+            species: Species
+            state: State of aggregation. Defaults to SOLID_STATE.
+
+        Returns
+            An instance
+        """
+        hill_formula = Formula(species).formula
+        species_: ChemicalSpecies = ChemicalSpecies.create_condensed(hill_formula, state=state)
+
+        return cls((species_,))

@@ -50,7 +50,7 @@ H2O_di: ReservoirSpecies = ReservoirSpecies.create_dissolved(
     "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
 )
 melt: MeltPhase = MeltPhase((H2O_di,))
-gas_HO_model: EquilibriumModel = EquilibriumModel(gas, melt)
+gas_HO_model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
 
 
 def test_version():
@@ -64,7 +64,7 @@ def test_H2O(helper) -> None:
     gas: GasPhase = GasPhase.create(("H2O",))
     melt: MeltPhase = MeltPhase((H2O_di,))
     planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(gas, melt)
+    model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)

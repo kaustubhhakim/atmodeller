@@ -18,7 +18,17 @@
 
 import logging
 
+import numpy as np
+from jaxtyping import ArrayLike
+
 from atmodeller import debug_logger
+from atmodeller.classes import EquilibriumModel
+from atmodeller.containers import Planet
+from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.output_core import Output
+from atmodeller.phases import GasPhase, PurePhase
+from atmodeller.thermodata import IronWustiteBuffer
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.WARNING)
@@ -30,79 +40,79 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
 
-# species: SpeciesCollection = SpeciesCollection.create(
-#     ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g", "C_cd")
-# )
-# CHO_model: EquilibriumModel = EquilibriumModel(species)
+gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
+graphite: PurePhase = PurePhase.create("C", state="cd")
+
+CHO_model: EquilibriumModel = EquilibriumModel(gas, condensates=(graphite,))
 
 
-# def test_graphite_stable(helper) -> None:
-#     """Tests graphite stable with around 50% condensed C mass fraction"""
+def test_graphite_stable(helper) -> None:
+    """Tests graphite stable with around 50% condensed C mass fraction"""
 
-#     planet: Planet = Planet(temperature=873)
-#     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-#         "O2_g": IronWustiteBuffer(np.nan)
-#     }
-#     oceans: ArrayLike = 1
-#     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
-#     c_kg: ArrayLike = 5 * h_kg
-#     o_kg: ArrayLike = 2.73159e19
-#     mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
+    planet: Planet = Planet(temperature=873)
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        "O2_g": IronWustiteBuffer(np.nan)
+    }
+    oceans: ArrayLike = 1
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = 5 * h_kg
+    o_kg: ArrayLike = 2.73159e19
+    mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-#     CHO_model.solve(
-#         state=planet,
-#         fugacity_constraints=fugacity_constraints,
-#         mass_constraints=mass_constraints,
-#         solver="basic",
-#     )
-#     output: Output = CHO_model.output
-#     solution: dict[str, ArrayLike] = output.quick_look()
+    CHO_model.solve(
+        state=planet,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+        solver="basic",
+    )
+    output: Output = CHO_model.output  # noqa: F821
+    solution: dict[str, ArrayLike] = output.quick_look()
 
-#     factsage_result: dict[str, float] = {
-#         "O2_g": 1.27e-25,
-#         "H2_g": 14.564,
-#         "CO_g": 0.07276,
-#         "H2O_g": 4.527,
-#         "CO2_g": 0.061195,
-#         "CH4_g": 96.74,
-#         "C_cd_activity": 1.0,
-#         "mass_C_cd": 3.54162e20,
-#     }
+    factsage_result: dict[str, float] = {
+        "O2_g": 1.27e-25,
+        "H2_g": 14.564,
+        "CO_g": 0.07276,
+        "H2O_g": 4.527,
+        "CO2_g": 0.061195,
+        "CH4_g": 96.74,
+        "C_cd_activity": 1.0,
+        "mass_C_cd": 3.54162e20,
+    }
 
-#     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# def test_graphite_unstable(helper) -> None:
-#     """Tests C-H-O system at IW+0.5 with graphite unstable
+def test_graphite_unstable(helper) -> None:
+    """Tests C-H-O system at IW+0.5 with graphite unstable
 
-#     Similar to :cite:p:`BHS22{Table E, row 2}`
-#     """
+    Similar to :cite:p:`BHS22{Table E, row 2}`
+    """
 
-#     planet: Planet = Planet(temperature=1400)
-#     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
-#     oceans: ArrayLike = 3
-#     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
-#     c_kg: ArrayLike = 1 * h_kg
-#     mass_constraints = {"C": c_kg, "H": h_kg}
+    planet: Planet = Planet(temperature=1400)
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
+    oceans: ArrayLike = 3
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = 1 * h_kg
+    mass_constraints = {"C": c_kg, "H": h_kg}
 
-#     CHO_model.solve(
-#         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
-#     )
-#     output: Output = CHO_model.output
-#     solution: dict[str, ArrayLike] = output.quick_look()
+    CHO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    )
+    output: Output = CHO_model.output
+    solution: dict[str, ArrayLike] = output.quick_look()
 
-#     factsage_result: dict[str, float] = {
-#         "O2_g": 4.11e-13,
-#         "H2_g": 236.98,
-#         "CO_g": 46.42,
-#         "H2O_g": 337.16,
-#         "CO2_g": 30.88,
-#         "CH4_g": 28.66,
-#         "C_cd_activity": 0.12202,
-#         "mass_C_cd": 0.0,
-#     }
+    factsage_result: dict[str, float] = {
+        "O2_g": 4.11e-13,
+        "H2_g": 236.98,
+        "CO_g": 46.42,
+        "H2O_g": 337.16,
+        "CO2_g": 30.88,
+        "CH4_g": 28.66,
+        "C_cd_activity": 0.12202,
+        "mass_C_cd": 0.0,
+    }
 
-#     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 # def test_water_stable(helper) -> None:

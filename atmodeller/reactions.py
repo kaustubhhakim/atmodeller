@@ -29,9 +29,9 @@ from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, Float, Integer
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
-from atmodeller.containers import SpeciesCollection
+from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.phases import GasPhase, MeltPhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.type_aliases import NpBool, NpFloat, NpInt
 from atmodeller.utilities import get_reaction_dictionary
@@ -354,6 +354,8 @@ class ReactionSystem(BaseReactionBlock):
     """Gas"""
     melt: MeltPhase
     """Melt"""
+    condensates: tuple[PurePhase, ...]
+    """Pure condensates"""
     formula_matrix: NpInt
     """Formula matrix of the full species collection"""
     reaction: ReactionNetwork
@@ -367,10 +369,14 @@ class ReactionSystem(BaseReactionBlock):
     _O2_index: NpInt
     _has_O2: NpBool
 
-    def __init__(self, gas: GasPhase, melt: MeltPhase):
+    def __init__(self, gas: GasPhase, *, melt: MeltPhase, condensates: Iterable[PurePhase]):
         self.gas = gas
         self.melt = melt
-        self.species = SpeciesCollection(gas.species + melt.species)
+        self.condensates = tuple(condensates)
+        condensate_species: tuple[ChemicalSpecies, ...] = tuple(
+            species_ for condensate in condensates for species_ in condensate.species
+        )
+        self.species = SpeciesCollection(gas.species + melt.species + condensate_species)
         self.formula_matrix = get_formula_matrix(self.species)
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)
