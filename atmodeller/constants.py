@@ -36,10 +36,6 @@ LIQUID_STATE: str = "l"
 """Suffix to identify liquids as per JANAF convention for the state of aggregation"""
 SOLID_STATE: str = "s"
 """Suffix to identify solids as per JANAF convention for the state of aggregation"""
-
-# TODO: remove condensed state. What to do about dissolved state?
-CONDENSED_STATE: str = "cd"
-"""Suffix to identify condensed phases as per JANAF convention for the state of aggregation"""
 DISSOLVED_STATE: str = "di"
 """Suffix to identify dissolved species"""
 

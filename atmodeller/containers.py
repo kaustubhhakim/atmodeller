@@ -33,13 +33,13 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
-    CONDENSED_STATE,
     DISSOLVED_STATE,
     GAS_STATE,
     LOG_NUMBER_MOLES_LOWER,
     LOG_NUMBER_MOLES_UPPER,
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
+    SOLID_STATE,
     TAU,
 )
 from atmodeller.eos.core import IdealGas
@@ -120,7 +120,7 @@ class ChemicalSpecies(eqx.Module):
         cls,
         formula: str,
         *,
-        state: str = CONDENSED_STATE,
+        state: str = SOLID_STATE,
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
     ) -> "ChemicalSpecies":
@@ -129,7 +129,7 @@ class ChemicalSpecies(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to
-                :const:`~atmodeller.constants.CONDENSED_STATE`
+                :const:`~atmodeller.constants.SOLID_STATE`.
             activity: Activity. Defaults to unity activity.
             solve_for_stability. Solve for stability. Defaults to ``True``.
 
@@ -157,7 +157,7 @@ class ChemicalSpecies(eqx.Module):
         Args:
             formula: Formula
             state: State of aggregation as defined by JANAF. Defaults to
-                :const:`~atmodeller.constants.GAS_STATE`
+                :const:`~atmodeller.constants.GAS_STATE`.
             activity: Activity. Defaults to an ideal gas.
             solve_for_stability. Solve for stability. Defaults to ``False``.
 
@@ -219,7 +219,8 @@ class ReservoirSpecies(eqx.Module):
 
         Args:
             formula: Formula
-            state: State of aggregation. Defaults to :const:`~atmodeller.constants.DISSOLVED_STATE`
+            state: State of aggregation. Defaults to
+                :const:`~atmodeller.constants.DISSOLVED_STATE`.
             activity: Activity. Defaults to unity activity.
             solubility: Solubility. Defaults to no solubility.
 
@@ -333,210 +334,6 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
 
     def __str__(self) -> str:
         return str(tuple(str(species) for species in self.species))
-
-
-# # TODO: Possibly some attributes could be removed from this class.
-# class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
-#     """Species collection
-
-#     Args:
-#         species: An iterable of species
-#     """
-
-#     species: tuple[TSpecies_co, ...]
-#     """Species in the collection"""
-#     species_names: tuple[str, ...]
-#     """Unique names of all species"""
-#     # gas_species_names: tuple[str, ...]
-#     # """Gas species names"""
-#     condensed_species_names: tuple[str, ...]
-#     """Condensed species names"""
-#     # gas_species_mask: NpBool
-#     # """Gas species mask"""
-#     active_stability: NpBool
-#     """Active stability mask"""
-#     molar_masses: NpFloat
-#     """Molar masses"""
-#     unique_elements: tuple[str, ...]
-#     """Unique elements in species in alphabetical order"""
-#     element_molar_masses: NpFloat
-#     """Molar masses of the ordered elements"""
-#     # O2_index: NpFloat
-#     # """Index of O2 or np.nan if not present"""
-#     formula_matrix: NpInt
-#     """Formula matrix"""
-#     number_solution: int
-#     """Number of solution quantities that cannot depend on traced quantities"""
-
-#     def __init__(self, species: Iterable[TSpecies_co]):
-#         self.species = tuple(species)
-#         self.species_names = tuple([species_.data.name for species_ in self])
-#         self.gas_species_names = tuple(
-#             [species.data.name for species in self if species.data.state == GAS_STATE]
-#         )
-#         self.condensed_species_names = tuple(
-#             [species.data.name for species in self if species.data.state == CONDENSED_STATE]
-#         )
-#         self.gas_species_mask = np.array(
-#             [species.data.state == GAS_STATE for species in self], dtype=bool
-#         )
-#         active_stability: list[bool] = [species.solve_for_stability for species in self]
-#         self.active_stability = np.array(active_stability, dtype=bool)
-#         self.molar_masses = np.array([species_.data.molar_mass for species_ in self], dtype=float)
-
-#         # Unique elements
-#         elements: list[str] = []
-#         for species_ in self.species:
-#             elements.extend(species_.data.elements)
-#         unique_elements: list[str] = list(set(elements))
-#         self.unique_elements = tuple(sorted(unique_elements))
-
-#         # Element molar masses
-#         element_molar_masses: list[float] = []
-#         for element_ in self.unique_elements:
-#             mformula: Formula = Formula(element_)
-#             molar_mass: float = mformula.mass * unit_conversion.g_to_kg
-#             element_molar_masses.append(molar_mass)
-#         self.element_molar_masses = np.array(element_molar_masses, dtype=float)
-
-#         self.O2_index = self.get_O2_index()
-
-#         self.formula_matrix = self.get_formula_matrix()
-
-#         # Ensure number_solution is static
-#         self.number_solution = sum([species.number_solution for species in self])
-
-#     @classmethod
-#     def create(cls, species: Iterable[str]) -> "SpeciesCollection[SpeciesProtocol]":
-#         """Creates an instance
-
-#         Args:
-#             species: An iterable of species names with a state suffix
-
-#         Returns
-#             An instance
-#         """
-#         species_list: list[SpeciesProtocol] = []
-
-#         for species_ in species:
-#             formula, state = species_.split("_")
-#             hill_formula = Formula(formula).formula
-#             if state == GAS_STATE:
-#                 species_to_add: SpeciesProtocol = ChemicalSpecies.create_gas(
-#                     hill_formula, state=state
-#                 )
-#             elif state == CONDENSED_STATE:
-#                 species_to_add = ChemicalSpecies.create_condensed(hill_formula, state=state)
-#             elif state == DISSOLVED_STATE:
-#                 species_to_add = ReservoirSpecies.create_dissolved(hill_formula, state=state)
-#             else:
-#                 raise ValueError(
-#                     f"State must be '{GAS_STATE}', '{CONDENSED_STATE}' or '{DISSOLVED_STATE}', "
-#                     f"got {state}"
-#                 )
-#             species_list.append(species_to_add)
-
-#         return SpeciesCollection(species_list)
-
-#     @property
-#     def number_species(self) -> int:
-#         """Number of species"""
-#         return self.__len__()
-
-#     @no_type_check
-#     def _extract_species_by_type(
-#         self, species_type: type[T_co]
-#     ) -> tuple["SpeciesCollection[T_co]", NpInt]:
-#         """Extracts species of a given type.
-
-#         Args:
-#             species_type: The species type to extract
-
-#         Returns:
-#             A tuple of (extracted species, indices array)
-#         """
-#         extracted: list[T_co] = []
-#         indices: list[int] = []
-#         for i, species_ in enumerate(self.species):
-#             if isinstance(species_, species_type):
-#                 extracted.append(species_)
-#                 indices.append(i)
-
-#         indices_array: NpInt = np.array(indices, dtype=int)
-
-#         return SpeciesCollection(extracted), indices_array
-
-#     @no_type_check
-#     def extract_reaction_species(self) -> tuple["SpeciesCollection[ChemicalSpecies]", NpInt]:
-#         """Extracts chemical species.
-
-#         Returns:
-#             A tuple of (extracted species, indices array)
-#         """
-#         return self._extract_species_by_type(ChemicalSpecies)
-
-#     @no_type_check
-#     def extract_dissolution_species(self) -> tuple["SpeciesCollection[ReservoirSpecies]", NpInt]:
-#         """Extracts reservoir species.
-
-#         Returns:
-#             A tuple of (extracted species, indices array)
-#         """
-#         return self._extract_species_by_type(ReservoirSpecies)
-
-#     def get_O2_index(self) -> NpFloat:
-#         """Gets the species index corresponding to diatomic oxygen.
-
-#         Note:
-#             This returns a float array for type consistency.
-
-#         Returns:
-#             Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
-#         """
-#         for nn, species_ in enumerate(self.species):
-#             if species_.data.hill_formula == "O2":
-#                 # logger.debug("Found O2 at index = %d", nn)
-#                 return np.array(nn, dtype=float)
-
-#         return np.array(np.nan, dtype=float)
-
-#     def get_formula_matrix(self) -> NpInt:
-#         """Gets the formula matrix.
-
-#         Elements are given in rows and species in columns following the convention in
-#         :cite:t:`LKS17`.
-
-#         Returns:
-#             Formula matrix
-#         """
-#         formula_matrix: NpInt = np.zeros(
-#             (len(self.unique_elements), self.number_species), dtype=int
-#         )
-
-#         for element_index, element in enumerate(self.unique_elements):
-#             for species_index, species_ in enumerate(self):
-#                 count: int = 0
-#                 try:
-#                     count = species_.data.composition[element][0]
-#                 except KeyError:
-#                     count = 0
-#                 formula_matrix[element_index, species_index] = count
-
-#         # logger.debug("formula_matrix = %s", formula_matrix)
-
-#         return formula_matrix
-
-#     def __getitem__(self, index: int) -> TSpecies_co:
-#         return self.species[index]
-
-#     def __iter__(self) -> Iterator[TSpecies_co]:
-#         return iter(self.species)
-
-#     def __len__(self) -> int:
-#         return len(self.species)
-
-#     def __str__(self) -> str:
-#         return str(tuple(str(species) for species in self.species))
 
 
 class ThermodynamicState(eqx.Module):
