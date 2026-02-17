@@ -105,6 +105,33 @@ def get_atmosphere_log_molar_mass(
     return molar_mass
 
 
+# ChatGPT suggestion
+def get_log_element_moles(
+    parameters: Parameters,
+    log_number_moles: Float[Array, " species"],
+) -> Float[Array, " elements"]:
+
+    formula_matrix = jnp.asarray(parameters.species.formula_matrix)
+
+    # mask zero stoichiometries
+    mask = formula_matrix > 0
+
+    # log(stoich) only where positive
+    log_stoich = jnp.where(
+        mask,
+        jnp.log(formula_matrix),
+        -jnp.inf,
+    )
+
+    # broadcast log_number_moles to (elements, species)
+    log_terms = log_stoich + log_number_moles
+
+    # logsumexp over species axis
+    log_element_moles = logsumexp(log_terms, axis=1)
+
+    return log_element_moles
+
+
 def get_element_moles(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " elements"]:
@@ -476,13 +503,16 @@ def objective_function(
 
     # Elemental mass balance residual
     # Number of moles of elements in the gas or condensed phase
-    element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
+    # element_moles: Float[Array, " elements"] = get_element_moles(parameters, log_number_moles)
     # jax.debug.print("element_moles = {out}", out=element_moles)
 
     # Relative mass error, computed in log-space for numerical stability
-    element_moles_total: Float[Array, " elements"] = element_moles
-    log_element_moles_total: Float[Array, " elements"] = jnp.log(element_moles_total)
+    # element_moles_total: Float[Array, " elements"] = element_moles
+    # log_element_moles_total: Float[Array, " elements"] = jnp.log(element_moles_total)
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
+
+    # This has better conditioning
+    log_element_moles_total = get_log_element_moles(parameters, log_number_moles)
 
     log_target_moles: Float[Array, " elements"] = parameters.mass_constraints.log_abundance()
     # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
