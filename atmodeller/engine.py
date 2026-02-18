@@ -91,33 +91,35 @@ def get_atmosphere_log_molar_mass(
     return molar_mass
 
 
-# ChatGPT suggestion
 def get_log_element_moles(
-    parameters: Parameters,
-    log_number_moles: Float[Array, " species"],
+    parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " elements"]:
+    """Gets the log number of moles of elements.
 
-    formula_matrix = jnp.asarray(parameters.reaction_system.formula_matrix)
+    Args:
+        parameters: Parameters
+        log_number_moles: Log number of moles
 
-    # mask zero stoichiometries
-    mask = formula_matrix > 0
-
-    # log(stoich) only where positive
-    log_stoich = jnp.where(
-        mask,
-        jnp.log(formula_matrix),
-        -jnp.inf,
+    Returns:
+        Log number of moles of elements
+    """
+    # Could precompute and store the log formula matrix
+    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
+        parameters.reaction_system.formula_matrix
+    )
+    mask: Bool[Array, "elements species"] = formula_matrix > 0
+    log_stoich: Float[Array, "element species"] = jnp.where(
+        mask, jnp.log(formula_matrix), -jnp.inf
     )
 
-    # broadcast log_number_moles to (elements, species)
-    log_terms = log_stoich + log_number_moles
+    log_terms: Float[Array, "element species"] = log_stoich + log_number_moles
 
-    # logsumexp over species axis
-    log_element_moles = logsumexp(log_terms, axis=1)
+    log_element_moles: Float[Array, " elements"] = logsumexp(log_terms, axis=1)
 
     return log_element_moles
 
 
+# TODO: Remove eventually, but keep until output routines are updated.
 def get_element_moles(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " elements"]:
@@ -366,7 +368,7 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-# TODO: reinstate, but only used by output routines
+# TODO: only used for output routines
 def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
 
@@ -466,7 +468,7 @@ def objective_function(
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Fugacity constraints residual (dimensionless)
-    fugacity_residual: Float[Array, " reactions"] = (
+    fugacity_residual: Float[Array, " species"] = (
         log_activity - parameters.fugacity_constraints.log_fugacity(temperature, total_pressure)
     )
     # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
@@ -481,7 +483,7 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
-    reaction_residual = parameters.reaction_system.get_residual(
+    reaction_residual: Float[Array, " reactions"] = parameters.reaction_system.get_residual(
         log_activity, log_stability, temperature, total_pressure
     )
     # jax.debug.print(
@@ -505,20 +507,21 @@ def objective_function(
     # log_element_moles_total: Float[Array, " elements"] = jnp.log(element_moles_total)
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
-    # This has better conditioning
-    log_element_moles_total = get_log_element_moles(parameters, log_number_moles)
+    log_element_moles_total: Float[Array, " elements"] = get_log_element_moles(
+        parameters, log_number_moles
+    )
 
     log_target_moles: Float[Array, " elements"] = parameters.mass_constraints.log_abundance()
     # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
 
-    # TODO: remove this old ratio error metric once testing complete
     # Dimensionless (ratio error - 1)
-    # Performs better for subneptune models
-    # mass_residual: Float[Array, " elements"] = (
-    #    safe_exp(log_element_moles_total - log_target_moles) - 1
-    # )
-
-    mass_residual: Float[Array, " elements"] = log_element_moles_total - log_target_moles
+    # More robust than log residual for poor initial guesses, which are often the case.
+    mass_residual: Float[Array, " elements"] = (
+        safe_exp(log_element_moles_total - log_target_moles) - 1
+    )
+    # Log residual converges fast when near the solution, but can be very large and unstable for
+    # poor initial guesses, which are often the case.
+    # mass_residual: Float[Array, " elements"] = log_element_moles_total - log_target_moles
 
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
