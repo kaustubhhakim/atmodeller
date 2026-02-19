@@ -14,7 +14,6 @@ import equinox as eqx
 from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool
 from molmass import Formula
-from xmmutablemap import ImmutableMap
 
 
 class ChemicalSpeciesData(eqx.Module):
@@ -30,7 +29,7 @@ class ChemicalSpeciesData(eqx.Module):
     """Formula"""
     state: str
     """State of aggregation. Defaults to an empty string."""
-    composition: ImmutableMap[str, tuple[int, float, float]]
+    composition: dict[str, tuple[int, float, float]]
     """Composition"""
     hill_formula: str
     """Hill formula"""
@@ -41,7 +40,7 @@ class ChemicalSpeciesData(eqx.Module):
         self.formula = formula
         self.state = state
         mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.composition = mformula.composition().asdict()
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg
 

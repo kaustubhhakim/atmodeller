@@ -19,16 +19,7 @@ from dataclasses import dataclass
 import equinox as eqx
 from jaxtyping import Array
 
-from atmodeller.engine import (
-    # get_element_moles,
-    # get_element_moles_in_melt,
-    # get_log_activity,
-    get_reactions_only_mask,
-    # get_species_moles_in_melt,
-    # get_species_ppmw_in_melt,
-    get_total_pressure,
-    objective_function,
-)
+from atmodeller.engine import get_total_pressure, objective_function
 from atmodeller.parameters import Parameters
 from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
 
@@ -57,12 +48,6 @@ class VmappedFunctions:
     parameters: Parameters
 
     # Precompiled vmapped functions
-    _get_element_moles: Callable
-    _get_element_moles_in_melt: Callable
-    _get_log_activity: Callable
-    _get_reactions_only_mask: Callable
-    _get_species_moles_in_melt: Callable
-    _get_species_ppmw_in_melt: Callable
     _get_total_pressure: Callable
     _objective_function_vmap: Callable
 
@@ -71,36 +56,6 @@ class VmappedFunctions:
 
         # Compute axes specs once
         parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
-
-        # self._get_element_moles = eqx.filter_vmap(
-        #     get_element_moles,
-        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        # )
-
-        # self._get_element_moles_in_melt = eqx.filter_vmap(
-        #     get_element_moles_in_melt,
-        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        # )
-
-        # self._get_log_activity = eqx.filter_vmap(
-        #     get_log_activity,
-        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        # )
-
-        self._get_reactions_only_mask = eqx.filter_vmap(
-            get_reactions_only_mask,
-            in_axes=(parameters_vmap_axes,),
-        )
-
-        # self._get_species_moles_in_melt = eqx.filter_vmap(
-        #     get_species_moles_in_melt,
-        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        # )
-
-        # self._get_species_ppmw_in_melt = eqx.filter_vmap(
-        #     get_species_ppmw_in_melt,
-        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        # )
 
         self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,
@@ -111,24 +66,6 @@ class VmappedFunctions:
             objective_function,
             in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, parameters_vmap_axes),
         )
-
-    def get_element_moles(self, log_number_moles: Array) -> Array:
-        return self._get_element_moles(self.parameters, log_number_moles)
-
-    def get_element_moles_in_melt(self, log_number_moles: Array) -> Array:
-        return self._get_element_moles_in_melt(self.parameters, log_number_moles)
-
-    def get_log_activity(self, log_number_moles: Array) -> Array:
-        return self._get_log_activity(self.parameters, log_number_moles)
-
-    def get_reactions_only_mask(self) -> Array:
-        return self._get_reactions_only_mask(self.parameters)
-
-    def get_species_moles_in_melt(self, log_number_moles: Array) -> Array:
-        return self._get_species_moles_in_melt(self.parameters, log_number_moles)
-
-    def get_species_ppmw_in_melt(self, log_number_moles: Array) -> Array:
-        return self._get_species_ppmw_in_melt(self.parameters, log_number_moles)
 
     def get_total_pressure(self, log_number_moles: Array) -> Array:
         return self._get_total_pressure(self.parameters, log_number_moles)

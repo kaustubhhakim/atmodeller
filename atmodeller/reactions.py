@@ -34,7 +34,6 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
-from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
@@ -385,17 +384,11 @@ class ReactionSystem(BaseReactionBlock):
     Handles phase indexing, assembly of reaction matrices, stability, and evaluation of equilibrium
     constants and residuals in a JAX-compatible way.
 
-    Phases supported:
-        - gas
-        - melt
-        - solid
-        - condensates
-
     Args:
-        gas: GasPhase
-        melt: MeltPhase
-        solid: SolidPhase
-        condensates: Iterable of PurePhase
+        gas: Gas phase
+        melt: Melt phase
+        solid: Solid phase
+        condensates: Iterable of pure phases (condensates)
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -421,7 +414,7 @@ class ReactionSystem(BaseReactionBlock):
     _O2_index: NpInt
     _has_O2: NpBool
     _log_stoich_matrix: NpFloat
-    phase_indices: ImmutableMap[str, PhaseIndex]
+    _phase_indices: dict[str, PhaseIndex]
 
     def __init__(
         self,
@@ -431,14 +424,19 @@ class ReactionSystem(BaseReactionBlock):
         solid: SolidPhase,
         condensates: Iterable[PurePhase],
     ):
+        # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
+        # preserved because reaction matrices, phase slices, and activity concatenation rely on
+        # this ordering.
+        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
+
         self.gas = gas
         self.melt = melt
         self.solid = solid
         self.condensates = tuple(condensates)
 
-        # Flatten all species
+        # Flatten all species. Index 0 because pure phases can only have one species.
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
-            species_ for condensate in condensates for species_ in condensate.species
+            condensate.species[0] for condensate in self.condensates
         )
         all_species: tuple[SpeciesProtocol, ...] = (
             gas.species.species + melt.species.species + solid.species.species + condensate_species
@@ -446,16 +444,15 @@ class ReactionSystem(BaseReactionBlock):
         self.species = SpeciesCollection(all_species)
 
         # Phase indexing
-        start = 0
-        indices: dict[str, PhaseIndex] = {}
-        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
+        start: int = 0
+        self._phase_indices = {}
+
         for phase_name, phase_collection in zip(
             phase_order, [gas, melt, solid, condensate_species]
         ):
             n: int = len(phase_collection)
-            indices[phase_name] = PhaseIndex(start, start + n)
+            self._phase_indices[phase_name] = PhaseIndex(start, start + n)
             start += n
-        self.phase_indices = ImmutableMap(indices)
 
         self.formula_matrix = get_formula_matrix(self.species)
         self._log_stoich_matrix = np.where(
@@ -520,7 +517,7 @@ class ReactionSystem(BaseReactionBlock):
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
         background_melt_mass: Float[Array, ""],
-    ) -> Float[Array, " species"]:
+    ) -> Float[Array, " num_species"]:
         """Gets log activity of each species.
 
         Args:
@@ -532,18 +529,20 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Log activity of each species
         """
-        log_activity_gas = self.gas.get_log_activity(
+        log_activity_gas: Float[Array, " num_gas_species"] = self.gas.get_log_activity(
             log_number_moles[self.gas_slice], temperature, pressure
         )
-        log_activity_melt = self.melt.get_log_mass_fraction(
+        log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[self.melt_slice], jnp.log(background_melt_mass), True
         )
-        log_activity_solid = self.solid.get_log_mass_fraction(
+        log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], jnp.log(background_melt_mass)
         )
-        log_activity_condensates = jnp.zeros(len(self.condensates))
+        log_activity_condensates: Float[Array, " num_condensates"] = jnp.zeros(
+            len(self.condensates)
+        )
 
-        log_activity = jnp.concatenate(
+        log_activity: Float[Array, " num_species"] = jnp.concatenate(
             (log_activity_gas, log_activity_melt, log_activity_solid, log_activity_condensates)
         )
 
@@ -666,7 +665,7 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
                 Slice object for the phase
         """
-        return self.phase_indices[phase_name].slice
+        return self._phase_indices[phase_name].slice
 
     def phase_mask(self, phase_name: str) -> NpBool:
         """Boolean mask for a given phase.
@@ -677,4 +676,4 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Boolean mask for the phase
         """
-        return self.phase_indices[phase_name].mask(len(self.species))
+        return self._phase_indices[phase_name].mask(len(self.species))

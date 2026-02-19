@@ -374,6 +374,12 @@ class PurePhase(BasePhase[ChemicalSpecies]):
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.species = SpeciesCollection(species)
+
+        if self.species.number_species != 1:
+            raise ValueError(
+                f"PurePhase must contain exactly one species, got {len(self.species)}"
+            )
+
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
@@ -396,7 +402,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         return cls(species_collection)
 
     # Although this could be a method, it is more efficient to not have to vmap over such a simple
-    # function.
+    # function that just returns zeros.
     # def get_log_activity(self) -> Float[Array, " species"]:
     #     """Gets the log activity of a pure phase.
 

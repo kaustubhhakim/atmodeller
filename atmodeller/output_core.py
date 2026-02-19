@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Float
 from molmass import Formula
 
 from atmodeller.containers import SpeciesCollection
@@ -504,15 +504,16 @@ class Output:
             )
         )  # type: ignore
 
-    def reaction_mask(self) -> NpBool:  # 2-D
-        """Gets the reaction mask of the residual array.
+    # TODO: remove
+    # def reaction_mask(self) -> NpBool:  # 2-D
+    #     """Gets the reaction mask of the residual array.
 
-        Returns:
-            Reaction mask of the residual array
-        """
-        reaction_mask: Bool[Array, "..."] = self.vmapf.get_reactions_only_mask()
+    #     Returns:
+    #         Reaction mask of the residual array
+    #     """
+    #     reaction_mask: Bool[Array, "..."] = self.vmapf.get_reactions_only_mask()
 
-        return np.asarray(reaction_mask, dtype=bool)
+    #     return np.asarray(reaction_mask, dtype=bool)
 
     def species_molar_mass_expanded(self) -> NpFloat:  # 2-D
         """Gets molar mass of all species in an expanded array.
