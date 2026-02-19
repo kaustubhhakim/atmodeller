@@ -20,7 +20,6 @@ import equinox as eqx
 from jaxtyping import Array
 
 from atmodeller.engine import (
-    get_atmosphere_log_molar_mass,
     get_element_moles,
     # get_element_moles_in_melt,
     get_log_activity,
@@ -58,7 +57,6 @@ class VmappedFunctions:
     parameters: Parameters
 
     # Precompiled vmapped functions
-    _get_atmosphere_log_molar_mass: Callable
     _get_element_moles: Callable
     _get_element_moles_in_melt: Callable
     _get_log_activity: Callable
@@ -73,12 +71,6 @@ class VmappedFunctions:
 
         # Compute axes specs once
         parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
-
-        # Pre-build vmap wrappers
-        self._get_atmosphere_log_molar_mass = eqx.filter_vmap(
-            get_atmosphere_log_molar_mass,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
 
         self._get_element_moles = eqx.filter_vmap(
             get_element_moles,
@@ -119,9 +111,6 @@ class VmappedFunctions:
             objective_function,
             in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, parameters_vmap_axes),
         )
-
-    def get_atmosphere_log_molar_mass(self, log_number_moles: Array) -> Array:
-        return self._get_atmosphere_log_molar_mass(self.parameters, log_number_moles)
 
     def get_element_moles(self, log_number_moles: Array) -> Array:
         return self._get_element_moles(self.parameters, log_number_moles)

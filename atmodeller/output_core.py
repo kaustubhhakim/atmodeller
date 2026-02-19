@@ -208,25 +208,27 @@ class Output:
 
         return out
 
-    def gas_log_molar_mass(self) -> NpFloat:  # 2-D
-        """Gets log molar mass of the gas.
+    # TODO: Switch to phase method
+    # def gas_log_molar_mass(self) -> NpFloat:  # 2-D
+    #     """Gets log molar mass of the gas.
 
-        Returns:
-            Log molar mass of the gas
-        """
-        gas_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
-            jnp.asarray(self.log_number_moles)
-        )
+    #     Returns:
+    #         Log molar mass of the gas
+    #     """
+    #     gas_log_molar_mass: Array = self.vmapf.get_atmosphere_log_molar_mass(
+    #         jnp.asarray(self.log_number_moles)
+    #     )
 
-        return np.asarray(gas_log_molar_mass)
+    #     return np.asarray(gas_log_molar_mass)
 
-    def gas_molar_mass(self) -> NpArray:  # 2-D
-        """Gets the molar mass of the gas.
+    # TODO: Switch to phase method
+    # def gas_molar_mass(self) -> NpArray:  # 2-D
+    #     """Gets the molar mass of the gas.
 
-        Returns:
-            Molar mass of the gas
-        """
-        return np.exp(self.gas_log_molar_mass())
+    #     Returns:
+    #         Molar mass of the gas
+    #     """
+    #     return np.exp(self.gas_log_molar_mass())
 
     def ideal_gas_volume(self) -> NpFloat:  # 1-D
         """Gets the volume of the gas assuming it is ideal.

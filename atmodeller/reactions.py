@@ -33,6 +33,7 @@ import numpy as np
 from jax import lax
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, Float, Integer
+from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
@@ -347,6 +348,36 @@ class DissolutionNetwork(BaseReactionBlock):
         return np.zeros_like(self.dissolution_matrix, dtype=float)
 
 
+class PhaseIndex:
+    """Stores start and stop indices of a phase in the full species collection.
+
+    Args:
+        start: Starting index of the phase in the full species collection
+        stop: Stopping index of the phase in the full species collection
+    """
+
+    def __init__(self, start: int, stop: int):
+        self.start = start
+        self.stop = stop
+
+    @property
+    def slice(self) -> slice:
+        """Slice object for indexing arrays."""
+        return slice(self.start, self.stop)
+
+    def mask(self, n_total: int) -> np.ndarray:
+        """Boolean mask for this phase."""
+        mask = np.zeros(n_total, dtype=bool)
+        mask[self.start : self.stop] = True
+        return mask
+
+    def __len__(self) -> int:
+        return self.stop - self.start
+
+    def __repr__(self) -> str:
+        return f"PhaseIndex(start={self.start}, stop={self.stop})"
+
+
 class ReactionSystem(BaseReactionBlock):
     """Reaction system that includes both core chemical reactions and dissolution reactions.
 
@@ -376,6 +407,7 @@ class ReactionSystem(BaseReactionBlock):
     """Stability matrix of the full reaction system"""
     _O2_index: NpInt
     _has_O2: NpBool
+    phase_indices: ImmutableMap[str, PhaseIndex]
 
     def __init__(
         self,
@@ -392,11 +424,23 @@ class ReactionSystem(BaseReactionBlock):
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
             species_ for condensate in condensates for species_ in condensate.species
         )
-        # Changing this order could break impicit assumptions about the order of species in the
-        # reaction and dissolution networks!
+
+        # Phase ordering and indexing
         self.species = SpeciesCollection(
             gas.species.species + melt.species.species + solid.species.species + condensate_species
         )
+
+        phase_indices: dict[str, PhaseIndex] = {}
+        start: int = 0
+        phase_indices["gas"] = PhaseIndex(start, start + gas.species.number_species)
+        start = phase_indices["gas"].stop
+        phase_indices["melt"] = PhaseIndex(start, start + melt.species.number_species)
+        start = phase_indices["melt"].stop
+        phase_indices["solid"] = PhaseIndex(start, start + solid.species.number_species)
+        start = phase_indices["solid"].stop
+        phase_indices["condensates"] = PhaseIndex(start, start + len(condensate_species))
+        self.phase_indices = ImmutableMap(phase_indices)
+
         self.formula_matrix = get_formula_matrix(self.species)
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)
@@ -409,16 +453,46 @@ class ReactionSystem(BaseReactionBlock):
 
         self.output_to_logger()
 
+    # General phase helpers
+    def species_slice(self, phase_name: str) -> slice:
+        """Returns a slice for a given phase."""
+        return self.phase_indices[phase_name].slice
+
+    def species_mask(self, phase_name: str) -> NpBool:
+        """Returns a boolean mask for a given phase."""
+        return self.phase_indices[phase_name].mask(len(self.species))
+
+    @property
+    def gas_slice(self) -> slice:
+        return self.species_slice("gas")
+
     @property
     def gas_species_mask(self) -> NpBool:
-        """Gas mask for the full species space"""
-        n_gas: int = self.gas.species.number_species
-        n_total: int = self.species.number_species
+        return self.species_mask("gas")
 
-        mask: NpBool = np.zeros(n_total, dtype=bool)
-        mask[:n_gas] = True
+    @property
+    def melt_slice(self) -> slice:
+        return self.species_slice("melt")
 
-        return mask
+    @property
+    def melt_species_mask(self) -> NpBool:
+        return self.species_mask("melt")
+
+    @property
+    def solid_slice(self) -> slice:
+        return self.species_slice("solid")
+
+    @property
+    def solid_species_mask(self) -> NpBool:
+        return self.species_mask("solid")
+
+    @property
+    def condensates_slice(self) -> slice:
+        return self.species_slice("condensates")
+
+    @property
+    def condensates_species_mask(self) -> NpBool:
+        return self.species_mask("condensates")
 
     @property
     def blocks(self) -> tuple[BaseReactionBlock, ...]:

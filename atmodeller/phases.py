@@ -32,6 +32,8 @@ from typing import Generic, Self
 
 import equinox as eqx
 import numpy as np
+from jax.scipy.special import logsumexp
+from jaxtyping import Array, Float
 from molmass import Formula
 
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
@@ -45,8 +47,15 @@ logger: logging.Logger = logging.getLogger(__name__)
 def _build_species_collection(
     species: str | Iterable[str], factory: Callable[[str], TSpecies_co]
 ) -> SpeciesCollection[TSpecies_co]:
-    """Normalize input and build a species collection using a factory."""
+    """Normalize input and build a species collection using a factory.
 
+    Args:
+        species: A single species name or an iterable of names
+        factory: A function that takes a Hill formula and returns a species instance
+
+    Returns:
+        A SpeciesCollection containing the constructed species
+    """
     if isinstance(species, str):
         species = [species]
 
@@ -77,6 +86,32 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
     def empty(cls) -> Self:
         """Returns an empty phase instance."""
         return cls([])
+
+    def get_log_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
+        """Get the log mass of the phase.
+
+        Args:
+            log_number_moles: Log number of moles of each species in the phase
+
+        Returns:
+            Log mass of the phase
+        """
+        return logsumexp(log_number_moles, b=self.species.molar_masses)
+
+    def get_log_molar_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
+        """Get the log molar mass of the phase.
+
+        Args:
+            log_number_moles: Log number of moles of each species in the phase
+
+        Returns:
+            Log molar mass of the phase
+        """
+        log_molar_mass: Float[Array, ""] = self.get_log_mass(log_number_moles) - logsumexp(
+            log_number_moles
+        )
+
+        return log_molar_mass
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):

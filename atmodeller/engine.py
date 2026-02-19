@@ -65,32 +65,6 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     return active_mask
 
 
-def get_atmosphere_log_molar_mass(
-    parameters: Parameters, log_number_moles: Float[Array, " species"]
-) -> Float[Array, ""]:
-    """Gets the log molar mass of the atmosphere.
-
-    Args:
-        parameters: Parameters
-        log_number_moles: Log number of moles
-
-    Returns:
-        Log molar mass of the atmosphere
-    """
-    gas_log_number_moles: Float[Array, " species"] = get_gas_species_data(
-        parameters, log_number_moles
-    )
-    gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, parameters.species.molar_masses
-    )
-    molar_mass: Float[Array, ""] = logsumexp(gas_log_number_moles, b=gas_molar_mass) - logsumexp(
-        gas_log_number_moles, b=parameters.reaction_system.gas_species_mask
-    )
-    # jax.debug.print("molar_mass = {out}", out=molar_mass)
-
-    return molar_mass
-
-
 def get_log_element_moles(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, " elements"]:
@@ -395,25 +369,26 @@ def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     return mask
 
 
-def get_gas_mass(
-    parameters: Parameters, log_number_moles: Float[Array, " species"]
-) -> Float[Array, ""]:
-    """Gets the gas mass.
+# TODO: remove eventually
+# def get_gas_mass(
+#     parameters: Parameters, log_number_moles: Float[Array, " species"]
+# ) -> Float[Array, ""]:
+#     """Gets the gas mass.
 
-    Args:
-        parameters: Parameters
-        log_number_moles: Log number of moles
+#     Args:
+#         parameters: Parameters
+#         log_number_moles: Log number of moles
 
-    Returns:
-        Gas mass
-    """
-    gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-        parameters, parameters.species.molar_masses
-    )
-    log_gas_mass: Float[Array, ""] = logsumexp(log_number_moles + jnp.log(gas_molar_mass))
-    gas_mass: Float[Array, ""] = jnp.exp(log_gas_mass)
+#     Returns:
+#         Gas mass
+#     """
+#     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
+#         parameters, parameters.species.molar_masses
+#     )
+#     log_gas_mass: Float[Array, ""] = logsumexp(log_number_moles + jnp.log(gas_molar_mass))
+#     gas_mass: Float[Array, ""] = jnp.exp(log_gas_mass)
 
-    return gas_mass
+#     return gas_mass
 
 
 def get_total_pressure(
@@ -428,7 +403,12 @@ def get_total_pressure(
     Returns:
         Total pressure in bar
     """
-    gas_mass: Float[Array, ""] = get_gas_mass(parameters, log_number_moles)
+    log_number_moles_gas: Float[Array, " gas_species"] = log_number_moles[
+        parameters.reaction_system.gas_slice
+    ]
+    gas_mass: Float[Array, ""] = jnp.exp(
+        parameters.reaction_system.gas.get_log_mass(log_number_moles_gas)
+    )
     pressure: Float[Array, ""] = parameters.state.get_pressure(gas_mass)
 
     return pressure
