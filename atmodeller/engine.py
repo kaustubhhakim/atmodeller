@@ -176,7 +176,11 @@ def objective_function(
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     log_activity: Float[Array, " species"] = parameters.reaction_system.get_log_activity(
-        log_number_moles, temperature, total_pressure, parameters.state.melt_mass
+        log_number_moles,
+        temperature,
+        total_pressure,
+        jnp.log(parameters.state.melt_mass),
+        jnp.log(parameters.state.solid_mass),
     )
     # jax.debug.print("log_activity = {out}", out=log_activity)
 

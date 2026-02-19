@@ -516,7 +516,8 @@ class ReactionSystem(BaseReactionBlock):
         log_number_moles: Array,
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
-        background_melt_mass: Float[Array, ""],
+        log_inert_melt_mass: Float[Array, ""] = jnp.array(-jnp.inf),
+        log_inert_solid_mass: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " num_species"]:
         """Gets log activity of each species.
 
@@ -524,7 +525,10 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles: Log number of moles of each species
             temperature: Temperature in K
             pressure: Pressure in bar
-            background_melt_mass: Mass of the background melt (e.g., silicate melt)
+            log_inert_melt_mass: Log of the inert, non-reactive bulk component of melt. Defaults
+                to negative infinity (i.e., no inert component).
+            log_inert_solid_mass: Log of the inert, non-reactive bulk component of solid.
+                Defaults to negative infinity (i.e., no inert component).
 
         Returns:
             Log activity of each species
@@ -533,10 +537,10 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles[self.gas_slice], temperature, pressure
         )
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
-            log_number_moles[self.melt_slice], jnp.log(background_melt_mass), True
+            log_number_moles[self.melt_slice], log_inert_melt_mass, True
         )
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
-            log_number_moles[self.solid_slice], jnp.log(background_melt_mass)
+            log_number_moles[self.solid_slice], log_inert_solid_mass
         )
         log_activity_condensates: Float[Array, " num_condensates"] = jnp.zeros(
             len(self.condensates)

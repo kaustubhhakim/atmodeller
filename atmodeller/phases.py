@@ -109,20 +109,20 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
     def get_log_mole_fraction(
         self,
         log_number_moles: Float[Array, " species"],
-        log_background_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " species"]:
         """Get the log mole fraction of each species.
 
         Args:
             log_number_moles: Log number of moles of each species
-            log_background_moles: Log number of moles of the background. Defaults to negative
-                infinity (i.e., no background).
+            log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
+                negative infinity (i.e., no inert component).
 
         Returns:
             Log mole fractions of each species
         """
         log_total_moles: Float[Array, ""] = logsumexp(
-            jnp.append(log_number_moles, log_background_moles)
+            jnp.append(log_number_moles, log_inert_moles)
         )
 
         return log_number_moles - log_total_moles
@@ -266,14 +266,15 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def get_log_mass_fraction(
         self,
         log_number_moles: Float[Array, " species"],
-        log_background_mass: Float[Array, ""],
+        log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
         dilute_limit: bool = True,
     ) -> Float[Array, " species"]:
         """Gets the log mass fraction of the species.
 
         Args:
             log_number_moles: Log number of moles
-            log_background_mass: Log mass of the background (e.g., silicate)
+            log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
             dilute_limit: Whether to assume the dilute limit for dissolution reactions. Defaults to
                 ``True``.
 
@@ -284,12 +285,10 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         # jax.debug.print("log_mass = {out}", out=log_mass)
 
         if dilute_limit:
-            total_log_mass: Float[Array, ""] = log_background_mass
+            total_log_mass: Float[Array, ""] = log_inert_mass
         else:
-            # Must account for a background (silicate) melt mass, given by the thermodynamic state
-            log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(
-                log_mass, log_background_mass
-            )
+            # Must account for an inert, non-reactive melt mass, given by the thermodynamic state
+            log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(log_mass, log_inert_mass)
             # jax.debug.print("log_mass_plus = {out}", out=log_mass_plus)
 
             # Log total (sum in linear space)
@@ -337,24 +336,25 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         return cls(species_collection)
 
     def get_log_mass_fraction(
-        self, log_number_moles: Float[Array, " species"], log_background_mass: Float[Array, ""]
+        self,
+        log_number_moles: Float[Array, " species"],
+        log_inert_mass: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " species"]:
         """Gets the log mass fraction of the species.
 
         Args:
             log_number_moles: Log number of moles
-            log_background_mass: Log mass of the background (e.g., silicate)
+            log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
 
         Returns:
-            Log mass fraction in the melt
+            Log mass fraction in the solid
         """
         log_mass: Float[Array, " species"] = log_number_moles + jnp.log(self.species.molar_masses)
         # jax.debug.print("log_mass = {out}", out=log_mass)
 
-        # Must account for a background (silicate) melt mass, given by the thermodynamic state
-        log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(
-            log_mass, log_background_mass
-        )
+        # Must account for an inert, non-reactive solid mass, given by the thermodynamic state
+        log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(log_mass, log_inert_mass)
         # jax.debug.print("log_mass_plus = {out}", out=log_mass_plus)
 
         # Log total (sum in linear space)
