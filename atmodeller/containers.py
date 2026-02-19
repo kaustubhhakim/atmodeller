@@ -38,7 +38,7 @@ from atmodeller.interfaces import (
     SolubilityProtocol,
 )
 from atmodeller.solubility.core import NoSolubility
-from atmodeller.thermodata import CondensateActivity, thermodynamic_data_source
+from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
 from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
     thermodynamic_coefficients_dictionary,
@@ -106,7 +106,7 @@ class ChemicalSpecies(eqx.Module):
         formula: str,
         *,
         state: str = SOLID_STATE,
-        activity: ActivityProtocol = CondensateActivity(),
+        activity: ActivityProtocol = ActivityCoefficient(),
         solve_for_stability: bool = True,
     ) -> "ChemicalSpecies":
         """Creates a condensate with some default values.
@@ -196,7 +196,7 @@ class ReservoirSpecies(eqx.Module):
         cls,
         formula: str,
         *,
-        activity: ActivityProtocol = CondensateActivity(),
+        activity: ActivityProtocol = ActivityCoefficient(),
         solubility: Optional[SolubilityProtocol] = None,
     ) -> "ReservoirSpecies":
         """Creates a dissolved species with some default values.

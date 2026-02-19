@@ -28,15 +28,15 @@ CRITICAL_DATA_SOURCE: Path = Path("critical_data.txt")
 """Source of the critical data"""
 
 
-class CondensateActivity(eqx.Module):
-    """Activity of a stable condensate
+class ActivityCoefficient(eqx.Module):
+    """Activity coefficient of a stable condensate.
 
     Args:
-        activity: Activity. Defaults to ``1``.
+        gamma: Activity coefficient. Defaults to 1 (ideal).
     """
 
-    activity: Array = eqx.field(converter=as_j64, default=1)
-    """Activity"""
+    gamma: Array = eqx.field(converter=as_j64, default=1)
+    """Activity coefficient"""
 
     def active(self) -> Bool[Array, "..."]:
         """Active activity constraint
@@ -47,25 +47,22 @@ class CondensateActivity(eqx.Module):
         Returns:
             Always ``False`` because it does not require solution.
         """
-        return jnp.full_like(self.activity, False, dtype=jnp.bool_)
+        return jnp.full_like(self.gamma, False, dtype=jnp.bool_)
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
-        """Log activity
+        """Log of the activity coefficient (dimensionless).
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Log activity, which is dimensionless
+            Log activity coefficient
         """
         del temperature
         del pressure
 
-        return jnp.log(self.activity)
-
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
-        return self.log_activity(temperature, pressure)
+        return jnp.log(self.gamma)
 
 
 class ThermodynamicCoefficients(eqx.Module):

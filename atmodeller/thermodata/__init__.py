@@ -7,7 +7,7 @@
 # Expose public API
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401
 from atmodeller.thermodata.core import (  # noqa: E402, F401
-    CondensateActivity,
+    ActivityCoefficient,
     CriticalData,
     critical_data_dictionary,
     thermodynamic_coefficients_dictionary,
