@@ -73,9 +73,9 @@ class EquilibriumModel:
         condensates: Optional[Iterable[PurePhase]] = None,
     ):
         if melt is None:
-            melt = MeltPhase(())
+            melt = MeltPhase.empty()
         if solid is None:
-            solid = SolidPhase(())
+            solid = SolidPhase.empty()
         if condensates is None:
             condensates = ()
         self.reaction_system = ReactionSystem(gas, melt=melt, solid=solid, condensates=condensates)

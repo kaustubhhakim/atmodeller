@@ -7,7 +7,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Generic, Literal, Optional, TypeVar
+from typing import Any, Generic, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -36,7 +36,6 @@ from atmodeller.interfaces import (
     ChemicalSpeciesData,
     FugacityConstraintProtocol,
     SolubilityProtocol,
-    SpeciesProtocol,
 )
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import CondensateActivity, thermodynamic_data_source
@@ -44,11 +43,9 @@ from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
     thermodynamic_coefficients_dictionary,
 )
-from atmodeller.type_aliases import NpArray, NpBool, NpFloat
+from atmodeller.type_aliases import NpArray, NpBool, NpFloat, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
 
 
 class ChemicalSpecies(eqx.Module):

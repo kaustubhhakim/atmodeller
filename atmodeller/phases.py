@@ -26,54 +26,74 @@ They are used by the equilibrium solver to:
 """
 
 import logging
+from abc import abstractmethod
 from collections.abc import Callable, Iterable
-from typing import TypeVar
+from typing import Generic, Self
 
+import equinox as eqx
 import numpy as np
 from molmass import Formula
 
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.type_aliases import NpFloat
+from atmodeller.type_aliases import NpFloat, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-TSpecies = TypeVar("TSpecies", bound=SpeciesProtocol)
 
-
-def _build_species_list(
-    species: str | Iterable[str], factory: Callable[[str], ChemicalSpecies]
-) -> list[ChemicalSpecies]:
-    """Normalize input and build a species list using a factory."""
+def _build_species_collection(
+    species: str | Iterable[str], factory: Callable[[str], TSpecies_co]
+) -> SpeciesCollection[TSpecies_co]:
+    """Normalize input and build a species collection using a factory."""
 
     if isinstance(species, str):
         species = [species]
 
-    species_list: list[ChemicalSpecies] = []
+    species_list: list[TSpecies_co] = []
 
     for species_ in species:
         hill_formula: str = Formula(species_).formula
         species_list.append(factory(hill_formula))
 
-    return species_list
+    return SpeciesCollection(species_list)
 
 
-class GasPhase(SpeciesCollection[ChemicalSpecies]):
+class BasePhase(eqx.Module, Generic[TSpecies_co]):
+    """Base class for all phases"""
+
+    species: SpeciesCollection[TSpecies_co]
+    """Collection of species in the phase"""
+
+    @abstractmethod
+    def __init__(self, species: Iterable[TSpecies_co]):
+        """Initialize a phase with a collection of species.
+
+        Args:
+            species: An iterable of species belonging to the phase
+        """
+
+    @classmethod
+    def empty(cls) -> Self:
+        """Returns an empty phase instance."""
+        return cls([])
+
+
+class GasPhase(BasePhase[ChemicalSpecies]):
     """Multicomponent gas mixture"""
 
     O2_index: NpFloat
     """Index of O2 or np.nan if not present"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
-        super().__init__(species)
+        self.species = SpeciesCollection(species)
         self.O2_index = self.get_O2_index()
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
 
     @classmethod
-    def create(cls, species: str | Iterable[str]) -> "GasPhase":
+    def create(cls, species: str | Iterable[str]) -> Self:
         """Creates an instance
 
         Args:
@@ -82,11 +102,11 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
         Returns
             An instance
         """
-        species_list = _build_species_list(
+        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
             species, lambda hill: ChemicalSpecies.create_gas(hill, state=GAS_STATE)
         )
 
-        return cls(species_list)
+        return cls(species_collection)
 
     def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
@@ -105,17 +125,17 @@ class GasPhase(SpeciesCollection[ChemicalSpecies]):
         return np.array(np.nan, dtype=float)
 
 
-class MeltPhase(SpeciesCollection[SpeciesProtocol]):
+class MeltPhase(BasePhase[SpeciesProtocol]):
     """Multicomponent silicate melt with optionally dissolved volatiles"""
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
-        super().__init__(species)
+        self.species = SpeciesCollection(species)
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
 
     @classmethod
-    def create(cls, species: str | Iterable[str]) -> "MeltPhase":
+    def create(cls, species: str | Iterable[str]) -> Self:
         """Creates an instance
 
         Args:
@@ -124,24 +144,24 @@ class MeltPhase(SpeciesCollection[SpeciesProtocol]):
         Returns
             An instance
         """
-        species_list = _build_species_list(
+        species_collection: SpeciesCollection[SpeciesProtocol] = _build_species_collection(
             species, lambda hill: ChemicalSpecies.create_condensed(hill, state=LIQUID_STATE)
         )
 
-        return cls(species_list)
+        return cls(species_collection)
 
 
-class SolidPhase(SpeciesCollection[ChemicalSpecies]):
+class SolidPhase(BasePhase[SpeciesProtocol]):
     """Multicomponent silicate solid"""
 
-    def __init__(self, species: Iterable[ChemicalSpecies]):
-        super().__init__(species)
+    def __init__(self, species: Iterable[SpeciesProtocol]):
+        self.species = SpeciesCollection(species)
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
 
     @classmethod
-    def create(cls, species: str | Iterable[str]) -> "SolidPhase":
+    def create(cls, species: str | Iterable[str]) -> Self:
         """Creates an instance
 
         Args:
@@ -150,24 +170,24 @@ class SolidPhase(SpeciesCollection[ChemicalSpecies]):
         Returns
             An instance
         """
-        species_list = _build_species_list(
+        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
             species, lambda hill: ChemicalSpecies.create_condensed(hill, state=SOLID_STATE)
         )
 
-        return cls(species_list)
+        return cls(species_collection)
 
 
-class PurePhase(SpeciesCollection[ChemicalSpecies]):
+class PurePhase(BasePhase[ChemicalSpecies]):
     """Pure, unity-activity phases"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
-        super().__init__(species)
+        self.species = SpeciesCollection(species)
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
 
     @classmethod
-    def create(cls, species: str, state: str = SOLID_STATE) -> "PurePhase":
+    def create(cls, species: str, state: str = SOLID_STATE) -> Self:
         """Creates an instance
 
         Args:
@@ -177,8 +197,8 @@ class PurePhase(SpeciesCollection[ChemicalSpecies]):
         Returns
             An instance
         """
-        species_list = _build_species_list(
+        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
             species, lambda hill: ChemicalSpecies.create_condensed(hill, state=state)
         )
 
-        return cls(species_list)
+        return cls(species_collection)

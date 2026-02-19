@@ -392,8 +392,10 @@ class ReactionSystem(BaseReactionBlock):
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
             species_ for condensate in condensates for species_ in condensate.species
         )
+        # Changing this order could break impicit assumptions about the order of species in the
+        # reaction and dissolution networks!
         self.species = SpeciesCollection(
-            gas.species + melt.species + solid.species + condensate_species
+            gas.species.species + melt.species.species + solid.species.species + condensate_species
         )
         self.formula_matrix = get_formula_matrix(self.species)
         self.reaction = ReactionNetwork(self.species)
@@ -410,10 +412,10 @@ class ReactionSystem(BaseReactionBlock):
     @property
     def gas_species_mask(self) -> NpBool:
         """Gas mask for the full species space"""
-        n_gas: int = self.gas.number_species
+        n_gas: int = self.gas.species.number_species
         n_total: int = self.species.number_species
 
-        mask = np.zeros(n_total, dtype=bool)
+        mask: NpBool = np.zeros(n_total, dtype=bool)
         mask[:n_gas] = True
 
         return mask
