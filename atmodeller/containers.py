@@ -358,7 +358,7 @@ class ThermodynamicState(eqx.Module):
         pressure: ArrayLike,
         mass: ArrayLike = 1,
         melt_fraction: ArrayLike = 1,
-        molar_mass: ArrayLike = 0.06,
+        molar_mass: ArrayLike = 60e-3,
     ):
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
@@ -465,7 +465,7 @@ class ThinAtmospherePlanet(eqx.Module):
         surface_radius: ArrayLike = 6371000,
         temperature: ArrayLike = 2000,
         pressure: ArrayLike = np.nan,
-        molar_mass: ArrayLike = 0.06,
+        molar_mass: ArrayLike = 60e-3,
     ):
         self.planet_mass = as_j64(planet_mass)
         self.core_mass_fraction = as_j64(core_mass_fraction)

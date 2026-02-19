@@ -85,11 +85,6 @@ class BaseReactionBlock(eqx.Module):
     def number_reactions(self) -> int:  # pyright: ignore
         """Number of reactions in the reaction block"""
 
-    @property
-    def active_reactions(self) -> NpBool:
-        """Boolean mask of active reactions"""
-        return np.ones(self.number_reactions, dtype=bool)
-
     @abstractmethod
     def get_log_Kp(self, temperature: Float[Array, "..."], *args, **kwargs) -> Float[Array, "..."]:
         """Gets log of the equilibrium constant of each reaction in the reaction block"""

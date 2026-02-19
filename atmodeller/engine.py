@@ -40,7 +40,9 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         Active mask
     """
     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
-    reactions_mask: ArrayLike = parameters.reaction_system.active_reactions
+    reactions_mask: Bool[Array, " dim"] = jnp.ones(
+        parameters.reaction_system.number_reactions, dtype=bool
+    )
     mass_mask: Bool[Array, " dim"] = parameters.mass_constraints.active()
     stability_mask: ArrayLike = parameters.reaction_system.species.active_stability
 
