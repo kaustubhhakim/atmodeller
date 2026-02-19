@@ -22,7 +22,7 @@ from jaxtyping import Array
 from atmodeller.engine import (
     # get_element_moles,
     # get_element_moles_in_melt,
-    get_log_activity,
+    # get_log_activity,
     get_reactions_only_mask,
     # get_species_moles_in_melt,
     # get_species_ppmw_in_melt,
@@ -82,10 +82,10 @@ class VmappedFunctions:
         #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
         # )
 
-        self._get_log_activity = eqx.filter_vmap(
-            get_log_activity,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
+        # self._get_log_activity = eqx.filter_vmap(
+        #     get_log_activity,
+        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+        # )
 
         self._get_reactions_only_mask = eqx.filter_vmap(
             get_reactions_only_mask,

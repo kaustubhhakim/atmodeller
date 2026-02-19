@@ -250,7 +250,7 @@ class DissolutionNetwork(BaseReactionBlock):
     dissolution_matrix: NpFloat
     """Dissolution reaction matrix"""
     vmap_solubility: Callable
-    """Vectorised solubility function for dissolution reactions"""
+    """Vectorized solubility function for dissolution reactions"""
     dilute_limit: bool = True
     """Whether to assume dilute limit for all dissolution reactions"""
 
@@ -513,6 +513,41 @@ class ReactionSystem(BaseReactionBlock):
     def number_reactions(self):
         """Number of reactions"""
         return sum(block.number_reactions for block in self.blocks)
+
+    def get_log_activity(
+        self,
+        log_number_moles: Array,
+        temperature: Float[Array, ""],
+        pressure: Float[Array, ""],
+        background_melt_mass: Float[Array, ""],
+    ) -> Float[Array, " species"]:
+        """Gets log activity of each species.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            background_melt_mass: Mass of the background melt (e.g., silicate melt)
+
+        Returns:
+            Log activity of each species
+        """
+        log_activity_gas = self.gas.get_log_activity(
+            log_number_moles[self.gas_slice], temperature, pressure
+        )
+        log_activity_melt = self.melt.get_log_mass_fraction(
+            log_number_moles[self.melt_slice], jnp.log(background_melt_mass), True
+        )
+        log_activity_solid = self.solid.get_log_mass_fraction(
+            log_number_moles[self.solid_slice], jnp.log(background_melt_mass)
+        )
+        log_activity_condensates = jnp.zeros(len(self.condensates))
+
+        log_activity = jnp.concatenate(
+            (log_activity_gas, log_activity_melt, log_activity_solid, log_activity_condensates)
+        )
+
+        return log_activity
 
     def get_log_Kp(
         self,

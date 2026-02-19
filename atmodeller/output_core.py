@@ -9,6 +9,7 @@ import pickle
 from pathlib import Path
 from typing import Any, Optional
 
+import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
@@ -21,6 +22,7 @@ from atmodeller.containers import SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
 from atmodeller.parameters import Parameters
+from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat
 
@@ -475,9 +477,32 @@ class Output:
         Returns:
             Log activity without stability
         """
-        log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_moles))
+        # This function no longer exists
+        # log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_moles))
 
-        return np.asarray(log_activity)
+        vmap_temperature = vmap_axes_spec(self.state.temperature)
+        pressure = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_moles))
+        vmap_pressure = vmap_axes_spec(pressure)
+        vmap_background_melt_mass = vmap_axes_spec(self.state.melt_mass)
+
+        log_activity_vmap = eqx.filter_vmap(
+            self.parameters.reaction_system.get_log_activity,
+            in_axes=(
+                LOG_NUMBER_MOLES_VMAP_AXES,
+                vmap_temperature,
+                vmap_pressure,
+                vmap_background_melt_mass,
+            ),
+        )  # type: ignore
+
+        return np.asarray(
+            log_activity_vmap(
+                jnp.asarray(self.log_number_moles),
+                self.state.temperature,
+                pressure,
+                self.state.melt_mass,
+            )
+        )  # type: ignore
 
     def reaction_mask(self) -> NpBool:  # 2-D
         """Gets the reaction mask of the residual array.

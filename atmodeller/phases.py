@@ -31,9 +31,12 @@ from collections.abc import Callable, Iterable
 from typing import Generic, Self
 
 import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
+from jax import lax
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, Float
+from jaxmod.utils import to_hashable
+from jaxtyping import Array, Float, Integer
 from molmass import Formula
 
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
@@ -141,10 +144,24 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
     O2_index: NpFloat
     """Index of O2 or np.nan if not present"""
+    vmap_log_activity: Callable
+    """Vectorized log activity functions"""
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.species = SpeciesCollection(species)
         self.O2_index = self.get_O2_index()
+
+        log_activity_funcs: list[Callable] = [
+            to_hashable(species_.activity.log_activity) for species_ in species
+        ]
+
+        def apply_log_activity(
+            index: Integer[Array, ""], temperature: Float[Array, ""], pressure: Float[Array, ""]
+        ) -> Float[Array, ""]:
+            return lax.switch(index, log_activity_funcs, temperature, pressure)
+
+        self.vmap_log_activity = eqx.filter_vmap(apply_log_activity, in_axes=(0, None, None))
+
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
@@ -164,6 +181,34 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         return cls(species_collection)
+
+    def get_log_activity(
+        self,
+        log_number_moles: Float[Array, " species"],
+        temperature: Float[Array, ""],
+        pressure: Float[Array, ""],
+    ) -> Float[Array, " species"]:
+        """Get the log activity of each species in the gas phase.
+
+        This is an ideal mixture of (potentially) non-ideal gases.
+
+        Args:
+            log_number_moles: Log number of moles of each species in the gas phase
+            temperature: Temperature of the gas phase
+            pressure: Pressure of the gas phase
+
+        Returns:
+            Log activity of each species in the gas phase
+        """
+        # Log activity of pure species
+        log_activity: Float[Array, " species"] = self.vmap_log_activity(
+            jnp.arange(self.species.number_species), temperature, pressure
+        )
+
+        # Ideal mixing
+        log_activity = log_activity + self.get_log_mole_fraction(log_number_moles)
+
+        return log_activity
 
     def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
@@ -211,6 +256,49 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         return cls(species_collection)
 
+    def get_log_mass_fraction(
+        self,
+        log_number_moles: Float[Array, " species"],
+        log_background_mass: Float[Array, ""],
+        dilute_limit: bool = True,
+    ) -> Float[Array, " species"]:
+        """Gets the log mass fraction of the species.
+
+        Args:
+            log_number_moles: Log number of moles
+            log_background_mass: Log mass of the background (e.g., silicate)
+            dilute_limit: Whether to assume the dilute limit for dissolution reactions. Defaults to
+                ``True``.
+
+        Returns:
+            Log mass fraction
+        """
+        log_mass: Float[Array, " species"] = log_number_moles + jnp.log(self.species.molar_masses)
+        # jax.debug.print("log_mass = {out}", out=log_mass)
+
+        if dilute_limit:
+            total_log_mass: Float[Array, ""] = log_background_mass
+        else:
+            # Must account for a background (silicate) melt mass, given by the thermodynamic state
+            log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(
+                log_mass, log_background_mass
+            )
+            # jax.debug.print("log_mass_plus = {out}", out=log_mass_plus)
+
+            # Log total (sum in linear space)
+            total_log_mass = logsumexp(log_mass_plus)
+            # jax.debug.print("total_log_mass = {out}", out=total_log_mass)
+
+        # Log mass fraction = log(m_i) − log(total)
+        log_mass_fraction: Float[Array, " species"] = log_mass - total_log_mass
+        # jax.debug.print("log_mass_fraction = {out}", out=log_mass_fraction)
+
+        # Finally, convert to ppmw
+        log_mass_ppmw: Float[Array, " species"] = log_mass_fraction + jnp.log(1e6)
+        # jax.debug.print("log_mass_ppmw = {out}", out=log_mass_ppmw)
+
+        return log_mass_ppmw
+
 
 class SolidPhase(BasePhase[SpeciesProtocol]):
     """Multicomponent silicate solid
@@ -240,6 +328,41 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         )
 
         return cls(species_collection)
+
+    def get_log_mass_fraction(
+        self, log_number_moles: Float[Array, " species"], log_background_mass: Float[Array, ""]
+    ) -> Float[Array, " species"]:
+        """Gets the log mass fraction of the species.
+
+        Args:
+            log_number_moles: Log number of moles
+            log_background_mass: Log mass of the background (e.g., silicate)
+
+        Returns:
+            Log mass fraction in the melt
+        """
+        log_mass: Float[Array, " species"] = log_number_moles + jnp.log(self.species.molar_masses)
+        # jax.debug.print("log_mass = {out}", out=log_mass)
+
+        # Must account for a background (silicate) melt mass, given by the thermodynamic state
+        log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(
+            log_mass, log_background_mass
+        )
+        # jax.debug.print("log_mass_plus = {out}", out=log_mass_plus)
+
+        # Log total (sum in linear space)
+        total_log_mass = logsumexp(log_mass_plus)
+        # jax.debug.print("total_log_mass = {out}", out=total_log_mass)
+
+        # Log mass fraction = log(m_i) − log(total)
+        log_mass_fraction: Float[Array, " species"] = log_mass - total_log_mass
+        # jax.debug.print("log_mass_fraction = {out}", out=log_mass_fraction)
+
+        # Finally, convert to ppmw
+        log_mass_ppmw: Float[Array, " species"] = log_mass_fraction + jnp.log(1e6)
+        # jax.debug.print("log_mass_ppmw = {out}", out=log_mass_ppmw)
+
+        return log_mass_ppmw
 
 
 class PurePhase(BasePhase[ChemicalSpecies]):
@@ -271,3 +394,15 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         )
 
         return cls(species_collection)
+
+    # Although this could be a method, it is more efficient to not have to vmap over such a simple
+    # function.
+    # def get_log_activity(self) -> Float[Array, " species"]:
+    #     """Gets the log activity of a pure phase.
+
+    #     The activity of a pure phase is unity by definition.
+
+    #     Returns:
+    #         Log activity of a pure phase (zero)
+    #     """
+    #     return jnp.zeros(self.species.number_species)

@@ -17,7 +17,7 @@ from atmodeller.containers import ChemicalSpecies, Planet, ReservoirSpecies
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output_core import Output
-from atmodeller.phases import GasPhase, MeltPhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -41,9 +41,12 @@ H4Si_g: ChemicalSpecies = ChemicalSpecies.create_gas("H4Si")
 O2Si_l: ChemicalSpecies = ChemicalSpecies.create_condensed("O2Si", state="l")
 
 gas: GasPhase = GasPhase((H2_g, H2O_g, O2_g, SiO_g, H4Si_g))
-melt: MeltPhase = MeltPhase((O2Si_l,))
 
-subneptune_model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
+# To force SiO2 to have unity activity, as per previous tests. Eventually can be relaxed to allow
+# for a more realistic activity, but this is fine for testing the real gas EOS.
+condensates: PurePhase = PurePhase((O2Si_l,))
+
+subneptune_model: EquilibriumModel = EquilibriumModel(gas, condensates=(condensates,))
 
 
 def test_fO2_holley(helper) -> None:
