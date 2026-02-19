@@ -113,6 +113,21 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         return log_molar_mass
 
+    def get_log_mole_fraction(
+        self, log_number_moles: Float[Array, " species"]
+    ) -> Float[Array, " species"]:
+        """Get the log mole fraction of each species in the phase.
+
+        Args:
+            log_number_moles: Log number of moles of each species in the phase
+
+        Returns:
+            Log mole fractions of each species in the phase
+        """
+        log_total_moles: Float[Array, ""] = logsumexp(log_number_moles)
+
+        return log_number_moles - log_total_moles
+
     def __len__(self) -> int:
         return len(self.species)
 
