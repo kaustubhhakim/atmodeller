@@ -90,44 +90,40 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """Returns an empty phase instance."""
         return cls([])
 
-    def get_log_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
-        """Get the log mass of the phase.
+    # TODO: May not be required here
+    # def get_log_molar_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
+    #     """Get the log molar mass of the phase.
 
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
+    #     Args:
+    #         log_number_moles: Log number of moles of each species in the phase
 
-        Returns:
-            Log mass of the phase
-        """
-        return logsumexp(log_number_moles, b=self.species.molar_masses)
+    #     Returns:
+    #         Log molar mass of the phase
+    #     """
+    #     log_molar_mass: Float[Array, ""] = self.get_log_mass(log_number_moles) - logsumexp(
+    #         log_number_moles
+    #     )
 
-    def get_log_molar_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
-        """Get the log molar mass of the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-
-        Returns:
-            Log molar mass of the phase
-        """
-        log_molar_mass: Float[Array, ""] = self.get_log_mass(log_number_moles) - logsumexp(
-            log_number_moles
-        )
-
-        return log_molar_mass
+    #     return log_molar_mass
 
     def get_log_mole_fraction(
-        self, log_number_moles: Float[Array, " species"]
+        self,
+        log_number_moles: Float[Array, " species"],
+        log_background_moles: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " species"]:
-        """Get the log mole fraction of each species in the phase.
+        """Get the log mole fraction of each species.
 
         Args:
-            log_number_moles: Log number of moles of each species in the phase
+            log_number_moles: Log number of moles of each species
+            log_background_moles: Log number of moles of the background. Defaults to negative
+                infinity (i.e., no background).
 
         Returns:
-            Log mole fractions of each species in the phase
+            Log mole fractions of each species
         """
-        log_total_moles: Float[Array, ""] = logsumexp(log_number_moles)
+        log_total_moles: Float[Array, ""] = logsumexp(
+            jnp.append(log_number_moles, log_background_moles)
+        )
 
         return log_number_moles - log_total_moles
 
@@ -188,17 +184,17 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
     ) -> Float[Array, " species"]:
-        """Get the log activity of each species in the gas phase.
+        """Get the log activity of each species.
 
         This is an ideal mixture of (potentially) non-ideal gases.
 
         Args:
-            log_number_moles: Log number of moles of each species in the gas phase
-            temperature: Temperature of the gas phase
-            pressure: Pressure of the gas phase
+            log_number_moles: Log number of moles of each species
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Log activity of each species in the gas phase
+            Log activity of each species
         """
         # Log activity of pure species
         log_activity: Float[Array, " species"] = self.vmap_log_activity(
@@ -209,6 +205,17 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         log_activity = log_activity + self.get_log_mole_fraction(log_number_moles)
 
         return log_activity
+
+    def get_log_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
+        """Get the log mass.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+
+        Returns:
+            Log mass of the phase
+        """
+        return logsumexp(log_number_moles, b=self.species.molar_masses)
 
     def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.

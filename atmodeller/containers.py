@@ -337,6 +337,8 @@ class ThermodynamicState(eqx.Module):
         pressure: Pressure in bar
         mass: Mass in kg. Defaults to ``1`` kg.
         melt_fraction: Melt fraction by weight in kg/kg. Defaults to ``1`` kg/kg.
+        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
+            value for silicate melts.
     """
 
     temperature: Array
@@ -347,6 +349,8 @@ class ThermodynamicState(eqx.Module):
     """Mass in kg"""
     melt_fraction: Array
     """Mass fraction of melt in kg/kg"""
+    molar_mass: Array
+    """Molar mass of the silicate in kg/mol"""
 
     def __init__(
         self,
@@ -354,11 +358,13 @@ class ThermodynamicState(eqx.Module):
         pressure: ArrayLike,
         mass: ArrayLike = 1,
         melt_fraction: ArrayLike = 1,
+        molar_mass: ArrayLike = 0.06,
     ):
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
         self.mass = as_j64(mass)
         self.melt_fraction = as_j64(melt_fraction)
+        self.molar_mass = as_j64(molar_mass)
 
     @property
     def melt_mass(self) -> Array:
@@ -366,9 +372,19 @@ class ThermodynamicState(eqx.Module):
         return self.mass * self.melt_fraction
 
     @property
+    def melt_moles(self) -> Array:
+        """Moles of the melt"""
+        return self.melt_mass / self.molar_mass
+
+    @property
     def solid_mass(self) -> Array:
         """Mass of the solid in kg"""
         return self.mass * (1.0 - self.melt_fraction)
+
+    @property
+    def solid_moles(self) -> Array:
+        """Moles of the solid"""
+        return self.solid_mass / self.molar_mass
 
     def get_pressure(self, gas_mass: Array) -> Array:
         """Gets the pressure.
@@ -422,6 +438,8 @@ class ThinAtmospherePlanet(eqx.Module):
         temperature: Temperature in K. Defaults to ``2000`` K.
         pressure: Pressure in bar. Defaults to ``np.nan`` to solve for the mechanical pressure
             balance at the surface.
+        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
+            value for silicate melts.
     """
 
     planet_mass: Array
@@ -436,6 +454,8 @@ class ThinAtmospherePlanet(eqx.Module):
     """Temperature in K"""
     pressure: Array
     """Pressure in bar"""
+    molar_mass: Array
+    """Molar mass of the silicate in kg/mol"""
 
     def __init__(
         self,
@@ -445,6 +465,7 @@ class ThinAtmospherePlanet(eqx.Module):
         surface_radius: ArrayLike = 6371000,
         temperature: ArrayLike = 2000,
         pressure: ArrayLike = np.nan,
+        molar_mass: ArrayLike = 0.06,
     ):
         self.planet_mass = as_j64(planet_mass)
         self.core_mass_fraction = as_j64(core_mass_fraction)
@@ -452,11 +473,17 @@ class ThinAtmospherePlanet(eqx.Module):
         self.surface_radius = as_j64(surface_radius)
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
+        self.molar_mass = as_j64(molar_mass)
 
     @property
     def mantle_mass(self) -> Array:
         """Mantle mass"""
         return self.planet_mass * self.mantle_mass_fraction
+
+    @property
+    def mantle_moles(self) -> Array:
+        """Moles of the mantle"""
+        return self.mantle_mass / self.molar_mass
 
     @property
     def mantle_mass_fraction(self) -> Array:
@@ -469,9 +496,19 @@ class ThinAtmospherePlanet(eqx.Module):
         return self.mantle_mass * self.mantle_melt_fraction
 
     @property
+    def mantle_melt_moles(self) -> Array:
+        """Moles of the molten mantle"""
+        return self.mantle_melt_mass / self.molar_mass
+
+    @property
     def mantle_solid_mass(self) -> Array:
         """Mass of the solid mantle"""
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
+
+    @property
+    def mantle_solid_moles(self) -> Array:
+        """Moles of the solid mantle"""
+        return self.mantle_solid_mass / self.molar_mass
 
     @property
     def surface_area(self) -> Array:
@@ -497,8 +534,16 @@ class ThinAtmospherePlanet(eqx.Module):
         return self.mantle_melt_mass
 
     @property
+    def melt_moles(self) -> Array:
+        return self.mantle_melt_moles
+
+    @property
     def solid_mass(self) -> Array:
         return self.mantle_solid_mass
+
+    @property
+    def solid_moles(self) -> Array:
+        return self.mantle_solid_moles
 
     def get_pressure(self, gas_mass: Array) -> Array:
         """Gets the pressure.
