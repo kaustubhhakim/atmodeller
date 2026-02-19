@@ -80,7 +80,11 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
-    """Multicomponent gas mixture"""
+    """Multicomponent gas mixture
+
+    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
+    type checkers (e.g., Pyright) infer types correctly.
+    """
 
     O2_index: NpFloat
     """Index of O2 or np.nan if not present"""
@@ -94,7 +98,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
     @classmethod
     def create(cls, species: str | Iterable[str]) -> Self:
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: A single gas species name or iterable of names
@@ -126,7 +130,11 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
 
 class MeltPhase(BasePhase[SpeciesProtocol]):
-    """Multicomponent silicate melt with optionally dissolved volatiles"""
+    """Multicomponent silicate melt with optionally dissolved volatiles
+
+    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
+    type checkers (e.g., Pyright) infer types correctly.
+    """
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
@@ -136,7 +144,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
     @classmethod
     def create(cls, species: str | Iterable[str]) -> Self:
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: A single melt species name or iterable of names
@@ -152,7 +160,11 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
 
 class SolidPhase(BasePhase[SpeciesProtocol]):
-    """Multicomponent silicate solid"""
+    """Multicomponent silicate solid
+
+    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
+    type checkers (e.g., Pyright) infer types correctly.
+    """
 
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
@@ -162,7 +174,7 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
     @classmethod
     def create(cls, species: str | Iterable[str]) -> Self:
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: A single solid species name or iterable of names
@@ -178,7 +190,11 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
 
 class PurePhase(BasePhase[ChemicalSpecies]):
-    """Pure, unity-activity phases"""
+    """Pure, unity-activity phases
+
+    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
+    type checkers (e.g., Pyright) infer types correctly.
+    """
 
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.species = SpeciesCollection(species)
@@ -188,7 +204,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
 
     @classmethod
     def create(cls, species: str, state: str = SOLID_STATE) -> Self:
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: Species
