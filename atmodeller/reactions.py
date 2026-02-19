@@ -31,8 +31,9 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
+from jax.scipy.special import logsumexp
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
-from jaxtyping import Array, Float, Integer
+from jaxtyping import Array, ArrayLike, Float, Integer
 from xmmutablemap import ImmutableMap
 
 from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
@@ -379,10 +380,22 @@ class PhaseIndex:
 
 
 class ReactionSystem(BaseReactionBlock):
-    """Reaction system that includes both core chemical reactions and dissolution reactions.
+    """Unified reaction system for core chemical reactions and dissolution reactions.
+
+    Handles phase indexing, assembly of reaction matrices, stability, and evaluation of equilibrium
+    constants and residuals in a JAX-compatible way.
+
+    Phases supported:
+        - gas
+        - melt
+        - solid
+        - condensates
 
     Args:
-        species: An iterable of species
+        gas: GasPhase
+        melt: MeltPhase
+        solid: SolidPhase
+        condensates: Iterable of PurePhase
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -407,6 +420,7 @@ class ReactionSystem(BaseReactionBlock):
     """Stability matrix of the full reaction system"""
     _O2_index: NpInt
     _has_O2: NpBool
+    _log_stoich_matrix: NpFloat
     phase_indices: ImmutableMap[str, PhaseIndex]
 
     def __init__(
@@ -421,27 +435,32 @@ class ReactionSystem(BaseReactionBlock):
         self.melt = melt
         self.solid = solid
         self.condensates = tuple(condensates)
+
+        # Flatten all species
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
             species_ for condensate in condensates for species_ in condensate.species
         )
-
-        # Phase ordering and indexing
-        self.species = SpeciesCollection(
+        all_species: tuple[SpeciesProtocol, ...] = (
             gas.species.species + melt.species.species + solid.species.species + condensate_species
         )
+        self.species = SpeciesCollection(all_species)
 
-        phase_indices: dict[str, PhaseIndex] = {}
-        start: int = 0
-        phase_indices["gas"] = PhaseIndex(start, start + gas.species.number_species)
-        start = phase_indices["gas"].stop
-        phase_indices["melt"] = PhaseIndex(start, start + melt.species.number_species)
-        start = phase_indices["melt"].stop
-        phase_indices["solid"] = PhaseIndex(start, start + solid.species.number_species)
-        start = phase_indices["solid"].stop
-        phase_indices["condensates"] = PhaseIndex(start, start + len(condensate_species))
-        self.phase_indices = ImmutableMap(phase_indices)
+        # Phase indexing
+        start = 0
+        indices: dict[str, PhaseIndex] = {}
+        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
+        for phase_name, phase_collection in zip(
+            phase_order, [gas, melt, solid, condensate_species]
+        ):
+            n: int = len(phase_collection)
+            indices[phase_name] = PhaseIndex(start, start + n)
+            start += n
+        self.phase_indices = ImmutableMap(indices)
 
         self.formula_matrix = get_formula_matrix(self.species)
+        self._log_stoich_matrix = np.where(
+            self.formula_matrix > 0, np.log(self.formula_matrix), -np.inf
+        )
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
@@ -453,46 +472,37 @@ class ReactionSystem(BaseReactionBlock):
 
         self.output_to_logger()
 
-    # General phase helpers
-    def species_slice(self, phase_name: str) -> slice:
-        """Returns a slice for a given phase."""
-        return self.phase_indices[phase_name].slice
-
-    def species_mask(self, phase_name: str) -> NpBool:
-        """Returns a boolean mask for a given phase."""
-        return self.phase_indices[phase_name].mask(len(self.species))
-
     @property
     def gas_slice(self) -> slice:
-        return self.species_slice("gas")
+        return self.phase_slice("gas")
 
     @property
     def gas_species_mask(self) -> NpBool:
-        return self.species_mask("gas")
+        return self.phase_mask("gas")
 
     @property
     def melt_slice(self) -> slice:
-        return self.species_slice("melt")
+        return self.phase_slice("melt")
 
     @property
     def melt_species_mask(self) -> NpBool:
-        return self.species_mask("melt")
+        return self.phase_mask("melt")
 
     @property
     def solid_slice(self) -> slice:
-        return self.species_slice("solid")
+        return self.phase_slice("solid")
 
     @property
     def solid_species_mask(self) -> NpBool:
-        return self.species_mask("solid")
+        return self.phase_mask("solid")
 
     @property
     def condensates_slice(self) -> slice:
-        return self.species_slice("condensates")
+        return self.phase_slice("condensates")
 
     @property
     def condensates_species_mask(self) -> NpBool:
-        return self.species_mask("condensates")
+        return self.phase_mask("condensates")
 
     @property
     def blocks(self) -> tuple[BaseReactionBlock, ...]:
@@ -554,8 +564,37 @@ class ReactionSystem(BaseReactionBlock):
     def get_matrix(self) -> NpFloat:
         return self.matrix
 
-    def get_stability_matrix(self) -> NpFloat:
+    def get_stability_matrix(self) -> ArrayLike:
         return self.stability_matrix
+
+    def get_log_element_moles(
+        self, log_number_moles: Float[Array, " num_species"]
+    ) -> Float[Array, " num_elements"]:
+        """Gets log number of moles of each element.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+
+        Returns:
+            Log number of moles of each element
+        """
+        log_terms: Float[Array, "element species"] = log_number_moles + self._log_stoich_matrix
+
+        return logsumexp(log_terms, axis=1)
+
+    def apply_stability(
+        self, residual: Float[Array, " num_reactions"], log_stability: Float[Array, " num_species"]
+    ) -> Float[Array, " num_reactions"]:
+        """Subtract stability contribution from residual.
+
+        Args:
+            residual: Residual of the reaction network before applying stability
+            log_stability: Log stability of each species
+
+        Returns:
+            Residual of the reaction network after applying stability
+        """
+        return residual - jnp.dot(self.get_stability_matrix(), safe_exp(log_stability))
 
     def get_residual(
         self,
@@ -581,8 +620,26 @@ class ReactionSystem(BaseReactionBlock):
         residual: Float[Array, " num_reactions"] = jnp.dot(self.matrix, log_activity) - log_Kp
         # jax.debug.print("reaction residual before stability = {out}", out=residual)
 
-        # Account for species stability
-        residual = residual - jnp.dot(self.stability_matrix, safe_exp(log_stability))
-        # jax.debug.print("reaction residual after stability = {out}", out=residual)
+        return self.apply_stability(residual, log_stability)
 
-        return residual
+    def phase_slice(self, phase_name: str) -> slice:
+        """Slice object for a given phase.
+
+        Args:
+            phase_name: Name of the phase
+
+        Returns:
+                Slice object for the phase
+        """
+        return self.phase_indices[phase_name].slice
+
+    def phase_mask(self, phase_name: str) -> NpBool:
+        """Boolean mask for a given phase.
+
+        Args:
+            phase_name: Name of the phase
+
+        Returns:
+            Boolean mask for the phase
+        """
+        return self.phase_indices[phase_name].mask(len(self.species))

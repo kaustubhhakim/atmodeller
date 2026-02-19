@@ -113,6 +113,9 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         return log_molar_mass
 
+    def __len__(self) -> int:
+        return len(self.species)
+
 
 class GasPhase(BasePhase[ChemicalSpecies]):
     """Multicomponent gas mixture

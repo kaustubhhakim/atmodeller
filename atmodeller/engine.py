@@ -30,7 +30,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
 from jaxmod.utils import safe_exp, to_hashable
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.containers import SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
@@ -63,79 +63,6 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     # jax.debug.print("active_mask = {out}", out=active_mask)
 
     return active_mask
-
-
-def get_log_element_moles(
-    parameters: Parameters, log_number_moles: Float[Array, " species"]
-) -> Float[Array, " elements"]:
-    """Gets the log number of moles of elements.
-
-    Args:
-        parameters: Parameters
-        log_number_moles: Log number of moles
-
-    Returns:
-        Log number of moles of elements
-    """
-    # Could precompute and store the log formula matrix
-    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.reaction_system.formula_matrix
-    )
-    mask: Bool[Array, "elements species"] = formula_matrix > 0
-    log_stoich: Float[Array, "element species"] = jnp.where(
-        mask, jnp.log(formula_matrix), -jnp.inf
-    )
-
-    log_terms: Float[Array, "element species"] = log_stoich + log_number_moles
-
-    log_element_moles: Float[Array, " elements"] = logsumexp(log_terms, axis=1)
-
-    return log_element_moles
-
-
-# TODO: Remove eventually, but keep until output routines are updated.
-def get_element_moles(
-    parameters: Parameters, log_number_moles: Float[Array, " species"]
-) -> Float[Array, " elements"]:
-    """Gets the number of moles of elements in the gas or condensed phase.
-
-    Input values are sanitised only for output routines, where partitioning between condensed and
-    gas species is required. For the solver itself, this distinction is unnecessary.
-
-    Args:
-        parameters: Parameters
-        log_number_moles: Log number of moles
-
-    Returns:
-        Number of moles of elements in the gas or condensed phase
-    """
-    species_moles: Array = jnp.nan_to_num(safe_exp(log_number_moles), nan=0.0)
-
-    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
-        parameters.reaction_system.formula_matrix
-    )
-    element_moles: Float[Array, " elements"] = formula_matrix @ species_moles
-
-    return element_moles
-
-
-def get_gas_species_data(
-    parameters: Parameters, some_array: ArrayLike
-) -> Shaped[Array, " species"]:
-    """Masks the gas species data from an array.
-
-    Args:
-        parameters: Parameters
-        some_array: Some array to mask the gas species data from
-
-    Returns:
-        An array with gas species data from `some_array` and other entries zeroed
-    """
-    gas_data: Shaped[Array, " species"] = (
-        jnp.asarray(some_array) * parameters.reaction_system.gas_species_mask
-    )
-
-    return gas_data
 
 
 def get_log_mole_fraction_in_gas(
@@ -369,28 +296,6 @@ def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     return mask
 
 
-# TODO: remove eventually
-# def get_gas_mass(
-#     parameters: Parameters, log_number_moles: Float[Array, " species"]
-# ) -> Float[Array, ""]:
-#     """Gets the gas mass.
-
-#     Args:
-#         parameters: Parameters
-#         log_number_moles: Log number of moles
-
-#     Returns:
-#         Gas mass
-#     """
-#     gas_molar_mass: Float[Array, " species"] = get_gas_species_data(
-#         parameters, parameters.species.molar_masses
-#     )
-#     log_gas_mass: Float[Array, ""] = logsumexp(log_number_moles + jnp.log(gas_molar_mass))
-#     gas_mass: Float[Array, ""] = jnp.exp(log_gas_mass)
-
-#     return gas_mass
-
-
 def get_total_pressure(
     parameters: Parameters, log_number_moles: Float[Array, " species"]
 ) -> Float[Array, ""]:
@@ -487,8 +392,8 @@ def objective_function(
     # log_element_moles_total: Float[Array, " elements"] = jnp.log(element_moles_total)
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
-    log_element_moles_total: Float[Array, " elements"] = get_log_element_moles(
-        parameters, log_number_moles
+    log_element_moles_total: Float[Array, " elements"] = (
+        parameters.reaction_system.get_log_element_moles(log_number_moles)
     )
 
     log_target_moles: Float[Array, " elements"] = parameters.mass_constraints.log_abundance()

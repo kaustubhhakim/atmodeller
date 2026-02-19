@@ -20,7 +20,7 @@ import equinox as eqx
 from jaxtyping import Array
 
 from atmodeller.engine import (
-    get_element_moles,
+    # get_element_moles,
     # get_element_moles_in_melt,
     get_log_activity,
     get_reactions_only_mask,
@@ -72,10 +72,10 @@ class VmappedFunctions:
         # Compute axes specs once
         parameters_vmap_axes: Parameters = vmap_axes_spec(parameters)
 
-        self._get_element_moles = eqx.filter_vmap(
-            get_element_moles,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
-        )
+        # self._get_element_moles = eqx.filter_vmap(
+        #     get_element_moles,
+        #     in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+        # )
 
         # self._get_element_moles_in_melt = eqx.filter_vmap(
         #     get_element_moles_in_melt,
