@@ -9,14 +9,18 @@ Having a single place for these aliases improves readability and consistency acr
 whilst also simplifying type checking and documentation.
 """
 
-from typing import TypeAlias
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 from jaxmod.type_aliases import OptxSolver as OptxSolver
+
+from atmodeller.interfaces import SpeciesProtocol
 
 NpArray: TypeAlias = npt.NDArray
 NpBool: TypeAlias = npt.NDArray[np.bool_]
 NpFloat: TypeAlias = npt.NDArray[np.float64]
 NpInt: TypeAlias = npt.NDArray[np.int_]
 Scalar: TypeAlias = int | float
+
+TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
