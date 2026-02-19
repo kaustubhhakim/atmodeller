@@ -57,7 +57,6 @@ dependencies = [
     # Optax pinned for Intel macOS
     "optax==0.2.5; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     "optax>0.2.5; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "xmmutablemap>=0.2.1",
     "optimistix>=0.0.11",
     # Equinox 0.13.3 breaks the code. To fix.
     "equinox==0.13.2",
