@@ -493,6 +493,7 @@ class Output:
             self.parameters.reaction_system.get_log_activity,
             in_axes=(
                 LOG_NUMBER_MOLES_VMAP_AXES,
+                LOG_NUMBER_MOLES_VMAP_AXES,  # log_stability has the same shape as log_number_moles
                 vmap_temperature,
                 vmap_pressure,
                 vmap_background_melt_mass,
@@ -502,6 +503,7 @@ class Output:
         return np.asarray(
             log_activity_vmap(
                 jnp.asarray(self.log_number_moles),
+                jnp.asarray(self.log_stability),
                 self.state.temperature,
                 pressure,
                 self.state.melt_mass,

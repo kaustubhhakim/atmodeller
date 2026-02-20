@@ -177,8 +177,8 @@ def objective_function(
     temperature: Float[Array, ""] = parameters.state.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2)
-    jax.debug.print("log_number_moles = {out}", out=log_number_moles)
-    jax.debug.print("log_stability = {out}", out=log_stability)
+    # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
+    # jax.debug.print("log_stability = {out}", out=log_stability)
 
     total_pressure: Float[Array, ""] = get_total_pressure(
         parameters, log_number_moles, log_stability
@@ -187,6 +187,7 @@ def objective_function(
 
     log_activity: Float[Array, " species"] = parameters.reaction_system.get_log_activity(
         log_number_moles,
+        log_stability,
         temperature,
         total_pressure,
         jnp.log(parameters.state.melt_mass),

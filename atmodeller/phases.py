@@ -91,39 +91,38 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """Returns an empty phase instance."""
         return cls([])
 
-    # Need to ensure all phases have this method first
-    # @abstractmethod
-    # def get_log_mole_fractions(
-    #     self,
-    #     log_number_moles: Float[Array, " num_species"],
-    #     log_stability: Float[Array, " num_species"],
-    #     log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-    # ) -> Float[Array, " num_species"]:
-    #     """Get the log mole fraction of each species.
+    @abstractmethod
+    def get_log_mole_fractions(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    ) -> Float[Array, " num_species"]:
+        """Get the log mole fraction of each species.
 
-    #     Args:
-    #         log_number_moles: Log number of moles of each species
-    #         log_stability: Log stability of each species
-    #         log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
-    #             negative infinity (i.e., no inert component).
+        Args:
+            log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
+            log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
+                negative infinity (i.e., no inert component).
 
-    #     Returns:
-    #         Log mole fractions of each species
-    #     """
+        Returns:
+            Log mole fractions of each species
+        """
 
     def get_log_effective_moles(
         self,
         log_number_moles: Float[Array, " num_species"],
         log_stability: Float[Array, " num_species"],
     ) -> Float[Array, " num_species"]:
-        """Gets the log effective moles of the phase, accounting for stability.
+        """Gets the log effective moles of species in the phase, accounting for stability.
 
         Args:
             log_number_moles: Log number of moles of each species
             log_stability: Log stability of each species
 
         Returns:
-            Log effective moles of the phase
+            Log effective moles of each species in the phase
         """
         log_stability_masked: Float[Array, " num_species"] = jnp.where(
             self.species.active_stability, log_stability, 0.0
@@ -202,7 +201,8 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
     def get_log_activity(
         self,
-        log_number_moles: Float[Array, " species"],
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
     ) -> Float[Array, " species"]:
@@ -212,6 +212,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         Args:
             log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -224,7 +225,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         # Ideal mixing
-        log_activity = log_activity + self.get_log_mole_fractions(log_number_moles)
+        log_activity = log_activity + self.get_log_mole_fractions(log_number_moles, log_stability)
 
         return log_activity
 
@@ -242,23 +243,45 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         Returns:
             Log mass of the phase
         """
+        # An inert background is not accommodated in the gas phase, but we include it here for
+        # consistency with the other phases.
         log_effective_moles: Float[Array, " num_species"] = self.get_log_effective_moles(
             log_number_moles, log_stability
         )
 
         return logsumexp(log_effective_moles, b=self.species.molar_masses)
 
-    @override
     def get_log_mole_fractions(
         self,
         log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
         log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " num_species"]:
+
+        log_effective_moles: Float[Array, " num_species"] = self.get_log_effective_moles(
+            log_number_moles, log_stability
+        )
         log_total_moles: Float[Array, ""] = logsumexp(
-            jnp.append(log_number_moles, log_inert_moles)
+            jnp.append(log_effective_moles, log_inert_moles)
         )
 
         return log_number_moles - log_total_moles
+
+    # @override
+    # def get_log_mole_fractions(
+    #     self,
+    #     log_number_moles: Float[Array, " num_species"],
+    #     log_stability: Float[Array, " num_species"],
+    #     log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    # ) -> Float[Array, " num_species"]:
+    #     log_effective_moles: Float[Array, " num_species"] = self.get_log_effective_moles(
+    #         log_number_moles, log_inert_moles
+    #     )
+    #     log_total_moles: Float[Array, ""] = logsumexp(
+    #         jnp.append(log_effective_moles, log_inert_moles)
+    #     )
+
+    #     return log_number_moles - log_total_moles
 
     def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
@@ -427,6 +450,13 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
         return log_mass_ppmw
 
+    @override
+    def get_log_mole_fractions(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    ) -> Float[Array, " num_species"]: ...
+
 
 class PurePhase(BasePhase[ChemicalSpecies]):
     """Pure, unity-activity phases
@@ -464,6 +494,32 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         )
 
         return cls(species_collection)
+
+    @override
+    def get_log_mole_fractions(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    ) -> Float[Array, " num_species"]:
+        """Gets the log mole fraction of the pure phase.
+
+        The activity of a pure phase is unity by definition, so the log mole fraction is zero.
+
+        Args:
+            log_number_moles: Log number of moles of each species. Not used.
+            log_stability: Log stability of each species. Not used.
+            log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
+                negative infinity (i.e., no inert component). Not used.
+
+        Returns:
+            Log mole fraction of the pure phase (zero)
+        """
+        del log_number_moles
+        del log_stability
+        del log_inert_moles
+
+        return jnp.zeros(self.species.number_species)
 
     # Although this could be a method, it is more efficient to not have to vmap over such a simple
     # function that just returns zeros.

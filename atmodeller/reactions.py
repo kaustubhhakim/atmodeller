@@ -508,7 +508,8 @@ class ReactionSystem(BaseReactionBlock):
 
     def get_log_activity(
         self,
-        log_number_moles: Array,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
         log_inert_melt_mass: Float[Array, ""] = jnp.array(-jnp.inf),
@@ -518,6 +519,7 @@ class ReactionSystem(BaseReactionBlock):
 
         Args:
             log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
             log_inert_melt_mass: Log of the inert, non-reactive bulk component of melt. Defaults
@@ -529,7 +531,7 @@ class ReactionSystem(BaseReactionBlock):
             Log activity of each species
         """
         log_activity_gas: Float[Array, " num_gas_species"] = self.gas.get_log_activity(
-            log_number_moles[self.gas_slice], temperature, pressure
+            log_number_moles[self.gas_slice], log_stability[self.gas_slice], temperature, pressure
         )
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[self.melt_slice], log_inert_melt_mass, True
