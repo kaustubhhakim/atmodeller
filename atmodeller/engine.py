@@ -146,7 +146,7 @@ def get_total_pressure(
         parameters.reaction_system.gas_slice
     ]
     gas_mass: Float[Array, ""] = jnp.exp(
-        parameters.reaction_system.gas.get_log_mass(log_number_moles_gas, log_stability_gas)
+        parameters.reaction_system.gas.get_log_phase_mass(log_number_moles_gas, log_stability_gas)
     )
     pressure: Float[Array, ""] = parameters.state.get_pressure(gas_mass)
 

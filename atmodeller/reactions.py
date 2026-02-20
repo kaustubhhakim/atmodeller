@@ -534,7 +534,10 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles[self.gas_slice], log_stability[self.gas_slice], temperature, pressure
         )
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
-            log_number_moles[self.melt_slice], log_inert_melt_mass, True
+            log_number_moles[self.melt_slice],
+            log_stability[self.melt_slice],
+            log_inert_melt_mass,
+            True,
         )
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], log_inert_solid_mass
