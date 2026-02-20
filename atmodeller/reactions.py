@@ -362,8 +362,15 @@ class PhaseIndex:
         return slice(self.start, self.stop)
 
     def mask(self, n_total: int) -> np.ndarray:
-        """Boolean mask for this phase."""
-        mask = np.zeros(n_total, dtype=bool)
+        """Boolean mask for this phase
+
+        Args:
+            n_total: Total number of species in the full species collection
+
+        Returns:
+            Boolean mask for this phase
+        """
+        mask: NpBool = np.zeros(n_total, dtype=bool)
         mask[self.start : self.stop] = True
         return mask
 
@@ -548,17 +555,17 @@ class ReactionSystem(BaseReactionBlock):
         jax.debug.print("log_activity_melt = {out}", out=log_activity_melt)
 
         # New implementation will use moles.
-        log_melt_mole_fraction: Float[Array, " num_melt_species"] = (
-            self.melt.get_log_mole_fraction(
-                log_number_moles[self.melt_slice],
-                log_stability[self.melt_slice],
-                log_inert_molar_mass,
-                log_inert_melt_mass,
-                True,
-                True,
-            )
+        log_activity_new: Float[Array, " num_melt_species"] = self.melt.get_log_activity(
+            log_number_moles[self.melt_slice],
+            log_stability[self.melt_slice],
+            temperature,
+            pressure,
+            log_inert_molar_mass,
+            log_inert_melt_mass,
+            True,
+            True,
         )
-        jax.debug.print("log_melt_mole_fraction = {out}", out=log_melt_mole_fraction)
+        jax.debug.print("log_activity_new = {out}", out=log_activity_new)
 
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], log_inert_solid_mass

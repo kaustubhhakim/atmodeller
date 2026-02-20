@@ -301,9 +301,24 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     type checkers (e.g., Pyright) infer types correctly.
     """
 
+    vmap_log_activity: Callable
+    """Vectorized log activity functions"""
+
     @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
+
+        log_activity_funcs: list[Callable] = [
+            to_hashable(species_.activity.log_activity) for species_ in species
+        ]
+
+        def apply_log_activity(
+            index: Integer[Array, ""], temperature: Float[Array, ""], pressure: Float[Array, ""]
+        ) -> Float[Array, ""]:
+            return lax.switch(index, log_activity_funcs, temperature, pressure)
+
+        self.vmap_log_activity = eqx.filter_vmap(apply_log_activity, in_axes=(0, None, None))
+
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
         )
@@ -323,6 +338,54 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         )
 
         return cls(species_collection)
+
+    def get_log_activity(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+        temperature: Float[Array, ""],
+        pressure: Float[Array, ""],
+        log_inert_molar_mass: Float[Array, ""],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+        dilute_limit: bool = True,
+        ignore_condensed_species: bool = True,
+    ) -> Float[Array, " num_species"]:
+        """Gets the log activity of the species.
+
+        Args:
+            log_number_moles: Log number of moles
+            log_stability: Log stability of each species
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            log_inert_molar_mass: Log molar mass of the inert, non-reactive component
+                (e.g., silicate).
+            log_inert_moles: Log moles of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
+            dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
+                Defaults to ``True``.
+            ignore_condensed_species: Whether to exclude condensed species from the phase mole
+                fractions. Defaults to ``True``.
+
+        Returns:
+            Log activity of each species
+        """
+        # Log activity coefficient of pure species
+        log_activity: Float[Array, " num_species"] = self.vmap_log_activity(
+            jnp.arange(self.species.number_species), temperature, pressure
+        )
+
+        log_mole_fraction: Float[Array, " num_species"] = self.get_log_mole_fraction(
+            log_number_moles,
+            log_stability,
+            log_inert_molar_mass,
+            log_inert_moles,
+            dilute_limit,
+            ignore_condensed_species,
+        )
+
+        log_activity: Float[Array, " num_species"] = log_activity + log_mole_fraction
+
+        return log_activity
 
     def get_log_phase_mass(
         self,
