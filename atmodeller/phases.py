@@ -213,7 +213,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         # Ideal mixing
-        log_activity = log_activity + self.get_log_mole_fractions(log_number_moles, log_stability)
+        log_activity = log_activity + self.get_log_mole_fraction(log_number_moles, log_stability)
 
         return log_activity
 
@@ -256,7 +256,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         return log_phase_mass - logsumexp(log_effective_moles)
 
-    def get_log_mole_fractions(
+    def get_log_mole_fraction(
         self,
         log_number_moles: Float[Array, " num_species"],
         log_stability: Float[Array, " num_species"],
@@ -412,12 +412,54 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         return log_mass_ppmw
 
-    # TODO
-    def get_log_mole_fractions(
+    def get_log_mole_fraction(
         self,
         log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+        log_inert_molar_mass: Float[Array, ""],
         log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-    ) -> Float[Array, " num_species"]: ...
+        dilute_limit: bool = True,
+        ignore_condensed_species: bool = True,
+    ) -> Float[Array, " num_species"]:
+        """Gets the log mole fraction of the species.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
+            log_inert_molar_mass: Log molar mass of the inert, non-reactive component
+                (e.g., silicate).
+            log_inert_moles: Log moles of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
+            dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
+                Defaults to ``True``.
+            ignore_condensed_species: Whether to exclude condensed species from the phase mole
+                fractions. Defaults to ``True``.
+
+        Returns:
+            Log mole fraction
+        """
+        log_mass_fraction: Float[Array, " num_species"] = self.get_log_mass_fraction(
+            log_number_moles,
+            log_stability,
+            log_inert_molar_mass + log_inert_moles,
+            dilute_limit,
+            ignore_condensed_species,
+        ) - jnp.log(1e6)  # Convert back from ppmw to mass fraction
+
+        log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(
+            log_number_moles,
+            log_stability,
+            log_inert_molar_mass + log_inert_moles,
+            dilute_limit,
+            ignore_condensed_species,
+        )
+
+        log_mass: Float[Array, " num_species"] = log_mass_fraction + log_phase_mass
+        log_moles: Float[Array, " num_species"] = log_mass - jnp.log(self.species.molar_masses)
+        log_total_moles: Float[Array, ""] = logsumexp(jnp.append(log_moles, log_inert_moles))
+        log_mole_fraction: Float[Array, " num_species"] = log_moles - log_total_moles
+
+        return log_mole_fraction
 
 
 class SolidPhase(BasePhase[SpeciesProtocol]):
@@ -487,7 +529,7 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         return log_mass_ppmw
 
     # TODO
-    def get_log_mole_fractions(
+    def get_log_mole_fraction(
         self,
         log_number_moles: Float[Array, " num_species"],
         log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
@@ -531,7 +573,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
 
         return cls(species_collection)
 
-    def get_log_mole_fractions(self) -> Float[Array, " num_species"]:
+    def get_log_mole_fraction(self) -> Float[Array, " num_species"]:
         """Gets the log mole fraction of the pure phase.
 
         The activity of a pure phase is unity by definition, so the log mole fraction is zero.

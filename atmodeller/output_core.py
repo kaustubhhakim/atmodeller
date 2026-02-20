@@ -488,6 +488,8 @@ class Output:
         )
         vmap_pressure = vmap_axes_spec(pressure)
         vmap_background_melt_mass = vmap_axes_spec(self.state.melt_mass)
+        vmap_background_solid_mass = vmap_axes_spec(self.state.solid_mass)
+        vmap_molar_mass = vmap_axes_spec(self.state.molar_mass)
 
         log_activity_vmap = eqx.filter_vmap(
             self.parameters.reaction_system.get_log_activity,
@@ -496,7 +498,9 @@ class Output:
                 LOG_NUMBER_MOLES_VMAP_AXES,  # log_stability has the same shape as log_number_moles
                 vmap_temperature,
                 vmap_pressure,
+                vmap_molar_mass,
                 vmap_background_melt_mass,
+                vmap_background_solid_mass,
             ),
         )  # type: ignore
 
@@ -506,7 +510,9 @@ class Output:
                 jnp.asarray(self.log_stability),
                 self.state.temperature,
                 pressure,
-                self.state.melt_mass,
+                jnp.log(self.state.molar_mass),
+                jnp.log(self.state.melt_mass),
+                jnp.log(self.state.solid_mass),
             )
         )  # type: ignore
 

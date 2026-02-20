@@ -190,6 +190,7 @@ def objective_function(
         log_stability,
         temperature,
         total_pressure,
+        jnp.log(parameters.state.molar_mass),
         jnp.log(parameters.state.melt_mass),
         jnp.log(parameters.state.solid_mass),
     )

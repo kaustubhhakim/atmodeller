@@ -130,6 +130,9 @@ class ThermodynamicStateProtocol(Protocol):
     def melt_moles(self) -> Array: ...
 
     @property
+    def molar_mass(self) -> Array: ...
+
+    @property
     def solid_mass(self) -> Array: ...
 
     @property

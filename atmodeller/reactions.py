@@ -28,6 +28,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
@@ -512,6 +513,7 @@ class ReactionSystem(BaseReactionBlock):
         log_stability: Float[Array, " num_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
+        log_inert_molar_mass: Float[Array, ""],
         log_inert_melt_mass: Float[Array, ""] = jnp.array(-jnp.inf),
         log_inert_solid_mass: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, " num_species"]:
@@ -522,6 +524,7 @@ class ReactionSystem(BaseReactionBlock):
             log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
+            log_inert_molar_mass: Log of the inert, non-reactive bulk component of melt in moles.
             log_inert_melt_mass: Log of the inert, non-reactive bulk component of melt. Defaults
                 to negative infinity (i.e., no inert component).
             log_inert_solid_mass: Log of the inert, non-reactive bulk component of solid.
@@ -533,12 +536,30 @@ class ReactionSystem(BaseReactionBlock):
         log_activity_gas: Float[Array, " num_gas_species"] = self.gas.get_log_activity(
             log_number_moles[self.gas_slice], log_stability[self.gas_slice], temperature, pressure
         )
+
+        # Current implementation required this
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[self.melt_slice],
             log_stability[self.melt_slice],
             log_inert_melt_mass,
             True,
+            True,
         )
+        jax.debug.print("log_activity_melt = {out}", out=log_activity_melt)
+
+        # New implementation will use moles.
+        log_melt_mole_fraction: Float[Array, " num_melt_species"] = (
+            self.melt.get_log_mole_fraction(
+                log_number_moles[self.melt_slice],
+                log_stability[self.melt_slice],
+                log_inert_molar_mass,
+                log_inert_melt_mass,
+                True,
+                True,
+            )
+        )
+        jax.debug.print("log_melt_mole_fraction = {out}", out=log_melt_mole_fraction)
+
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], log_inert_solid_mass
         )
