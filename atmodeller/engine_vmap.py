@@ -59,7 +59,7 @@ class VmappedFunctions:
 
         self._get_total_pressure = eqx.filter_vmap(
             get_total_pressure,
-            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES),
+            in_axes=(parameters_vmap_axes, LOG_NUMBER_MOLES_VMAP_AXES, LOG_NUMBER_MOLES_VMAP_AXES),
         )
 
         self._objective_function_vmap = eqx.filter_vmap(
@@ -67,8 +67,8 @@ class VmappedFunctions:
             in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, parameters_vmap_axes),
         )
 
-    def get_total_pressure(self, log_number_moles: Array) -> Array:
-        return self._get_total_pressure(self.parameters, log_number_moles)
+    def get_total_pressure(self, log_number_moles: Array, log_stability: Array) -> Array:
+        return self._get_total_pressure(self.parameters, log_number_moles, log_stability)
 
     def objective_function(self, solution: Array) -> Array:
         return self._objective_function_vmap(solution, self.parameters)
