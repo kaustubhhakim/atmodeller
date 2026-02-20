@@ -349,10 +349,10 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         log_stability: Float[Array, " n_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
         log_inert_molar_mass: Float[Array, ""],
         log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-        dilute_limit: bool = True,
-        ignore_condensed_species: bool = True,
     ) -> Float[Array, " n_species"]:
         """Gets the log activity of the species.
 
@@ -361,14 +361,13 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
             log_stability: Log stability of each species in the melt phase
             temperature: Temperature in K
             pressure: Pressure in bar
+            dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
+            ignore_condensed_species: Whether to exclude condensed species from the phase mole
+                fractions
             log_inert_molar_mass: Log molar mass of the inert, non-reactive component
                 (e.g., silicate).
             log_inert_moles: Log moles of the inert, non-reactive component (e.g., silicate).
                 Defaults to negative infinity (i.e., no inert component).
-            dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
-                Defaults to ``True``.
-            ignore_condensed_species: Whether to exclude condensed species from the phase mole
-                fractions. Defaults to ``True``.
 
         Returns:
             Log activity of each species in the melt phase
@@ -384,10 +383,10 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         log_mole_fraction: Float[Array, " n_species"] = self.get_log_mole_fraction(
             log_number_moles,
             log_stability,
-            log_inert_molar_mass,
-            log_inert_moles,
             dilute_limit,
             ignore_condensed_species,
+            log_inert_molar_mass,
+            log_inert_moles,
         )
 
         log_activity: Float[Array, " n_species"] = log_activity + log_mole_fraction
@@ -398,21 +397,19 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         self,
         log_number_moles: Float[Array, " n_species"],
         log_stability: Float[Array, " n_species"],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-        dilute_limit: bool = True,
-        ignore_condensed_species: bool = True,
     ) -> Float[Array, ""]:
         """Gets the log phase mass.
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
             log_stability: Log stability of each species in the melt phase
+            dilute_limit: Whether to exclude dissolved species from the phase mass
+            ignore_condensed_species: Whether to exclude condensed species from the phase mass
             log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
                 Defaults to negative infinity (i.e., no inert component).
-            dilute_limit: Whether to exclude dissolved species from the phase mass. Defaults to
-                ``True``.
-            ignore_condensed_species: Whether to exclude condensed species from the phase mass.
-                Defaults to ``True``.
 
         Returns:
             Log mass of the melt phase
@@ -446,21 +443,19 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         self,
         log_number_moles: Float[Array, " n_species"],
         log_stability: Float[Array, " n_species"],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-        dilute_limit: bool = True,
-        ignore_condensed_species: bool = True,
     ) -> Float[Array, " n_species"]:
         """Gets the log mass fraction of the species in the melt phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
             log_stability: Log stability of each species in the melt phase
+            dilute_limit: Whether to exclude dissolved species from the phase mass
+            ignore_condensed_species: Whether to exclude condensed species from the phase mass
             log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
                 Defaults to negative infinity (i.e., no inert component).
-            dilute_limit: Whether to exclude dissolved species from the phase mass. Defaults to
-                ``True``.
-            ignore_condensed_species: Whether to exclude condensed species from the phase mass.
-                Defaults to ``True``.
 
         Returns:
             Log mass fraction of each species in the melt phase
@@ -469,7 +464,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
             log_number_moles, log_stability
         )
         log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(
-            log_number_moles, log_stability, log_inert_mass, dilute_limit, ignore_condensed_species
+            log_number_moles, log_stability, dilute_limit, ignore_condensed_species, log_inert_mass
         )
         # Log mass fraction = log(m_i) − log(total)
         log_mass_fraction: Float[Array, " n_species"] = log_effective_mass - log_phase_mass
@@ -481,24 +476,23 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         self,
         log_number_moles: Float[Array, " n_species"],
         log_stability: Float[Array, " n_species"],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
         log_inert_molar_mass: Float[Array, ""],
         log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-        dilute_limit: bool = True,
-        ignore_condensed_species: bool = True,
     ) -> Float[Array, " n_species"]:
         """Gets the log mole fraction of the species in the melt phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
             log_stability: Log stability of each species in the melt phase
+            dilute_limit: Whether to exclude dissolved species from the phase mole fractions
+            ignore_condensed_species: Whether to exclude condensed species from the phase mole
+                fractions.
             log_inert_molar_mass: Log molar mass of the inert, non-reactive component
                 (e.g., silicate).
             log_inert_moles: Log moles of the inert, non-reactive component (e.g., silicate).
                 Defaults to negative infinity (i.e., no inert component).
-            dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
-                Defaults to ``True``.
-            ignore_condensed_species: Whether to exclude condensed species from the phase mole
-                fractions. Defaults to ``True``.
 
         Returns:
             Log mole fraction of each species in the melt phase
@@ -506,16 +500,16 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         log_mass_fraction: Float[Array, " n_species"] = self.get_log_mass_fraction(
             log_number_moles,
             log_stability,
-            log_inert_molar_mass + log_inert_moles,
             dilute_limit,
             ignore_condensed_species,
+            log_inert_molar_mass + log_inert_moles,
         )
         log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(
             log_number_moles,
             log_stability,
-            log_inert_molar_mass + log_inert_moles,
             dilute_limit,
             ignore_condensed_species,
+            log_inert_molar_mass + log_inert_moles,
         )
 
         log_mass: Float[Array, " n_species"] = log_mass_fraction + log_phase_mass

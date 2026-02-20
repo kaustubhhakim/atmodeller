@@ -40,7 +40,6 @@ class Parameters(eqx.Module):
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
         batch_size: Batch size. Defaults to ``1``.
-        dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
     """
 
     reaction_system: ReactionSystem

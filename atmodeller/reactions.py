@@ -236,6 +236,9 @@ class DissolutionNetwork(BaseReactionBlock):
 
     Args:
         species: An iterable of species
+        dilute_limit: Whether to assume dilute limit for all dissolution reactions
+        ignore_condensed_species: Whether to exclude condensed species from melt phase mole
+            fractions
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -246,11 +249,20 @@ class DissolutionNetwork(BaseReactionBlock):
     """Dissolution reaction matrix"""
     vmap_solubility: Callable
     """Vectorized solubility function for dissolution reactions"""
-    dilute_limit: bool = True
+    dilute_limit: bool
     """Whether to assume dilute limit for all dissolution reactions"""
+    ignore_condensed_species: bool
+    """Whether to exclude condensed species from melt phase mole fractions"""
 
-    def __init__(self, species: Iterable[SpeciesProtocol]):
+    def __init__(
+        self,
+        species: Iterable[SpeciesProtocol],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
+    ):
         self.species = SpeciesCollection(species)
+        self.dilute_limit = dilute_limit
+        self.ignore_condensed_species = ignore_condensed_species
 
         # Most direct to construct the dissolution matrix in full species space
         dissolution_matrix: NpFloat = np.zeros(
@@ -392,6 +404,9 @@ class ReactionSystem(BaseReactionBlock):
         melt: Melt phase
         solid: Solid phase
         condensates: Iterable of pure phases (condensates)
+        dilute_limit: Whether to assume dilute limit for all dissolution reactions
+        ignore_condensed_species: Whether to exclude condensed species from melt phase mole
+            fractions
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -426,6 +441,8 @@ class ReactionSystem(BaseReactionBlock):
         melt: MeltPhase,
         solid: SolidPhase,
         condensates: Iterable[PurePhase],
+        dilute_limit: bool,
+        ignore_condensed_species: bool,
     ):
         # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
         # preserved because reaction matrices, phase slices, and activity concatenation rely on
@@ -462,7 +479,7 @@ class ReactionSystem(BaseReactionBlock):
             self.formula_matrix > 0, np.log(self.formula_matrix), -np.inf
         )
         self.reaction = ReactionNetwork(self.species)
-        self.dissolution = DissolutionNetwork(self.species)
+        self.dissolution = DissolutionNetwork(self.species, dilute_limit, ignore_condensed_species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
@@ -548,24 +565,38 @@ class ReactionSystem(BaseReactionBlock):
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[self.melt_slice],
             log_stability[self.melt_slice],
+            self.dissolution.dilute_limit,
+            self.dissolution.ignore_condensed_species,
             log_inert_melt_mass,
-            True,
-            True,
         )
         jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
 
-        # New implementation will use moles.
-        log_activity_new: Float[Array, " num_melt_species"] = self.melt.get_log_activity(
+        # Test output for activity by moles
+        log_activity_melt_by_moles: Float[Array, " num_melt_species"] = self.melt.get_log_activity(
             log_number_moles[self.melt_slice],
             log_stability[self.melt_slice],
             temperature,
             pressure,
+            self.dissolution.dilute_limit,
+            self.dissolution.ignore_condensed_species,
             log_inert_molar_mass,
             log_inert_melt_mass,
-            True,
-            True,
         )
-        jax.debug.print("activity_new = {out}", out=jnp.exp(log_activity_new))
+        jax.debug.print("activity_melt_by_moles = {out}", out=jnp.exp(log_activity_melt_by_moles))
+
+        jax.debug.print(
+            "melt_phase_mass = {out}",
+            out=jnp.exp(
+                self.melt.get_log_phase_mass(
+                    log_number_moles[self.melt_slice],
+                    log_stability[self.melt_slice],
+                    self.dissolution.dilute_limit,
+                    self.dissolution.ignore_condensed_species,
+                    log_inert_melt_mass,
+                )
+            ),
+        )
+        jax.debug.print("melt inert mass = {out}", out=jnp.exp(log_inert_melt_mass))
 
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], log_inert_solid_mass
