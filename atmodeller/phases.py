@@ -36,7 +36,7 @@ import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
 from jaxmod.utils import to_hashable
-from jaxtyping import Array, Float, Integer
+from jaxtyping import Array, Bool, Float, Integer
 from molmass import Formula
 
 from atmodeller import override
@@ -303,6 +303,55 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         return cls(species_collection)
 
+    def get_log_mass(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+        log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
+        dilute_limit: bool = True,
+        ignore_condensed_species: bool = True,
+    ) -> Float[Array, ""]:
+        """Gets the log mass.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
+            log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
+            dilute_limit: Whether to exclude dissolved species from the total mass. Defaults to
+                ``True``.
+            ignore_condensed_species: Whether to exclude condensed species from the total mass.
+                Defaults to ``True``.
+
+        Returns:
+            Log mass of the phase
+        """
+        # Compute for all species, then mask out contributions of dissolved and/or condensed
+        # species as needed
+        log_effective_moles: Float[Array, " num_species"] = self.get_log_effective_moles(
+            log_number_moles, log_stability
+        )
+        log_effective_mass: Float[Array, " num_species"] = log_effective_moles + jnp.log(
+            self.species.molar_masses
+        )
+        mask: Bool[Array, " num_species"] = jnp.ones(self.species.number_species, dtype=bool)
+
+        if dilute_limit:
+            # In the dilute limit, we exclude the contribution of dissolved species to the total
+            # mass
+            mask = mask.at[self.species.reservoir_species_mask].set(False)
+
+        if ignore_condensed_species:
+            # Ignore condensed species by masking their contributions to the total mass
+            mask = mask.at[self.species.reaction_species_mask].set(False)
+
+        log_mass: Float[Array, " num"] = log_effective_mass[mask]
+
+        # Account for an inert, non-reactive melt mass, given by the thermodynamic state
+        log_mass_plus: Float[Array, " num__plus_one"] = jnp.append(log_mass, log_inert_mass)
+
+        return logsumexp(log_mass_plus)
+
     def get_log_mass_fraction(
         self,
         log_number_moles: Float[Array, " num_species"],
@@ -321,6 +370,8 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log mass fraction
         """
+        # FIXME: Must account for chemical species
+
         log_mass: Float[Array, " num_species"] = log_number_moles + jnp.log(
             self.species.molar_masses
         )
