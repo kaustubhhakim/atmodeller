@@ -39,6 +39,7 @@ from jaxmod.utils import to_hashable
 from jaxtyping import Array, Float, Integer
 from molmass import Formula
 
+from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
@@ -90,6 +91,47 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """Returns an empty phase instance."""
         return cls([])
 
+    # Need to ensure all phases have this method first
+    # @abstractmethod
+    # def get_log_mole_fractions(
+    #     self,
+    #     log_number_moles: Float[Array, " num_species"],
+    #     log_stability: Float[Array, " num_species"],
+    #     log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    # ) -> Float[Array, " num_species"]:
+    #     """Get the log mole fraction of each species.
+
+    #     Args:
+    #         log_number_moles: Log number of moles of each species
+    #         log_stability: Log stability of each species
+    #         log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
+    #             negative infinity (i.e., no inert component).
+
+    #     Returns:
+    #         Log mole fractions of each species
+    #     """
+
+    def get_log_effective_moles(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+    ) -> Float[Array, " num_species"]:
+        """Gets the log effective moles of the phase, accounting for stability.
+
+        Args:
+            log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
+
+        Returns:
+            Log effective moles of the phase
+        """
+        log_stability_masked: Float[Array, " num_species"] = jnp.where(
+            self.species.active_stability, log_stability, 0.0
+        )
+        log_effective_moles: Float[Array, " num_species"] = log_number_moles + log_stability_masked
+
+        return log_effective_moles
+
     # TODO: May not be required here
     # def get_log_molar_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
     #     """Get the log molar mass of the phase.
@@ -105,27 +147,6 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
     #     )
 
     #     return log_molar_mass
-
-    def get_log_mole_fraction(
-        self,
-        log_number_moles: Float[Array, " species"],
-        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-    ) -> Float[Array, " species"]:
-        """Get the log mole fraction of each species.
-
-        Args:
-            log_number_moles: Log number of moles of each species
-            log_inert_moles: Log number of moles of the inert, non-reactive component. Defaults to
-                negative infinity (i.e., no inert component).
-
-        Returns:
-            Log mole fractions of each species
-        """
-        log_total_moles: Float[Array, ""] = logsumexp(
-            jnp.append(log_number_moles, log_inert_moles)
-        )
-
-        return log_number_moles - log_total_moles
 
     def __len__(self) -> int:
         return len(self.species)
@@ -143,6 +164,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
     vmap_log_activity: Callable
     """Vectorized log activity functions"""
 
+    @override
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.species = SpeciesCollection(species)
         self.O2_index = self.get_O2_index()
@@ -197,25 +219,46 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             Log activity of each species
         """
         # Log activity of pure species
-        log_activity: Float[Array, " species"] = self.vmap_log_activity(
+        log_activity: Float[Array, " num_species"] = self.vmap_log_activity(
             jnp.arange(self.species.number_species), temperature, pressure
         )
 
         # Ideal mixing
-        log_activity = log_activity + self.get_log_mole_fraction(log_number_moles)
+        log_activity = log_activity + self.get_log_mole_fractions(log_number_moles)
 
         return log_activity
 
-    def get_log_mass(self, log_number_moles: Float[Array, " species"]) -> Float[Array, ""]:
+    def get_log_mass(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_stability: Float[Array, " num_species"],
+    ) -> Float[Array, ""]:
         """Get the log mass.
 
         Args:
             log_number_moles: Log number of moles of each species
+            log_stability: Log stability of each species
 
         Returns:
             Log mass of the phase
         """
-        return logsumexp(log_number_moles, b=self.species.molar_masses)
+        log_effective_moles: Float[Array, " num_species"] = self.get_log_effective_moles(
+            log_number_moles, log_stability
+        )
+
+        return logsumexp(log_effective_moles, b=self.species.molar_masses)
+
+    @override
+    def get_log_mole_fractions(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    ) -> Float[Array, " num_species"]:
+        log_total_moles: Float[Array, ""] = logsumexp(
+            jnp.append(log_number_moles, log_inert_moles)
+        )
+
+        return log_number_moles - log_total_moles
 
     def get_O2_index(self) -> NpFloat:
         """Gets the species index corresponding to diatomic oxygen.
@@ -241,6 +284,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     type checkers (e.g., Pyright) infer types correctly.
     """
 
+    @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
         logger.info(
@@ -265,10 +309,10 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
     def get_log_mass_fraction(
         self,
-        log_number_moles: Float[Array, " species"],
+        log_number_moles: Float[Array, " num_species"],
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
         dilute_limit: bool = True,
-    ) -> Float[Array, " species"]:
+    ) -> Float[Array, " num_species"]:
         """Gets the log mass fraction of the species.
 
         Args:
@@ -281,14 +325,18 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log mass fraction
         """
-        log_mass: Float[Array, " species"] = log_number_moles + jnp.log(self.species.molar_masses)
+        log_mass: Float[Array, " num_species"] = log_number_moles + jnp.log(
+            self.species.molar_masses
+        )
         # jax.debug.print("log_mass = {out}", out=log_mass)
 
         if dilute_limit:
             total_log_mass: Float[Array, ""] = log_inert_mass
         else:
             # Must account for an inert, non-reactive melt mass, given by the thermodynamic state
-            log_mass_plus: Float[Array, " species_plus_one"] = jnp.append(log_mass, log_inert_mass)
+            log_mass_plus: Float[Array, " num_species_plus_one"] = jnp.append(
+                log_mass, log_inert_mass
+            )
             # jax.debug.print("log_mass_plus = {out}", out=log_mass_plus)
 
             # Log total (sum in linear space)
@@ -296,14 +344,21 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
             # jax.debug.print("total_log_mass = {out}", out=total_log_mass)
 
         # Log mass fraction = log(m_i) − log(total)
-        log_mass_fraction: Float[Array, " species"] = log_mass - total_log_mass
+        log_mass_fraction: Float[Array, " num_species"] = log_mass - total_log_mass
         # jax.debug.print("log_mass_fraction = {out}", out=log_mass_fraction)
 
         # Finally, convert to ppmw
-        log_mass_ppmw: Float[Array, " species"] = log_mass_fraction + jnp.log(1e6)
+        log_mass_ppmw: Float[Array, " num_species"] = log_mass_fraction + jnp.log(1e6)
         # jax.debug.print("log_mass_ppmw = {out}", out=log_mass_ppmw)
 
         return log_mass_ppmw
+
+    @override
+    def get_log_mole_fractions(
+        self,
+        log_number_moles: Float[Array, " num_species"],
+        log_inert_moles: Float[Array, ""] = jnp.array(-jnp.inf),
+    ) -> Float[Array, " num_species"]: ...
 
 
 class SolidPhase(BasePhase[SpeciesProtocol]):
@@ -313,6 +368,7 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
     type checkers (e.g., Pyright) infer types correctly.
     """
 
+    @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
         logger.info(
@@ -337,9 +393,9 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
     def get_log_mass_fraction(
         self,
-        log_number_moles: Float[Array, " species"],
+        log_number_moles: Float[Array, " num_species"],
         log_inert_mass: Float[Array, ""] = jnp.array(-jnp.inf),
-    ) -> Float[Array, " species"]:
+    ) -> Float[Array, " num_species"]:
         """Gets the log mass fraction of the species.
 
         Args:
@@ -379,6 +435,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
     type checkers (e.g., Pyright) infer types correctly.
     """
 
+    @override
     def __init__(self, species: Iterable[ChemicalSpecies]):
         self.species = SpeciesCollection(species)
 
