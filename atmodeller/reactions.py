@@ -36,7 +36,7 @@ from jax.scipy.special import logsumexp
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
 
-from atmodeller.constants import GAS_STATE, STANDARD_CONCENTRATION
+from atmodeller.constants import GAS_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
@@ -331,8 +331,8 @@ class DissolutionNetwork(BaseReactionBlock):
         # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
 
         log_Kp: Float[Array, " num_reactions"] = (
-            jnp.log(species_ppmw) - jnp.log(STANDARD_CONCENTRATION) - jnp.log(gas_species_activity)
-        )
+            jnp.log(species_ppmw) - jnp.log(1e6) - jnp.log(gas_species_activity)
+        )  # NOTE: convert from ppmw to mass fraction
 
         return log_Kp
 
@@ -552,7 +552,7 @@ class ReactionSystem(BaseReactionBlock):
             True,
             True,
         )
-        jax.debug.print("log_activity_melt = {out}", out=log_activity_melt)
+        jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
 
         # New implementation will use moles.
         log_activity_new: Float[Array, " num_melt_species"] = self.melt.get_log_activity(
@@ -565,7 +565,7 @@ class ReactionSystem(BaseReactionBlock):
             True,
             True,
         )
-        jax.debug.print("log_activity_new = {out}", out=log_activity_new)
+        jax.debug.print("activity_new = {out}", out=jnp.exp(log_activity_new))
 
         log_activity_solid: Float[Array, " num_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[self.solid_slice], log_inert_solid_mass
