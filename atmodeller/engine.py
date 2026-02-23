@@ -125,8 +125,8 @@ def get_min_log_elemental_abundance_per_species(
 
 
 def get_total_pressure(
-    parameters: Parameters, log_number_moles: Float[Array, " species"]
-) -> Float[Array, ""]:
+    parameters: Parameters, log_number_moles: Float[Array, "... n_species"]
+) -> Float[Array, "..."]:
     """Gets the total pressure.
 
     Args:
@@ -136,13 +136,14 @@ def get_total_pressure(
     Returns:
         Total pressure in bar
     """
-    log_number_moles_gas: Float[Array, " gas_species"] = log_number_moles[
-        parameters.reaction_system.gas_slice
+    log_number_moles_gas: Float[Array, "... n_gas_species"] = log_number_moles[
+        ..., parameters.reaction_system.gas_slice
     ]
-    gas_mass: Float[Array, ""] = jnp.exp(
+    gas_mass: Float[Array, "... 1"] = jnp.exp(
         parameters.reaction_system.gas.get_log_phase_mass(log_number_moles_gas)
     )
-    pressure: Float[Array, ""] = parameters.state.get_pressure(gas_mass)
+    gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
+    pressure: Float[Array, "..."] = parameters.state.get_pressure(gas_mass_squeeze)
 
     return pressure
 
@@ -174,12 +175,11 @@ def objective_function(
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    total_pressure: Float[Array, ""] = get_total_pressure(parameters, log_number_moles)
+    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, log_number_moles)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     log_activity: Float[Array, " species"] = parameters.reaction_system.get_log_activity(
         log_number_moles,
-        log_stability,
         temperature,
         total_pressure,
         jnp.log(parameters.state.molar_mass),
