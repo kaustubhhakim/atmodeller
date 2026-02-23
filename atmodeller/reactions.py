@@ -558,13 +558,12 @@ class ReactionSystem(BaseReactionBlock):
             Log activity of each species
         """
         log_activity_gas: Float[Array, " num_gas_species"] = self.gas.get_log_activity(
-            log_number_moles[self.gas_slice], log_stability[self.gas_slice], temperature, pressure
+            log_number_moles[self.gas_slice], temperature, pressure
         )
 
         # Current implementation required this
         log_activity_melt: Float[Array, " num_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[self.melt_slice],
-            log_stability[self.melt_slice],
             self.dissolution.dilute_limit,
             self.dissolution.ignore_condensed_species,
             log_inert_melt_mass,
@@ -574,7 +573,6 @@ class ReactionSystem(BaseReactionBlock):
         # Test output for activity by moles
         log_activity_melt_by_moles: Float[Array, " num_melt_species"] = self.melt.get_log_activity(
             log_number_moles[self.melt_slice],
-            log_stability[self.melt_slice],
             temperature,
             pressure,
             self.dissolution.dilute_limit,
@@ -589,7 +587,6 @@ class ReactionSystem(BaseReactionBlock):
             out=jnp.exp(
                 self.melt.get_log_phase_mass(
                     log_number_moles[self.melt_slice],
-                    log_stability[self.melt_slice],
                     self.dissolution.dilute_limit,
                     self.dissolution.ignore_condensed_species,
                     log_inert_melt_mass,

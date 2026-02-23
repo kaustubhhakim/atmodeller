@@ -250,9 +250,7 @@ class Output:
         Returns:
             Total pressure
         """
-        total_pressure: Array = self.vmapf.get_total_pressure(
-            jnp.asarray(self.log_number_moles), jnp.asarray(self.log_stability)
-        )
+        total_pressure: Array = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_moles))
 
         return np.asarray(total_pressure)
 
@@ -483,9 +481,7 @@ class Output:
         # log_activity: Array = self.vmapf.get_log_activity(jnp.asarray(self.log_number_moles))
 
         vmap_temperature = vmap_axes_spec(self.state.temperature)
-        pressure = self.vmapf.get_total_pressure(
-            jnp.asarray(self.log_number_moles), jnp.asarray(self.log_stability)
-        )
+        pressure = self.vmapf.get_total_pressure(jnp.asarray(self.log_number_moles))
         vmap_pressure = vmap_axes_spec(pressure)
         vmap_background_melt_mass = vmap_axes_spec(self.state.melt_mass)
         vmap_background_solid_mass = vmap_axes_spec(self.state.solid_mass)

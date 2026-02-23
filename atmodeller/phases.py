@@ -91,49 +91,22 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """Returns an empty phase instance."""
         return cls([])
 
-    def get_log_effective_mass(
-        self,
-        log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
+    def get_log_mass(
+        self, log_number_moles: Float[Array, " n_species"]
     ) -> Float[Array, " n_species"]:
-        """Gets the log effective mass of each species in the phase, accounting for stability.
+        """Gets the log mass of each species in the phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
-            log_stability: Log stability of each species in the phase
 
         Returns:
-            Log effective mass of each species in the phase
+            Log mass of each species in the phase
         """
-        log_effective_moles: Float[Array, " n_species"] = self.get_log_effective_moles(
-            log_number_moles, log_stability
-        )
-        log_effective_mass: Float[Array, " n_species"] = log_effective_moles + jnp.log(
+        log_mass: Float[Array, " n_species"] = log_number_moles + jnp.log(
             self.species.molar_masses
         )
 
-        return log_effective_mass
-
-    def get_log_effective_moles(
-        self,
-        log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
-    ) -> Float[Array, " n_species"]:
-        """Gets the log effective moles of species in the phase, accounting for stability.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_stability: Log stability of each species in the phase
-
-        Returns:
-            Log effective moles of each species in the phase
-        """
-        log_stability_masked: Float[Array, " n_species"] = jnp.where(
-            self.species.active_stability, log_stability, 0.0
-        )
-        log_effective_moles: Float[Array, " n_species"] = log_number_moles + log_stability_masked
-
-        return log_effective_moles
+        return log_mass
 
     def __len__(self) -> int:
         return len(self.species)
@@ -190,7 +163,6 @@ class GasPhase(BasePhase[ChemicalSpecies]):
     def get_log_activity(
         self,
         log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
     ) -> Float[Array, " species"]:
@@ -200,7 +172,6 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         Args:
             log_number_moles: Log number of moles of each species in the gas phase
-            log_stability: Log stability of each species in the gas phase
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -213,69 +184,48 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         # Ideal mixing
-        log_activity = log_activity + self.get_log_mole_fraction(log_number_moles, log_stability)
+        log_activity = log_activity + self.get_log_mole_fraction(log_number_moles)
 
         return log_activity
 
-    def get_log_phase_mass(
-        self,
-        log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
-    ) -> Float[Array, ""]:
+    def get_log_phase_mass(self, log_number_moles: Float[Array, " n_species"]) -> Float[Array, ""]:
         """Get the log mass of the phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the gas phase
-            log_stability: Log stability of each species in the gas phase
 
         Returns:
             Log mass of the gas phase
         """
-        log_effective_mass: Float[Array, " n_species"] = self.get_log_effective_mass(
-            log_number_moles, log_stability
-        )
+        log_mass: Float[Array, " n_species"] = self.get_log_mass(log_number_moles)
 
-        return logsumexp(log_effective_mass)
+        return logsumexp(log_mass)
 
-    def get_log_molar_mass(
-        self,
-        log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
-    ) -> Float[Array, ""]:
+    def get_log_molar_mass(self, log_number_moles: Float[Array, " n_species"]) -> Float[Array, ""]:
         """Get the log molar mass.
 
         Args:
             log_number_moles: Log number of moles of each species in the gas phase
-            log_stability: Log stability of each species in the phase
 
         Returns:
             Log molar mass of the gas phase
         """
-        log_effective_moles: Float[Array, " n_species"] = self.get_log_effective_moles(
-            log_number_moles, log_stability
-        )
-        log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(log_number_moles, log_stability)
+        log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(log_number_moles)
 
-        return log_phase_mass - logsumexp(log_effective_moles)
+        return log_phase_mass - logsumexp(log_number_moles)
 
     def get_log_mole_fraction(
-        self,
-        log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
+        self, log_number_moles: Float[Array, " n_species"]
     ) -> Float[Array, " n_species"]:
         """Gets the log mole fraction of each species in the gas phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the gas phase
-            log_stability: Log stability of each species in the gas phase
 
         Returns:
             Log mole fraction of each species in the gas phase
         """
-        log_effective_moles: Float[Array, " n_species"] = self.get_log_effective_moles(
-            log_number_moles, log_stability
-        )
-        log_total_moles: Float[Array, ""] = logsumexp(log_effective_moles)
+        log_total_moles: Float[Array, ""] = logsumexp(log_number_moles)
 
         return log_number_moles - log_total_moles
 
@@ -346,7 +296,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def get_log_activity(
         self,
         log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
         temperature: Float[Array, ""],
         pressure: Float[Array, ""],
         dilute_limit: bool,
@@ -358,7 +307,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
-            log_stability: Log stability of each species in the melt phase
             temperature: Temperature in K
             pressure: Pressure in bar
             dilute_limit: Whether to exclude dissolved species from the phase mole fractions.
@@ -382,7 +330,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         log_mole_fraction: Float[Array, " n_species"] = self.get_log_mole_fraction(
             log_number_moles,
-            log_stability,
             dilute_limit,
             ignore_condensed_species,
             log_inert_molar_mass,
@@ -396,7 +343,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def get_log_phase_mass(
         self,
         log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
         dilute_limit: bool,
         ignore_condensed_species: bool,
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
@@ -405,7 +351,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
-            log_stability: Log stability of each species in the melt phase
             dilute_limit: Whether to exclude dissolved species from the phase mass
             ignore_condensed_species: Whether to exclude condensed species from the phase mass
             log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
@@ -416,9 +361,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         """
         # Compute for all species, then mask out contributions of dissolved and/or condensed
         # species as needed
-        log_effective_mass: Float[Array, " n_species"] = self.get_log_effective_mass(
-            log_number_moles, log_stability
-        )
+        log_effective_mass: Float[Array, " n_species"] = self.get_log_mass(log_number_moles)
         mask: Bool[Array, " n_species"] = jnp.ones(self.species.number_species, dtype=bool)
 
         if dilute_limit:
@@ -442,7 +385,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def get_log_mass_fraction(
         self,
         log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
         dilute_limit: bool,
         ignore_condensed_species: bool,
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
@@ -451,7 +393,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
-            log_stability: Log stability of each species in the melt phase
             dilute_limit: Whether to exclude dissolved species from the phase mass
             ignore_condensed_species: Whether to exclude condensed species from the phase mass
             log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
@@ -460,11 +401,9 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log mass fraction of each species in the melt phase
         """
-        log_effective_mass: Float[Array, " n_species"] = self.get_log_effective_mass(
-            log_number_moles, log_stability
-        )
+        log_effective_mass: Float[Array, " n_species"] = self.get_log_mass(log_number_moles)
         log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(
-            log_number_moles, log_stability, dilute_limit, ignore_condensed_species, log_inert_mass
+            log_number_moles, dilute_limit, ignore_condensed_species, log_inert_mass
         )
         # Log mass fraction = log(m_i) − log(total)
         log_mass_fraction: Float[Array, " n_species"] = log_effective_mass - log_phase_mass
@@ -475,7 +414,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def get_log_mole_fraction(
         self,
         log_number_moles: Float[Array, " n_species"],
-        log_stability: Float[Array, " n_species"],
         dilute_limit: bool,
         ignore_condensed_species: bool,
         log_inert_molar_mass: Float[Array, ""],
@@ -485,7 +423,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
-            log_stability: Log stability of each species in the melt phase
             dilute_limit: Whether to exclude dissolved species from the phase mole fractions
             ignore_condensed_species: Whether to exclude condensed species from the phase mole
                 fractions.
@@ -499,14 +436,12 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         """
         log_mass_fraction: Float[Array, " n_species"] = self.get_log_mass_fraction(
             log_number_moles,
-            log_stability,
             dilute_limit,
             ignore_condensed_species,
             log_inert_molar_mass + log_inert_moles,
         )
         log_phase_mass: Float[Array, ""] = self.get_log_phase_mass(
             log_number_moles,
-            log_stability,
             dilute_limit,
             ignore_condensed_species,
             log_inert_molar_mass + log_inert_moles,
