@@ -545,7 +545,7 @@ class ThinAtmospherePlanet(eqx.Module):
     def solid_moles(self) -> Array:
         return self.mantle_solid_moles
 
-    def get_pressure(self, gas_mass: Array) -> Array:
+    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
         """Gets the pressure.
 
         A pressure is used if specified, otherwise the default behaviour is to compute the
@@ -566,7 +566,7 @@ class ThinAtmospherePlanet(eqx.Module):
         )
         # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
 
-        pressure: Float[Array, ""] = jnp.where(
+        pressure: Float[Array, "..."] = jnp.where(
             pressure_specified, self.pressure, mechanical_pressure
         )
         # jax.debug.print("pressure = {out}", out=pressure)
