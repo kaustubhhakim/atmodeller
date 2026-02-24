@@ -141,7 +141,9 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         ) -> Float[Array, "..."]:
             return lax.switch(index, log_activity_funcs, temperature, pressure)
 
-        self.vmap_log_activity = eqx.filter_vmap(apply_log_activity, in_axes=(0, None, None))
+        self.vmap_log_activity = eqx.filter_vmap(
+            apply_log_activity, in_axes=(0, None, None), out_axes=-1
+        )
 
         logger.info(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
