@@ -279,6 +279,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         return np.array(element_molar_masses, dtype=float)
 
     @property
+    def number_elements(self) -> int:
+        """Number of unique elements in the species"""
+        return len(self.unique_elements)
+
+    @property
     def number_species(self) -> int:
         """Number of species"""
         return self.__len__()
