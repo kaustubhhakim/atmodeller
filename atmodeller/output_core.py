@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.units import unit_conversion
+from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, ArrayLike, Float
 from molmass import Formula
 
@@ -22,7 +23,7 @@ from atmodeller.containers import SpeciesCollection
 from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
 from atmodeller.parameters import Parameters
-from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
+from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.type_aliases import NpArray, NpBool, NpFloat
 

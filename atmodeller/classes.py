@@ -31,16 +31,18 @@ from typing import Literal, Optional
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
-from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
+from atmodeller.output import Output, OutputDisequilibrium
+from atmodeller.output_new import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
+from atmodeller.solvers import solve_with_jit
 from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -136,7 +138,7 @@ class EquilibriumModel:
         solver_parameters: Optional[SolverParameters] = None,
         solver: Literal["basic", "robust"] = "robust",
         solver_recompile: bool = False,
-    ) -> None:
+    ) -> Array:
         """Runs the nonlinear solver and initialises the output state.
 
         This method executes the compiled equilibrium solver produced by :meth:`set_solver` and
@@ -178,21 +180,27 @@ class EquilibriumModel:
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
 
-        if self._solver is None or solver_recompile:
-            if solver == "basic":
-                self._solver = make_independent_solver(parameters)
-                # Alternatively, could use the batch solver
-                # self._solver = make_batch_solver(parameters)
-            elif solver == "robust":
-                self._solver = make_solver(parameters)
-            else:
-                raise ValueError(f"Unknown solver type: {solver}")
-            self._selected_solver = solver
+        # Previous
+        # if self._solver is None or solver_recompile:
+        #    if solver == "basic":
+        #        self._solver = make_independent_solver(parameters)
+        #        # Alternatively, could use the batch solver
+        #        # self._solver = make_batch_solver(parameters)
+        #    elif solver == "robust":
+        #        self._solver = make_solver(parameters)
+        #    else:
+        #        raise ValueError(f"Unknown solver type: {solver}")
+        #    self._selected_solver = solver
 
-        multi_sol: MultiAttemptSolution = self._solver(base_solution_array, parameters, subkey)
+        multi_sol: MultiAttemptSolution = solve_with_jit(base_solution_array, parameters, subkey)
 
-        num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
-        num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
+        # previous
+        # multi_sol: MultiAttemptSolution = MultiAttemptSolution(
+        #    sol
+        # )  # self._solver(base_solution_array, parameters, subkey)
+
+        num_successful_models: int = 1  # jnp.count_nonzero(multi_sol.solver_success).item()
+        num_failed_models: int = 1  # jnp.count_nonzero(~multi_sol.solver_success).item()
 
         logger.info(
             "Solve (%s) complete: %d (%0.2f%%) successful model(s)",
@@ -218,16 +226,20 @@ class EquilibriumModel:
             )
 
         # Want the maximum number of steps for cases that solved
-        mask_num_steps: Bool[Array, " batch"] = (
+        mask_num_steps: Bool[Array, "..."] = (
             multi_sol.num_steps < parameters.solver_parameters.max_steps
         )
         # Replace invalid values with -inf so they never win in the max
         max_less_than_max: Array = jnp.where(mask_num_steps, multi_sol.num_steps, -jnp.inf).max()
         logger.info("Solver steps (max) = %s", int(max_less_than_max.item()))
 
-        self._output = OutputSolution(parameters, multi_sol.value, multi_sol)
+        # TODO: In general for speed don't initialise an output object
+        self._output = Output(parameters, multi_sol.value, multi_sol)
+
+        return multi_sol.value
 
 
+# TODO: Make JAX compatible and can return a 1-D array
 def _broadcast_component(
     component: Optional[ArrayLike], default_value: float, dim: int, batch_size: int, name: str
 ) -> NpFloat:
@@ -284,7 +296,7 @@ def broadcast_initial_solution(
     initial_log_stability: Optional[ArrayLike],
     number_of_species: int,
     batch_size: int,
-) -> Float[Array, " batch_size solution"]:
+) -> Float[Array, "... solution"]:
     """Creates and broadcasts the initial solution to shape ``(batch_size, solution)``
 
     ``D = number_of_species + number_of_stability``, i.e. the total number of solution quantities
@@ -296,7 +308,7 @@ def broadcast_initial_solution(
         batch_size: Batch size
 
     Returns:
-        Initial solution with shape ``(batch_size, solution)``
+        Initial solution with shape ``(batch_size, solution)`` or a 1-D array
     """
     number_moles: NpFloat = _broadcast_component(
         initial_log_number_moles,
@@ -313,4 +325,11 @@ def broadcast_initial_solution(
         name="initial_log_stability",
     )
 
-    return jnp.concatenate((number_moles, stability), axis=-1)
+    solution = jnp.concatenate((number_moles, stability), axis=-1)
+
+    # TODO: Bit hacky. This is new since the objective supports broadcasting naturally now. To
+    # clean up.
+    if batch_size == 1:
+        return solution.squeeze(axis=0)
+
+    return solution

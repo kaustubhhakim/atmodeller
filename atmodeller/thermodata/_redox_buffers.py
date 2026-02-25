@@ -106,7 +106,11 @@ class RedoxBuffer(eqx.Module):
         Returns:
             Log fugacity
         """
-        return jnp.log(10) * self.log10_fugacity(temperature, pressure)
+        broadcast_shape = jnp.broadcast_shapes(jnp.shape(temperature), jnp.shape(pressure))
+
+        log_fugacity = jnp.log(10) * self.log10_fugacity(temperature, pressure)
+
+        return jnp.broadcast_to(log_fugacity, broadcast_shape)
 
 
 class IronWustiteBufferHirschmann08(RedoxBuffer):

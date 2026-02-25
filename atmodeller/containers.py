@@ -622,10 +622,20 @@ class FixedFugacityConstraint(eqx.Module):
         return ~jnp.isnan(self.fugacity)
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
-        del temperature
-        del pressure
+        """Log fugacity
 
-        return jnp.log(self.fugacity)
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
+        """
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
+            jnp.shape(temperature), jnp.shape(pressure)
+        )
+
+        return jnp.broadcast_to(jnp.log(self.fugacity), broadcast_shape)
 
 
 class FugacityConstraintSet(eqx.Module):
@@ -682,8 +692,14 @@ class FugacityConstraintSet(eqx.Module):
             Mask indicating whether fugacity constraints are active or not
         """
         mask_list: list[Array] = [constraint.active() for constraint in self.constraints]
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(*[jnp.shape(m) for m in mask_list])
 
-        return jnp.array(mask_list)
+        active_constraints: Bool[Array, "..."] = jnp.stack(
+            [jnp.broadcast_to(m, broadcast_shape) for m in mask_list], axis=-1
+        )
+        # jax.debug.print("active fugacity constraints = {out}", out=active_constraints)
+
+        return active_constraints
 
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
         """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
@@ -734,7 +750,9 @@ class FugacityConstraintSet(eqx.Module):
             return lax.switch(index, fugacity_funcs, temperature, pressure)
 
         indices: Array = jnp.arange(len(self.constraints))
-        vmap_fugacity: Callable = eqx.filter_vmap(apply_fugacity, in_axes=(0, None, None))
+        vmap_fugacity: Callable = eqx.filter_vmap(
+            apply_fugacity, in_axes=(0, None, None), out_axes=-1
+        )
         log_fugacity: Array = vmap_fugacity(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
@@ -846,6 +864,8 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
+    # TODO: Can probably clean up this logic with natural broadcasting rules and consistent 2-D
+    # storage of abundance.
     def log_abundance(self) -> Float[Array, "..."]:
         """Element abundances in log-space
 

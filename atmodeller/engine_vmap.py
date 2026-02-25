@@ -17,11 +17,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import equinox as eqx
+from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array
 
 from atmodeller.engine import get_total_pressure, objective_function
 from atmodeller.parameters import Parameters
-from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec
+from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES
 
 
 @dataclass
