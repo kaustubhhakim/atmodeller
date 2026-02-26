@@ -8,13 +8,13 @@ import logging
 from typing import Mapping
 
 import numpy as np
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import FixedFugacityConstraint, Planet, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.output import Output
+from atmodeller.output_new import Output, get_gas_log_partial_pressure
 from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
@@ -58,15 +58,21 @@ def test_H2O(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints, solver="basic")
+    solution: Float[Array, "..."] = model.solve(state=planet, mass_constraints=mass_constraints)
     output: Output = model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, float] = {"H2O_g": 1.0312913336898137}
 
     # output.to_excel("test_H2O")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_O(helper) -> None:
@@ -81,9 +87,15 @@ def test_H_O(helper) -> None:
     o_kg: ArrayLike = 6.25774e20
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints, solver="basic")
+    solution: Float[Array, "..."] = model.solve(state=planet, mass_constraints=mass_constraints)
     output: Output = model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     fastchem_result: dict[str, float] = {
         "H2O_g": 76.45861543,
@@ -93,7 +105,7 @@ def test_H_O(helper) -> None:
 
     # output.to_excel("test_H_O")
 
-    assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution_dict, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_H_fO2(helper) -> None:
@@ -105,14 +117,17 @@ def test_H_fO2(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver="basic",
+    solution: Float[Array, "..."] = gas_HO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_HO_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.2570800742364775,
@@ -122,7 +137,7 @@ def test_H_fO2(helper) -> None:
 
     # output.to_excel("test_H_fO2")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_fH2(helper) -> None:
@@ -130,18 +145,23 @@ def test_H_fO2_fH2(helper) -> None:
 
     planet: Planet = Planet()
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
         "H2_g": FixedFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
+        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
     }
 
-    gas_HO_model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        solver="basic",
-        solver_recompile=True,
+    solution: Float[Array, "..."] = gas_HO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints
     )
+    logger.debug(f"Solution: {solution}")
+
     output: Output = gas_HO_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array([3.262913506271090e-09, 1.031823848794260e-07, 3.262913506271089e-06]),
@@ -151,7 +171,7 @@ def test_H_fO2_fH2(helper) -> None:
 
     # output.to_excel("test_H_fO2_fH2")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_temperature(helper) -> None:
@@ -168,15 +188,17 @@ def test_H_fO2_batch_temperature(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver="basic",
-        solver_recompile=True,
+    solution: Float[Array, "..."] = gas_HO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_HO_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
@@ -207,7 +229,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
 
     # output.to_excel("test_H_fO2_batch_temperature")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_fO2_shift(helper) -> None:
@@ -224,15 +246,17 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver="basic",
-        solver_recompile=True,
+    solution: Float[Array, "..."] = gas_HO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_HO_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
@@ -263,7 +287,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     # output.to_excel("test_H_fO2_batch_fO2_shift")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_H_mass(helper) -> None:
@@ -278,15 +302,17 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
-    gas_HO_model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver="basic",
-        solver_recompile=True,
+    solution: Float[Array, "..."] = gas_HO_model.solve(
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
     output: Output = gas_HO_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+
+    gas_partial_pressure: NpFloat = np.exp(
+        get_gas_log_partial_pressure(output.parameters, solution)
+    )
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array([2.570800742364757e-01, 2.426110356931991e01, 1.610286613431932e03]),
@@ -296,4 +322,4 @@ def test_H_fO2_batch_H_mass(helper) -> None:
 
     # output.to_excel("test_H_fO2_batch_H_mass")
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)

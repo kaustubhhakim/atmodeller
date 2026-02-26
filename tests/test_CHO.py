@@ -70,7 +70,9 @@ def test_H_and_C(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.2582458752325180,
@@ -103,7 +105,7 @@ def test_CHO_reduced(helper) -> None:
     output: Output = gas_CHO_model.output
 
     gas_partial_pressure = np.exp(get_gas_log_partial_pressure(output.parameters, solution))
-    solution_dict = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict = dict(zip(gas.species.species_names, gas_partial_pressure.T))
 
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
@@ -138,7 +140,9 @@ def test_CHO_IW(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
@@ -184,7 +188,9 @@ def test_CHO_oxidised(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
@@ -222,7 +228,9 @@ def test_CHO_highly_oxidised(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 7.13e-05,
@@ -254,7 +262,9 @@ def test_CHO_middle_temperature(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     factsage_result: dict[str, float] = {
         "H2_g": 59.066,
@@ -291,7 +301,9 @@ def test_CHO_low_temperature(helper) -> None:
     gas_partial_pressure: NpFloat = np.exp(
         get_gas_log_partial_pressure(output.parameters, solution)
     )
-    solution_dict: dict[str, NpFloat] = dict(zip(gas.species.species_names, gas_partial_pressure))
+    solution_dict: dict[str, NpFloat] = dict(
+        zip(gas.species.species_names, gas_partial_pressure.T)
+    )
 
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
