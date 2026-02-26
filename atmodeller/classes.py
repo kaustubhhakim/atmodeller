@@ -136,8 +136,6 @@ class EquilibriumModel:
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
-        solver: Literal["basic", "robust"] = "robust",
-        solver_recompile: bool = False,
     ) -> Array:
         """Runs the nonlinear solver and initialises the output state.
 
@@ -158,9 +156,6 @@ class EquilibriumModel:
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
-            solver: Build a ``basic`` (faster compile time) or a ``robust`` (slower compile time)
-                solver. Defaults to ``robust``.
-            solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
             self.reaction_system,
@@ -199,8 +194,8 @@ class EquilibriumModel:
         #    sol
         # )  # self._solver(base_solution_array, parameters, subkey)
 
-        num_successful_models: int = 1  # jnp.count_nonzero(multi_sol.solver_success).item()
-        num_failed_models: int = 1  # jnp.count_nonzero(~multi_sol.solver_success).item()
+        num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
+        num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
 
         logger.info(
             "Solve (%s) complete: %d (%0.2f%%) successful model(s)",
@@ -233,7 +228,7 @@ class EquilibriumModel:
         max_less_than_max: Array = jnp.where(mask_num_steps, multi_sol.num_steps, -jnp.inf).max()
         logger.info("Solver steps (max) = %s", int(max_less_than_max.item()))
 
-        # TODO: In general for speed don't initialise an output object
+        # TODO: In general for speed don't initialise an output object for efficiency/
         self._output = Output(parameters, multi_sol.value, multi_sol)
 
         return multi_sol.value
