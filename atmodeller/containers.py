@@ -17,7 +17,7 @@ from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, to_hashable
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
@@ -679,13 +679,13 @@ class FugacityConstraintSet(eqx.Module):
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
-                # NOTE: This is applied to all species, which is OK because it returns nans,
-                # meaning no imposed activity/fugacity.
+                # This is applied to all species, which is OK because it returns nans, meaning no
+                # imposed activity/fugacity.
                 constraints.append(FixedFugacityConstraint())
 
         return cls(tuple(constraints), species)
 
-    def active(self) -> Bool[Array, "..."]:
+    def active(self) -> Bool[Array, "... species"]:
         """Active fugacity constraints
 
         Returns:
@@ -694,7 +694,7 @@ class FugacityConstraintSet(eqx.Module):
         mask_list: list[Array] = [constraint.active() for constraint in self.constraints]
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(*[jnp.shape(m) for m in mask_list])
 
-        active_constraints: Bool[Array, "..."] = jnp.stack(
+        active_constraints: Bool[Array, "... species"] = jnp.stack(
             [jnp.broadcast_to(m, broadcast_shape) for m in mask_list], axis=-1
         )
         # jax.debug.print("active fugacity constraints = {out}", out=active_constraints)
@@ -726,7 +726,9 @@ class FugacityConstraintSet(eqx.Module):
 
         return out
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def log_fugacity(
+        self, temperature: ArrayLike, pressure: ArrayLike
+    ) -> Float[Array, "... species"]:
         """Log fugacity
 
         Args:
@@ -736,7 +738,6 @@ class FugacityConstraintSet(eqx.Module):
         Returns:
             Log fugacity in bar
         """
-        # NOTE: Must avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
             to_hashable(constraint.log_fugacity) for constraint in self.constraints
         ]
@@ -749,11 +750,11 @@ class FugacityConstraintSet(eqx.Module):
             # jax.debug.print("index = {out}", out=index)
             return lax.switch(index, fugacity_funcs, temperature, pressure)
 
-        indices: Array = jnp.arange(len(self.constraints))
+        indices: Integer[Array, " species"] = jnp.arange(len(self.constraints))
         vmap_fugacity: Callable = eqx.filter_vmap(
             apply_fugacity, in_axes=(0, None, None), out_axes=-1
         )
-        log_fugacity: Array = vmap_fugacity(indices, temperature, pressure)
+        log_fugacity: Float[Array, "... species"] = vmap_fugacity(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
@@ -762,26 +763,18 @@ class FugacityConstraintSet(eqx.Module):
 class MassConstraintSet(eqx.Module):
     """A set of mass constraints
 
-    Note:
-        ``abundance`` must be stored as a 2-D array so that the vmapping operation only batches
-        over the leading dimension if it has a size greater than unity. Then, the methods that
-        process ``abundance`` consistently return 1-D arrays, shape (elements,), to avoid
-        triggering JAX recompilation.
-
     Args:
         abundance: Abundance
         species: Species collection
         units: Units of the abundance. Defaults to ``mass``.
     """
 
-    abundance: Float[Array, "..."] = eqx.field(converter=as_j64)
+    abundance: Float[Array, "... elements"] = eqx.field(converter=as_j64)
     """Abundance"""
     species: SpeciesCollection
     """Species collection"""
     units: Literal["mass", "moles"] = "mass"
     """Units of the abundance"""
-    oxygen_column_index: Optional[int] = None
-    """Column index of oxygen in ``abundance``. Defaults to ``None``."""
 
     @classmethod
     def create(
@@ -808,10 +801,13 @@ class MassConstraintSet(eqx.Module):
         # Determine the maximum length of any array in mass_constraints_
         max_len: int = get_batch_size(mass_constraints_)
 
-        # Initialise to all nans assuming that there are no mass constraints
-        abundance: NpFloat = np.full(
-            (max_len, len(species.unique_elements)), np.nan, dtype=np.float64
+        # Initialise to all nans — shape (elements,) for scalar, (batch, elements) for batched
+        shape: tuple[int, ...] = (
+            (len(species.unique_elements),)
+            if max_len == 1
+            else (max_len, len(species.unique_elements))
         )
+        abundance: NpFloat = np.full(shape, np.nan, dtype=np.float64)
 
         # Populate mass constraints. This accommodates mass constraints given as mass or moles of
         # species as well as elements
@@ -832,13 +828,13 @@ class MassConstraintSet(eqx.Module):
 
             if np.any(element_sum != 0):
                 # Broadcasts scalar along that column
-                abundance[:, nn] = element_sum
+                abundance[..., nn] = element_sum
 
         # jax.debug.print("abundance = {out}", out=abundance)
 
         return cls(abundance, species, units)
 
-    def abundance_mol(self) -> Float[Array, "..."]:
+    def abundance_mol(self) -> Float[Array, "... elements"]:
         """Abundance by moles for all elements
 
         Returns:
@@ -851,7 +847,7 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    def abundance_mass(self) -> Float[Array, "..."]:
+    def abundance_mass(self) -> Float[Array, "... elements"]:
         """Abundance by mass for all elements
 
         Returns:
@@ -864,33 +860,13 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    # TODO: Can probably clean up this logic with natural broadcasting rules and consistent 2-D
-    # storage of abundance.
-    def log_abundance(self) -> Float[Array, "..."]:
+    def log_abundance(self) -> Float[Array, "... elements"]:
         """Element abundances in log-space
-
-        ``abundance`` is stored as a 2-D array with shape (batch, elements) so that ``vmap`` only
-        maps over the leading dimension when batching is active. When called inside a ``vmap``,
-        each mapped instance receives a single row of the abundance matrix, i.e. an array of shape
-        (elements,). When called outside ``vmap``, ``abundance`` has shape (1, elements) and must
-        be reduced to a consistent 1-D vector.
-
-        If the batch dimension is greater than one and the method is called outside a vmapped
-        workflow, the full 2-D log-abundance array is returned unchanged. This preserves the
-        natural behaviour for genuinely batched data while still collapsing the leading singleton
-        dimension in unbatched use.
 
         Returns:
             Log abundance by moles for all elements
         """
-        log_abundance: Float[Array, "..."] = jnp.log(self.abundance_mol())
-
-        # Ensure stable 1-D output:
-        #  - Unbatched case: shape (1, elements) --> (elements,)
-        #  - Vmapped case: shape (elements,) --> already correct
-        # ``squeeze`` removes the leading singleton, and ``atleast_1d`` guards against accidental
-        # collapse when only a single element exists.
-        log_abundance = jnp.atleast_1d(log_abundance.squeeze())
+        log_abundance: Float[Array, "... elements"] = jnp.log(self.abundance_mol())
 
         return log_abundance
 
@@ -907,13 +883,13 @@ class MassConstraintSet(eqx.Module):
 
         for label, arr in [("number", abundance_mol), ("mass", abundance_mass)]:
             for idx, element in enumerate(self.species.unique_elements):
-                col = arr[:, idx]
+                col = arr[..., idx]
                 if not np.all(np.isnan(col)):
                     out[f"{element}_{label}"] = col
 
         return out
 
-    def active(self) -> Bool[Array, "..."]:
+    def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
 
         Returns:
