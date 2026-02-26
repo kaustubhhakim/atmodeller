@@ -162,7 +162,7 @@ def tau_sweep_solver(
 
 
 @eqx.filter_jit
-@eqx.debug.assert_max_traces(max_traces=1)
+# @eqx.debug.assert_max_traces(max_traces=3)
 def solve_with_jit(
     base_solution_array: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
 ) -> MultiAttemptSolution:

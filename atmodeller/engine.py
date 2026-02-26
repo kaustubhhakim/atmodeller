@@ -23,7 +23,6 @@ scenarios or parameter sets.
 """
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxmod.utils import safe_exp
 from jaxtyping import Array, Bool, Float, Integer
@@ -53,21 +52,21 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, "... dim"]:
     reactions_mask: Bool[Array, " reactions"] = jnp.ones(
         parameters.reaction_system.number_reactions, dtype=bool
     )
-    jax.debug.print("reactions_mask = {out}", out=reactions_mask)
+    # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
     stability_mask: Bool[Array, " species"] = jnp.asarray(
         parameters.reaction_system.species.active_stability, dtype=bool
     )
-    jax.debug.print("stability_mask = {out}", out=stability_mask)
+    # jax.debug.print("stability_mask = {out}", out=stability_mask)
 
     # Broadcast 1-D masks to batch shape + their own last dim
     reactions_mask = jnp.broadcast_to(reactions_mask, batch_shape + reactions_mask.shape)
-    jax.debug.print("reactions_mask (broadcast) = {out}", out=reactions_mask)
+    # jax.debug.print("reactions_mask (broadcast) = {out}", out=reactions_mask)
     stability_mask = jnp.broadcast_to(stability_mask, batch_shape + stability_mask.shape)
-    jax.debug.print("stability_mask (broadcast) = {out}", out=stability_mask)
+    # jax.debug.print("stability_mask (broadcast) = {out}", out=stability_mask)
     fugacity_mask = jnp.broadcast_to(fugacity_mask, batch_shape + fugacity_mask.shape[-1:])
-    jax.debug.print("fugacity_mask (broadcast) = {out}", out=fugacity_mask)
+    # jax.debug.print("fugacity_mask (broadcast) = {out}", out=fugacity_mask)
     mass_mask = jnp.broadcast_to(mass_mask, batch_shape + mass_mask.shape[-1:])
-    jax.debug.print("mass_mask (broadcast) = {out}", out=mass_mask)
+    # jax.debug.print("mass_mask (broadcast) = {out}", out=mass_mask)
 
     # NOTE: Order must be identical to objective_function() residual concatenation
     return jnp.concatenate([fugacity_mask, reactions_mask, mass_mask, stability_mask], axis=-1)
@@ -76,7 +75,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, "... dim"]:
 def get_min_log_elemental_abundance_per_species(
     parameters: Parameters,
 ) -> Float[Array, "... species"]:
-    """For each species, find the elemental mass constraint with the lowest abundance.
+    """Gets the elemental mass constraint with the lowest abundance for each species.
 
     Args:
         parameters: Parameters
@@ -95,7 +94,9 @@ def get_min_log_elemental_abundance_per_species(
     log_abundance: Float[Array, "... elements"] = parameters.mass_constraints.log_abundance()
     # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-    # Broadcast over batch dimensions and species, then mask out absent elements.
+    # Mask log_abundance to nan where element is absent from species, then take min over elements
+    # formula_matrix != 0 has shape (elements, species); log_abundance[..., :, None] broadcasts
+    # over batch dims and species to give (... elements species)
     masked_abundance: Float[Array, "... elements species"] = jnp.where(
         mask, log_abundance[..., :, None], jnp.nan
     )
@@ -153,15 +154,15 @@ def objective_function(
     Returns:
         Residual
     """
-    jax.debug.print("Starting new objective_function evaluation")
+    # jax.debug.print("Starting new objective_function evaluation")
     temperature: Float[Array, "..."] = parameters.state.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2, axis=-1)
-    jax.debug.print("log_number_moles = {out}", out=log_number_moles)
-    jax.debug.print("log_stability = {out}", out=log_stability)
+    # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
+    # jax.debug.print("log_stability = {out}", out=log_stability)
 
     total_pressure: Float[Array, "..."] = get_total_pressure(parameters, log_number_moles)
-    jax.debug.print("total_pressure = {out}", out=total_pressure)
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
         log_number_moles,
@@ -171,13 +172,13 @@ def objective_function(
         jnp.log(parameters.state.melt_mass),
         jnp.log(parameters.state.solid_mass),
     )
-    jax.debug.print("log_activity = {out}", out=log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Fugacity constraints residual (dimensionless)
     fugacity_residual: Float[Array, "... species"] = (
         log_activity - parameters.fugacity_constraints.log_fugacity(temperature, total_pressure)
     )
-    jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
     # jax.debug.print(
     #     "fugacity_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(fugacity_residual),
@@ -192,7 +193,7 @@ def objective_function(
     reaction_residual: Float[Array, "... reactions"] = parameters.reaction_system.get_residual(
         log_activity, log_stability, temperature, total_pressure
     )
-    jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+    # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 
     # jax.debug.print(
     #     "reaction_residual min/max: {out}/{out2}",
@@ -209,10 +210,10 @@ def objective_function(
     log_element_moles_total: Float[Array, "... elements"] = (
         parameters.reaction_system.get_log_element_moles(log_number_moles)
     )
-    jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
+    # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
     log_target_moles: Float[Array, "... elements"] = parameters.mass_constraints.log_abundance()
-    jax.debug.print("log_target_moles = {out}", out=log_target_moles)
+    # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
 
     # Dimensionless (ratio error - 1)
     # More robust than log residual for poor initial guesses, which are often the case.
@@ -223,7 +224,7 @@ def objective_function(
     # poor initial guesses, which are often the case.
     # mass_residual: Float[Array, " elements"] = log_element_moles_total - log_target_moles
 
-    jax.debug.print("mass_residual = {out}", out=mass_residual)
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
     #     "mass_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(mass_residual),
@@ -237,17 +238,17 @@ def objective_function(
 
     # Stability residual
     log_tau: Float[Array, "..."] = jnp.log(parameters.solver_parameters.tau)
-    jax.debug.print("log_tau.shape = {out}", out=log_tau.shape)
+    # jax.debug.print("log_tau.shape = {out}", out=log_tau.shape)
     log_min_number_moles: Float[Array, "... species"] = (
         get_min_log_elemental_abundance_per_species(parameters) + log_tau
     )
-    jax.debug.print("log_min_number_moles = {out}", out=log_min_number_moles)
+    # jax.debug.print("log_min_number_moles = {out}", out=log_min_number_moles)
 
     # Dimensionless (log-ratio)
     stability_residual: Float[Array, "... species"] = (
         log_number_moles + log_stability - log_min_number_moles
     )
-    jax.debug.print("stability_residual = {out}", out=stability_residual)
+    # jax.debug.print("stability_residual = {out}", out=stability_residual)
     # jax.debug.print(
     #     "stability_residual min/max: {out}/{out2}",
     #     out=jnp.nanmin(stability_residual),
@@ -264,11 +265,11 @@ def objective_function(
         [fugacity_residual, reaction_residual, mass_residual, stability_residual],
         axis=-1,
     )
-    jax.debug.print("residual (with nans) = {out}", out=residual)
+    # jax.debug.print("residual (with nans) = {out}", out=residual)
 
     # This final masking operation drops nans (unused constraint options)
     active_mask: Bool[Array, "... dim"] = get_active_mask(parameters)
-    jax.debug.print("active_mask = {out}", out=active_mask)
+    # jax.debug.print("active_mask = {out}", out=active_mask)
     size: int = parameters.reaction_system.species.number_solution
     # jax.debug.print("size = {out}", out=size)
     dim: int = active_mask.shape[-1]
@@ -280,11 +281,11 @@ def objective_function(
     )[..., :size]
     # jax.debug.print("active_indices = {out}", out=active_indices)
 
-    # Broadcast active_indices to match residual ndim (e.g. residual is (1,21), indices is (8,))
+    # Broadcast active_indices to match residual ndim
     active_indices = jnp.broadcast_to(active_indices, residual.shape[:-1] + (size,))
-    jax.debug.print("active_indices = {out}", out=active_indices)
+    # jax.debug.print("active_indices = {out}", out=active_indices)
 
     residual = jnp.take_along_axis(residual, active_indices, axis=-1)
-    jax.debug.print("residual = {out}", out=residual)
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual

@@ -31,7 +31,6 @@ from collections.abc import Callable, Iterable
 from typing import Generic, Self
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
@@ -184,17 +183,17 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             Log activity of each species in the gas phase
         """
         # Log activity of pure species
-        jax.debug.print("log_number_moles = {out}", out=log_number_moles)
-        jax.debug.print("temperature = {out}", out=temperature)
-        jax.debug.print("pressure = {out}", out=pressure)
+        # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
+        # jax.debug.print("temperature = {out}", out=temperature)
+        # jax.debug.print("pressure = {out}", out=pressure)
         log_activity: Float[Array, "... n_species"] = self.vmap_log_activity(
             jnp.arange(self.species.number_species), temperature, pressure
         )
-        jax.debug.print("log_activity (pure) = {out}", out=log_activity)
+        # jax.debug.print("log_activity (pure) = {out}", out=log_activity)
 
         # Ideal mixing
         log_activity = log_activity + self.get_log_mole_fraction(log_number_moles)
-        jax.debug.print("log_activity (total) = {out}", out=log_activity)
+        # jax.debug.print("log_activity (total) = {out}", out=log_activity)
 
         return log_activity
 

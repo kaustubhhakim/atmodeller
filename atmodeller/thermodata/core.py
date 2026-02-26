@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import cast
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT
@@ -252,16 +251,16 @@ class ThermodynamicCoefficients(eqx.Module):
             :math:`\times T`
         """
         index: Integer[Array, "..."] = self._get_index(temperature)
-        jax.debug.print(
-            "temperature.shape = {t}, index.shape = {i}",
-            t=jnp.shape(temperature),
-            i=jnp.shape(index),
-        )
+        # jax.debug.print(
+        #     "temperature.shape = {t}, index.shape = {i}",
+        #     t=jnp.shape(temperature),
+        #     i=jnp.shape(index),
+        # )
         # jax.debug.print("index = {out}", out=index)
         cp_coeffs_for_index: Float[Array, "... 7"] = jnp.take(
             jnp.array(self.cp_coeffs), index, axis=0
         )
-        jax.debug.print("cp_coeffs_for_index.shape = {out}", out=jnp.shape(cp_coeffs_for_index))
+        # jax.debug.print("cp_coeffs_for_index.shape = {out}", out=jnp.shape(cp_coeffs_for_index))
         # jax.debug.print("cp_coeffs_for_index = {out}", out=cp_coeffs_for_index)
         b1_for_index: Float[Array, "..."] = jnp.take(jnp.array(self.b1), index)
         # jax.debug.print("b1_for_index = {out}", out=b1_for_index)
@@ -270,7 +269,7 @@ class ThermodynamicCoefficients(eqx.Module):
         gibbs_for_index: Float[Array, "..."] = self._G_over_RT(
             cp_coeffs_for_index, b1_for_index, b2_for_index, temperature
         )
-        jax.debug.print("gibbs_for_index.shape = {out}", out=jnp.shape(gibbs_for_index))
+        # jax.debug.print("gibbs_for_index.shape = {out}", out=jnp.shape(gibbs_for_index))
 
         return gibbs_for_index
 
