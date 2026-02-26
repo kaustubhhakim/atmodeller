@@ -108,33 +108,6 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-# TODO: only used for output routines
-# def get_reactions_only_mask(parameters: Parameters) -> Bool[Array, " dim"]:
-#     """Returns a mask with `True` only for active reactions positions, `False` elsewhere.
-
-#     Args:
-#         parameters: Parameters
-
-#     Returns:
-#         Reactions only mask for the residual array
-#     """
-#     # Create a full mask of False
-#     size: int = parameters.reaction_network.data.number_solution
-#     mask: Bool[Array, " dim"] = jnp.zeros(size, dtype=bool)
-
-#     fugacity_mask: Bool[Array, " dim"] = parameters.fugacity_constraints.active()
-#     reactions_mask: NpBool = parameters.reaction_network.active_reactions
-#     num_active_fugacity: Integer[Array, ""] = jnp.sum(fugacity_mask)
-
-#     # Place the reactions_mask at position num_active_fugacity dynamically.
-#     # Use lax.dynamic_update_slice: (array_to_update, update, start_indices)
-#     mask: Bool[Array, " dim"] = lax.dynamic_update_slice(
-#         mask, reactions_mask, (num_active_fugacity,)
-#     )
-
-#     return mask
-
-
 def get_total_pressure(
     parameters: Parameters, log_number_moles: Float[Array, "... n_species"]
 ) -> Float[Array, "..."]:
