@@ -24,7 +24,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @eqx.filter_jit
 def get_gas_log_mole_fraction(
-    parameters: Parameters, solution: Array
+    parameters: Parameters, solution: Float[Array, "... solution"]
 ) -> Float[Array, "... n_species"]:
     """Gets gas log mole fraction.
 
@@ -46,7 +46,7 @@ def get_gas_log_mole_fraction(
 
 @eqx.filter_jit
 def get_gas_log_partial_pressure(
-    parameters: Parameters, solution: Array
+    parameters: Parameters, solution: Float[Array, "... solution"]
 ) -> Float[Array, "... n_species"]:
     """Gets gas log partial pressure.
 
