@@ -131,7 +131,7 @@ def tau_sweep_solver(
     # Initial solve at TAU to check which entries need the sweep
     key, subkey = jax.random.split(key)
     get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
-    initial_parameters: Parameters = eqx.tree_at(get_leaf, parameters, jnp.array(TAU_MAX))
+    initial_parameters: Parameters = eqx.tree_at(get_leaf, parameters, jnp.array(TAU))
 
     first_sol: MultiAttemptSolution = batch_retry_solver(
         initial_guess,
@@ -142,9 +142,9 @@ def tau_sweep_solver(
         parameters.solver_parameters.atol,
     )
     first_solution: Float[Array, "... solution"] = first_sol.value
-    jax.debug.print("first_solution = {out}", out=first_solution)
+    # jax.debug.print("first_solution = {out}", out=first_solution)
     first_converged: Bool[Array, "..."] = first_sol.attempts > 0
-    jax.debug.print("first_converged = {out}", out=first_converged)
+    # jax.debug.print("first_converged = {out}", out=first_converged)
 
     # Build per-entry tau schedules of shape (TAU_NUM, *batch_shape)
     # Converged entries: [TAU, TAU, ..., TAU]
@@ -152,44 +152,49 @@ def tau_sweep_solver(
     varying_schedule: Float[Array, " tau"] = jnp.logspace(
         jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
     )
-    jax.debug.print("varying_schedule = {out}", out=varying_schedule)
+    # jax.debug.print("varying_schedule = {out}", out=varying_schedule)
     constant_schedule: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
-    jax.debug.print("constant_schedule = {out}", out=constant_schedule)
+    # jax.debug.print("constant_schedule = {out}", out=constant_schedule)
 
     batch_shape: tuple[int, ...] = initial_guess.shape[:-1]  # () or (N,) or (N, M)
-    jax.debug.print("batch_shape = {out}", out=batch_shape)
+    # jax.debug.print("batch_shape = {out}", out=batch_shape)
 
     # Reshape schedules to (TAU_NUM, *batch_shape) via broadcasting
     varying = varying_schedule.reshape((TAU_NUM,) + (1,) * len(batch_shape))
-    jax.debug.print("varying = {out}", out=varying)
+    # jax.debug.print("varying = {out}", out=varying)
     constant = constant_schedule.reshape((TAU_NUM,) + (1,) * len(batch_shape))
-    jax.debug.print("constant = {out}", out=constant)
+    # jax.debug.print("constant = {out}", out=constant)
 
     # first_converged shape: (*batch_shape,) -> (1, *batch_shape) for broadcasting
     tau_schedule: Float[Array, "tau ..."] = jnp.where(
         first_converged[None, ...], constant, varying
     )  # shape: (TAU_NUM, *batch_shape)
 
-    initial_carry: tuple[Array, Array] = (key, initial_guess)
-    jax.debug.print("initial_carry = {out}", out=initial_carry)
+    def run_scan(key_and_guess: tuple) -> MultiAttemptSolution:
+        """Run the full tau sweep scan (used when some entries failed the initial solve)."""
+        key_, _ = key_and_guess
+        initial_carry_: tuple[Array, Array] = (key_, first_solution)
+        _, results_ = jax.lax.scan(solve_tau_step, initial_carry_, tau_schedule)
+        solution_, result_value_, steps_, attempts_ = results_
+        final_result_: optx.RESULTS = cast(
+            optx.RESULTS,
+            EnumerationItem(result_value_[-1], optx.RESULTS),  # pyright: ignore
+        )
+        sol_: Solution = Solution(
+            solution_[-1], final_result_, None, {"num_steps": jnp.max(steps_, axis=0)}, None
+        )
+        return MultiAttemptSolution(sol_, jnp.max(attempts_, axis=0))
 
-    _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_schedule)
-    solution, result_value, steps, attempts = results
-    jax.debug.print("results = {out}", out=results)
+    def run_single_step(_: tuple) -> MultiAttemptSolution:
+        """All entries converged at TAU on the first attempt: return immediately."""
+        # jax.debug.print("All entries converged at TAU on the first attempt. Skipping tau sweep.")
+        return first_sol
 
-    # Bundle the final outputs into a single optimistix Solution object
-    final_result: optx.RESULTS = cast(
-        optx.RESULTS,
-        EnumerationItem(result_value[-1], optx.RESULTS),  # pyright: ignore
+    # If all entries converged at TAU on the first attempt, skip the sweep entirely
+    all_converged: Bool[Array, ""] = jnp.all(first_converged)
+    multi_sol: MultiAttemptSolution = lax.cond(
+        all_converged, run_single_step, run_scan, operand=(key, first_solution)
     )
-
-    # NOTE: This solution instance does not return all the information from the solves, but it
-    # encapsulates the most important (final) quantities. Aggregate output, solution and result
-    # for final TAU
-    sol: Solution = Solution(
-        solution[-1], final_result, None, {"num_steps": jnp.max(steps, axis=0)}, None
-    )
-    multi_sol: MultiAttemptSolution = MultiAttemptSolution(sol, jnp.max(attempts, axis=0))
 
     return multi_sol
 
