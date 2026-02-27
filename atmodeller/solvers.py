@@ -225,7 +225,7 @@ def solve_with_jit(
 
     def solve_with_generic_multistart(key):
         """Function for generic multistart"""
-        subkey = jax.random.split(key)[1]  # Split only once and pass subkey
+        _, subkey = jax.random.split(key)  # Split only once and pass subkey
         return batch_retry_solver(
             base_solution_array,
             parameters,
