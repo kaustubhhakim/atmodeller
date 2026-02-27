@@ -920,7 +920,7 @@ class SolverParameters(RootFindParameters):
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
-    tau: Array = eqx.field(converter=as_j64, default=TAU)  # NOTE: Must be an array to trace tau
+    tau: Array = eqx.field(converter=as_j64, default=TAU)
     """Tau factor for species stability"""
 
     def get_options(self, number_species: int) -> dict[str, Any]:
