@@ -59,7 +59,6 @@ class EquilibriumModel:
         melt: Melt phase. Defaults to an empty melt phase if not provided.
         solid: Solid phase. Defaults to an empty solid phase if not provided.
         condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
-        dilute_limit: Whether to treat dissolution in the dilute limit. Defaults to ``True``.
         ignore_condensed_species: Whether to exclude condensed species from the phase fractions.
             Defaults to ``True``.
     """
@@ -76,7 +75,6 @@ class EquilibriumModel:
         melt: Optional[MeltPhase] = None,
         solid: Optional[SolidPhase] = None,
         condensates: Optional[Iterable[PurePhase]] = None,
-        dilute_limit: bool = True,
         ignore_condensed_species: bool = True,
     ):
         if melt is None:
@@ -91,7 +89,6 @@ class EquilibriumModel:
             melt=melt,
             solid=solid,
             condensates=condensates,
-            dilute_limit=dilute_limit,
             ignore_condensed_species=ignore_condensed_species,
         )
 
