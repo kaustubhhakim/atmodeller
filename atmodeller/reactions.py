@@ -237,8 +237,6 @@ class DissolutionNetwork(BaseReactionBlock):
 
     Args:
         species: An iterable of species
-        ignore_condensed_species: Whether to exclude condensed species from melt phase mole
-            fractions
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -249,12 +247,9 @@ class DissolutionNetwork(BaseReactionBlock):
     """Dissolution reaction matrix"""
     vmap_solubility: Callable
     """Vectorized solubility function for dissolution reactions"""
-    ignore_condensed_species: bool
-    """Whether to exclude condensed species from melt phase mole fractions"""
 
-    def __init__(self, species: Iterable[SpeciesProtocol], ignore_condensed_species: bool):
+    def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
-        self.ignore_condensed_species = ignore_condensed_species
 
         # Most direct to construct the dissolution matrix in full species space
         dissolution_matrix: NpFloat = np.zeros(
@@ -397,8 +392,6 @@ class ReactionSystem(BaseReactionBlock):
         melt: Melt phase
         solid: Solid phase
         condensates: Iterable of pure phases (condensates)
-        ignore_condensed_species: Whether to exclude condensed species from melt phase mole
-            fractions
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -433,7 +426,6 @@ class ReactionSystem(BaseReactionBlock):
         melt: MeltPhase,
         solid: SolidPhase,
         condensates: Iterable[PurePhase],
-        ignore_condensed_species: bool,
     ):
         # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
         # preserved because reaction matrices, phase slices, and activity concatenation rely on
@@ -470,7 +462,7 @@ class ReactionSystem(BaseReactionBlock):
             self.formula_matrix > 0, np.log(self.formula_matrix), -np.inf
         )
         self.reaction = ReactionNetwork(self.species)
-        self.dissolution = DissolutionNetwork(self.species, ignore_condensed_species)
+        self.dissolution = DissolutionNetwork(self.species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
@@ -553,9 +545,7 @@ class ReactionSystem(BaseReactionBlock):
 
         # Current implementation required this
         log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_mass_fraction(
-            log_number_moles[..., self.melt_slice],
-            self.dissolution.ignore_condensed_species,
-            log_inert_melt_mass,
+            log_number_moles[..., self.melt_slice], log_inert_melt_mass
         )
         # jax.debug.print("log_activity_melt = {out}", out=log_activity_melt)
 
@@ -565,7 +555,6 @@ class ReactionSystem(BaseReactionBlock):
                 log_number_moles[..., self.melt_slice],
                 temperature,
                 pressure,
-                self.dissolution.ignore_condensed_species,
                 log_inert_molar_mass,
                 log_inert_melt_mass,
             )
