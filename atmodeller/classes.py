@@ -59,8 +59,6 @@ class EquilibriumModel:
         melt: Melt phase. Defaults to an empty melt phase if not provided.
         solid: Solid phase. Defaults to an empty solid phase if not provided.
         condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
-        ignore_condensed_species: Whether to exclude condensed species from the phase fractions.
-            Defaults to ``True``.
     """
 
     reaction_system: ReactionSystem
@@ -75,7 +73,6 @@ class EquilibriumModel:
         melt: Optional[MeltPhase] = None,
         solid: Optional[SolidPhase] = None,
         condensates: Optional[Iterable[PurePhase]] = None,
-        ignore_condensed_species: bool = True,
     ):
         if melt is None:
             melt = MeltPhase.empty()
@@ -84,13 +81,7 @@ class EquilibriumModel:
         if condensates is None:
             condensates = ()
 
-        self.reaction_system = ReactionSystem(
-            gas,
-            melt=melt,
-            solid=solid,
-            condensates=condensates,
-            ignore_condensed_species=ignore_condensed_species,
-        )
+        self.reaction_system = ReactionSystem(gas, melt=melt, solid=solid, condensates=condensates)
 
     @property
     def output(self) -> Output:
@@ -225,8 +216,7 @@ class EquilibriumModel:
         max_less_than_max: Array = jnp.where(mask_num_steps, multi_sol.num_steps, -jnp.inf).max()
         logger.info("Solver steps (max) = %s", int(max_less_than_max.item()))
 
-        # TODO: In general for speed don't initialise an output object for efficiency/
-        self._output = Output(parameters, multi_sol.value, multi_sol)
+        self._output = Output(parameters, multi_sol)
 
         return multi_sol.value
 
