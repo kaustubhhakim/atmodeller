@@ -110,17 +110,18 @@ def get_min_log_elemental_abundance_per_species(
 
 
 def get_total_pressure(
-    parameters: Parameters, log_number_moles: Float[Array, "... n_species"]
+    parameters: Parameters, solution: Float[Array, "... twice_species"]
 ) -> Float[Array, "..."]:
     """Gets the total pressure.
 
     Args:
         parameters: Parameters
-        log_number_moles: Log number of moles
+        solution: Solution array for all species i.e. log number of moles and log stability
 
     Returns:
         Total pressure in bar
     """
+    log_number_moles, _ = jnp.split(solution, 2, axis=-1)
     log_number_moles_gas: Float[Array, "... n_gas_species"] = log_number_moles[
         ..., parameters.reaction_system.gas_slice
     ]
@@ -131,6 +132,34 @@ def get_total_pressure(
     pressure: Float[Array, "..."] = parameters.state.get_pressure(gas_mass_squeeze)
 
     return pressure
+
+
+def get_log_activity(
+    parameters: Parameters, solution: Float[Array, "... twice_species"]
+) -> Float[Array, "... n_species"]:
+    """Gets the log activity of each species.
+
+    Args:
+        parameters: Parameters
+        solution: Solution array for all species i.e. log number of moles and log stability
+
+    Returns:
+        Log activity of each species
+    """
+    log_number_moles, _ = jnp.split(solution, 2, axis=-1)
+    temperature: Float[Array, "..."] = parameters.state.temperature
+    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
+
+    log_activity: Float[Array, "... n_species"] = parameters.reaction_system.get_log_activity(
+        log_number_moles,
+        temperature,
+        total_pressure,
+        jnp.log(parameters.state.molar_mass),
+        jnp.log(parameters.state.melt_mass),
+        jnp.log(parameters.state.solid_mass),
+    )
+
+    return log_activity
 
 
 @eqx.filter_jit
@@ -161,17 +190,10 @@ def objective_function(
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, log_number_moles)
+    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
-    log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
-        log_number_moles,
-        temperature,
-        total_pressure,
-        jnp.log(parameters.state.molar_mass),
-        jnp.log(parameters.state.melt_mass),
-        jnp.log(parameters.state.solid_mass),
-    )
+    log_activity: Float[Array, "... species"] = get_log_activity(parameters, solution)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Fugacity constraints residual (dimensionless)
