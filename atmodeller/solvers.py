@@ -84,7 +84,7 @@ def tau_sweep_solver(
         :class:`~jaxmod.solvers.MultiAttemptSolution` object
     """
 
-    def solve_tau_step(carry: tuple, tau: Float[Array, " batch"]) -> tuple[tuple, tuple]:
+    def solve_tau_step(carry: tuple, tau: Float[Array, " ..."]) -> tuple[tuple, tuple]:
         """Performs a single solver step for a given batch of tau values.
 
         This function is intended to be used inside :func``jax.lax.scan`` to iterate over
@@ -116,33 +116,66 @@ def tau_sweep_solver(
             parameters.solver_parameters.atol,
         )
 
-        new_solution: Float[Array, "batch solution"] = new_sol.value
+        new_solution: Float[Array, "... solution"] = new_sol.value
         new_result: optx.RESULTS = new_sol.result
-        new_steps: Integer[Array, " batch"] = new_sol.stats["num_steps"]
-        success_attempt: Integer[Array, " batch"] = new_sol.attempts
+        new_steps: Integer[Array, "..."] = new_sol.stats["num_steps"]
+        success_attempt: Integer[Array, "..."] = new_sol.attempts
 
-        new_carry: tuple[PRNGKeyArray, Float[Array, "batch solution"]] = (key, new_solution)
+        new_carry: tuple[PRNGKeyArray, Float[Array, "... solution"]] = (key, new_solution)
 
         # Output current solution for this tau step
         out: tuple[Array, ...] = (new_solution, new_result._value, new_steps, success_attempt)  # pyright: ignore
 
         return new_carry, out
 
-    varying_tau_row: Float[Array, " tau"] = jnp.logspace(
+    # Initial solve at TAU to check which entries need the sweep
+    key, subkey = jax.random.split(key)
+    get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
+    initial_parameters: Parameters = eqx.tree_at(get_leaf, parameters, jnp.array(TAU_MAX))
+
+    first_sol: MultiAttemptSolution = batch_retry_solver(
+        initial_guess,
+        initial_parameters,
+        subkey,
+        parameters.solver_parameters.multistart_perturbation,
+        parameters.solver_parameters.multistart,
+        parameters.solver_parameters.atol,
+    )
+    first_solution: Float[Array, "... solution"] = first_sol.value
+    jax.debug.print("first_solution = {out}", out=first_solution)
+    first_converged: Bool[Array, "..."] = first_sol.attempts > 0
+    jax.debug.print("first_converged = {out}", out=first_converged)
+
+    # Build per-entry tau schedules of shape (TAU_NUM, *batch_shape)
+    # Converged entries: [TAU, TAU, ..., TAU]
+    # Failed entries:    [TAU_MAX, ..., TAU]  (log-spaced)
+    varying_schedule: Float[Array, " tau"] = jnp.logspace(
         jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
     )
-    constant_tau_row: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
-    tau_templates: Float[Array, "tau 2"] = jnp.stack([varying_tau_row, constant_tau_row], axis=1)
+    jax.debug.print("varying_schedule = {out}", out=varying_schedule)
+    constant_schedule: Float[Array, " tau"] = jnp.full((TAU_NUM,), TAU)
+    jax.debug.print("constant_schedule = {out}", out=constant_schedule)
 
-    # Create solver_status as a 1-D array of zeros with the batch dimension
-    solver_status: Integer[Array, " batch"] = jnp.zeros(initial_guess.shape[0], dtype=int)
+    batch_shape: tuple[int, ...] = initial_guess.shape[:-1]  # () or (N,) or (N, M)
+    jax.debug.print("batch_shape = {out}", out=batch_shape)
 
-    tau_array: Float[Array, "tau batch"] = tau_templates[:, solver_status]
+    # Reshape schedules to (TAU_NUM, *batch_shape) via broadcasting
+    varying = varying_schedule.reshape((TAU_NUM,) + (1,) * len(batch_shape))
+    jax.debug.print("varying = {out}", out=varying)
+    constant = constant_schedule.reshape((TAU_NUM,) + (1,) * len(batch_shape))
+    jax.debug.print("constant = {out}", out=constant)
+
+    # first_converged shape: (*batch_shape,) -> (1, *batch_shape) for broadcasting
+    tau_schedule: Float[Array, "tau ..."] = jnp.where(
+        first_converged[None, ...], constant, varying
+    )  # shape: (TAU_NUM, *batch_shape)
 
     initial_carry: tuple[Array, Array] = (key, initial_guess)
+    jax.debug.print("initial_carry = {out}", out=initial_carry)
 
-    _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
+    _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_schedule)
     solution, result_value, steps, attempts = results
+    jax.debug.print("results = {out}", out=results)
 
     # Bundle the final outputs into a single optimistix Solution object
     final_result: optx.RESULTS = cast(
@@ -178,13 +211,12 @@ def solve_with_jit(
     """
     # Define the condition to check if active stability is enabled
     condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
+    # jax.debug.print("condition (active stability) = {out}", out=condition)
 
-    # HACK to debug jitting issues one solver at a time.
-
-    # def solve_with_stability_multistart(key):
-    #     """Function for multistart with stability"""
-    #     subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
-    #     return tau_sweep_solver(base_solution_array, parameters, subkey)
+    def solve_with_stability_multistart(key):
+        """Function for multistart with stability"""
+        subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
+        return tau_sweep_solver(base_solution_array, parameters, subkey)
 
     def solve_with_generic_multistart(key):
         """Function for generic multistart"""
@@ -200,9 +232,9 @@ def solve_with_jit(
 
     multi_sol = lax.cond(
         condition,
+        lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
         # lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
-        # lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
-        lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
+        # lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
         lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
         operand=None,  # Operand not used for decision making
     )
