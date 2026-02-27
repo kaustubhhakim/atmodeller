@@ -6,20 +6,19 @@
 
 import logging
 from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 import pytest
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import Planet, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.output_new import Output, get_gas_log_partial_pressure
 from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.type_aliases import NpFloat
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -38,7 +37,7 @@ gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
 gas_CHO_model: EquilibriumModel = EquilibriumModel(gas)
 
 
-def test_H_and_C(helper) -> None:
+def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
     gas: GasPhase = GasPhase.create(("H2O", "H2", "O2", "CO", "CO2"))
@@ -62,31 +61,27 @@ def test_H_and_C(helper) -> None:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    solution: Float[Array, "..."] = model.solve(
+    model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    target: dict[str, float] = {
-        "H2O_g": 0.2582458752325180,
-        "H2_g": 0.2502809714412906,
-        "O2_g": 8.838513516896038e-08,
-        "CO_g": 59.65835224848439,
-        "CO2_g": 13.43793686555727,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 0.2582458752325180,
+                "H2_g": 0.2502809714412906,
+                "O2_g": 8.838513516896038e-08,
+                "CO_g": 59.65835224848439,
+                "CO2_g": 13.43793686555727,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, target, rtol=RTOL, atol=ATOL)
+    assert model.output.compare(target, log=False, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_reduced(helper) -> None:
+def test_CHO_reduced() -> None:
     """Tests C-H-O system at IW-2
 
     Similar to :cite:p:`BHS22{Table E, row 1}`.
@@ -99,27 +94,27 @@ def test_CHO_reduced(helper) -> None:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure = np.exp(get_gas_log_partial_pressure(output.parameters, solution))
-    solution_dict = dict(zip(gas.species.species_names, gas_partial_pressure.T))
-
-    factsage_result: dict[str, float] = {
-        "H2_g": 175.5,
-        "H2O_g": 13.8,
-        "CO_g": 6.21,
-        "CO2_g": 0.228,
-        "CH4_g": 38.07,
-        "O2_g": 1.25e-15,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2_g": 175.5,
+                "H2O_g": 13.8,
+                "CO_g": 6.21,
+                "CO2_g": 0.228,
+                "CH4_g": 38.07,
+                "O2_g": 1.25e-15,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_IW(helper) -> None:
+def test_CHO_IW() -> None:
     """Tests C-H-O system at IW+0.5
 
     Similar to :cite:p:`BHS22{Table E, row 2}`.
@@ -132,42 +127,42 @@ def test_CHO_IW(helper) -> None:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    factsage_result: dict[str, float] = {
-        "CH4_g": 28.66,
-        "CO2_g": 30.88,
-        "CO_g": 46.42,
-        "H2O_g": 337.16,
-        "H2_g": 236.98,
-        "O2_g": 4.11e-13,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "CH4_g": 28.66,
+                "CO2_g": 30.88,
+                "CO_g": 46.42,
+                "H2O_g": 337.16,
+                "H2_g": 236.98,
+                "O2_g": 4.11e-13,
+            }
+        }
     }
 
-    fastchem_result: dict[str, float] = {
-        "CH4_g": 29.61919788,
-        "CO2_g": 29.82548282,
-        "CO_g": 45.94958264,
-        "H2O_g": 332.03616807,
-        "H2_g": 236.73845646,
-        "O2_g": 3.96475584e-13,
+    fastchem_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "CH4_g": 29.61919788,
+                "CO2_g": 29.82548282,
+                "CO_g": 45.94958264,
+                "H2O_g": 332.03616807,
+                "H2_g": 236.73845646,
+                "O2_g": 3.96475584e-13,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
-    assert helper.isclose(solution_dict, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_oxidised(helper) -> None:
+def test_CHO_oxidised() -> None:
     """Tests C-H-O system at IW+2
 
     Similar to :cite:p:`BHS22{Table E, row 3}`.
@@ -180,28 +175,24 @@ def test_CHO_oxidised(helper) -> None:
     c_kg: ArrayLike = 0.1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    factsage_result: dict[str, float] = {
-        "CH4_g": 0.00129,
-        "CO2_g": 3.25,
-        "CO_g": 0.873,
-        "H2O_g": 218.48,
-        "H2_g": 27.40,
-        "O2_g": 1.29e-11,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "CH4_g": 0.00129,
+                "CO2_g": 3.25,
+                "CO_g": 0.873,
+                "H2O_g": 218.48,
+                "H2_g": 27.40,
+                "O2_g": 1.29e-11,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
@@ -220,28 +211,24 @@ def test_CHO_highly_oxidised(helper) -> None:
     # o_kg: ArrayLike = 3.25196e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    factsage_result: dict[str, float] = {
-        "CH4_g": 7.13e-05,
-        "CO2_g": 357.23,
-        "CO_g": 10.21,
-        "H2O_g": 432.08,
-        "H2_g": 5.78,
-        "O2_g": 1.14e-09,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "CH4_g": 7.13e-05,
+                "CO2_g": 357.23,
+                "CO_g": 10.21,
+                "H2O_g": 432.08,
+                "H2_g": 5.78,
+                "O2_g": 1.14e-09,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_middle_temperature(helper) -> None:
@@ -254,28 +241,24 @@ def test_CHO_middle_temperature(helper) -> None:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    factsage_result: dict[str, float] = {
-        "H2_g": 59.066,
-        "H2O_g": 18.320,
-        "CO_g": 8.91e-4,
-        "CO2_g": 7.48e-4,
-        "CH4_g": 19.548,
-        "O2_g": 1.27e-25,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2_g": 59.066,
+                "H2O_g": 18.320,
+                "CO_g": 8.91e-4,
+                "CO2_g": 7.48e-4,
+                "CH4_g": 19.548,
+                "O2_g": 1.27e-25,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_low_temperature(helper) -> None:
@@ -293,25 +276,21 @@ def test_CHO_low_temperature(helper) -> None:
     o_kg: ArrayLike = 1.02999e20
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    solution: Float[Array, "..."] = gas_CHO_model.solve(
+    gas_CHO_model.solve(
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = gas_CHO_model.output
 
-    gas_partial_pressure: NpFloat = np.exp(
-        get_gas_log_partial_pressure(output.parameters, solution)
-    )
-    solution_dict: dict[str, NpFloat] = dict(
-        zip(gas.species.species_names, gas_partial_pressure.T)
-    )
-
-    factsage_result: dict[str, float] = {
-        "H2_g": 55.475,
-        "H2O_g": 8.0,
-        "CO2_g": 1.24e-14,
-        "O2_g": 7.85e-54,
-        "CH4_g": 16.037,
-        "CO_g": 2.12e-16,
+    factsage_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2_g": 55.475,
+                "H2O_g": 8.0,
+                "CO2_g": 1.24e-14,
+                "O2_g": 7.85e-54,
+                "CH4_g": 16.037,
+                "CO_g": 2.12e-16,
+            }
+        }
     }
 
-    assert helper.isclose(solution_dict, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
