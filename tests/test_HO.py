@@ -60,7 +60,7 @@ def test_H2O() -> None:
 
     model.solve(state=planet, mass_constraints=mass_constraints)
 
-    target: dict[str, float] = {"H2O_g": 1.0312913336898137}
+    target: dict[str, Any] = {"gas": {"partial_pressure_bar": {"H2O_g": 1.0312913336898137}}}
 
     # output.to_excel("test_H2O")
 
@@ -81,15 +81,19 @@ def test_H_O() -> None:
 
     model.solve(state=planet, mass_constraints=mass_constraints)
 
-    fastchem_result: dict[str, float] = {
-        "H2O_g": 76.45861543,
-        "H2_g": 73.84378192,
-        "O2_g": 8.91399329e-08,
+    fastchem_result: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 76.45861543,
+                "H2_g": 73.84378192,
+                "O2_g": 8.91399329e-08,
+            }
+        }
     }
 
     # output.to_excel("test_H_O")
 
-    assert model.output.compare(fastchem_result, log=True, rtol=RTOL, atol=ATOL)
+    assert model.output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_H_fO2() -> None:
@@ -105,10 +109,14 @@ def test_H_fO2() -> None:
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    target: dict[str, float] = {
-        "H2O_g": 0.2570800742364775,
-        "H2_g": 0.2491511264610601,
-        "O2_g": 8.838513516896038e-08,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 0.2570800742364775,
+                "H2_g": 0.2491511264610601,
+                "O2_g": 8.838513516896038e-08,
+            }
+        }
     }
 
     # output.to_excel("test_H_fO2")
@@ -127,10 +135,20 @@ def test_H_fO2_fH2() -> None:
 
     gas_HO_model.solve(state=planet, fugacity_constraints=fugacity_constraints)
 
-    target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([3.262913506271090e-09, 1.031823848794260e-07, 3.262913506271089e-06]),
-        "H2_g": np.array([1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]),
-        "O2_g": np.array([8.838513516896060e-09, 8.838513516896038e-08, 8.838513516896018e-07]),
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": np.array(
+                    [3.262913506271090e-09, 1.031823848794260e-07, 3.262913506271089e-06]
+                ),
+                "H2_g": np.array(
+                    [1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]
+                ),
+                "O2_g": np.array(
+                    [8.838513516896060e-09, 8.838513516896038e-08, 8.838513516896018e-07]
+                ),
+            }
+        }
     }
 
     assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
@@ -260,10 +278,20 @@ def test_H_fO2_batch_H_mass() -> None:
         state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([2.570800742364757e-01, 2.426110356931991e01, 1.610286613431932e03]),
-        "H2_g": np.array([2.491511264610584e-01, 2.351283467393216e01, 1.560621626756960e03]),
-        "O2_g": np.array([8.838513516896038e-08, 8.838513516896038e-08, 8.838513516896102e-08]),
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": np.array(
+                    [2.570800742364757e-01, 2.426110356931991e01, 1.610286613431932e03]
+                ),
+                "H2_g": np.array(
+                    [2.491511264610584e-01, 2.351283467393216e01, 1.560621626756960e03]
+                ),
+                "O2_g": np.array(
+                    [8.838513516896038e-08, 8.838513516896038e-08, 8.838513516896102e-08]
+                ),
+            }
+        }
     }
 
     # output.to_excel("test_H_fO2_batch_H_mass")
