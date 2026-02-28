@@ -5,8 +5,7 @@
 """Tests for systems with real gases"""
 
 import logging
-import pprint
-from typing import Mapping
+from typing import Any, Mapping
 
 import numpy as np
 from jaxtyping import ArrayLike
@@ -16,14 +15,13 @@ from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies, Planet, ReservoirSpecies
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.output_core import Output
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -49,7 +47,7 @@ condensates: PurePhase = PurePhase((O2Si_l,))
 subneptune_model: EquilibriumModel = EquilibriumModel(gas, condensates=(condensates,))
 
 
-def test_fO2_holley(helper) -> None:
+def test_fO2_holley() -> None:
     """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
 
     H2_g: ChemicalSpecies = ChemicalSpecies.create_gas(
@@ -71,24 +69,23 @@ def test_fO2_holley(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     model.solve(
-        state=planet,
-        fugacity_constraints=fugacity_constraints,
-        mass_constraints=mass_constraints,
-        solver="basic",
+        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
-    output: Output = model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
 
-    target: dict[str, float] = {
-        "H2O_g": 32.77037875523393,
-        "H2_g": 71.50338102110962,
-        "O2_g": 1.525466019972294e-21,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 32.77037875523393,
+                "H2_g": 71.50338102110962,
+                "O2_g": 1.525466019972294e-21,
+            }
+        }
     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert model.output.compare(target, rtol=RTOL, atol=ATOL)
 
 
-def test_chabrier_earth(helper) -> None:
+def test_chabrier_earth() -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
     planet: Planet = Planet(temperature=3400)
@@ -97,38 +94,32 @@ def test_chabrier_earth(helper) -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    # Works
-    log_number_moles = np.array([56.0, 55.0, 36.0, 57.0, 53.0, 58.0])
-    # log_number_moles = np.array([55.0, 55.0, 36.0, 55.0, 55.0, 55.0])
+    subneptune_model.solve(state=planet, mass_constraints=mass_constraints)
 
-    subneptune_model.solve(
-        state=planet,
-        mass_constraints=mass_constraints,
-        solver="basic",
-        initial_log_number_moles=log_number_moles,
-    )
-    output: Output = subneptune_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
-
-    target: dict[str, float] = {
-        "H2O_g": 7.253556287801738e03,
-        "H2O_g_activity": 7.253556287801635e03,
-        "H2_g": 1.162520652380062e04,
-        "H2_g_activity": 2.516876841308367e05,
-        "H4Si_g": 6.759146395057408e04,
-        "H4Si_g_activity": 6.759146395057408e04,
-        "O2Si_l": 9.311489514762553e04,
-        "O2Si_l_activity": 1.0,
-        "O2_g": 1.791815879185495e-05,
-        "O2_g_activity": 1.791815879185482e-05,
-        "OSi_g": 6.302402285027329e02,
-        "OSi_g_activity": 6.302402285027240e02,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 7.253556287801738e03,
+                "H2_g": 1.162520652380062e04,
+                "H4Si_g": 6.759146395057408e04,
+                "O2_g": 1.791815879185495e-05,
+                "OSi_g": 6.302402285027329e02,
+            },
+            "fugacity": {
+                "H2O_g": 7.253556287801635e03,
+                "H2_g": 2.516876841308367e05,
+                "H4Si_g": 6.759146395057408e04,
+                "O2_g": 1.791815879185482e-05,
+                "OSi_g": 6.302402285027240e02,
+            },
+        },
+        "condensates": {"activity": {"O2Si_l": 1.0}},
     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert subneptune_model.output.compare(target, rtol=RTOL, atol=ATOL)
 
 
-def test_chabrier_subNeptune(helper) -> None:
+def test_chabrier_subNeptune() -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune
 
     This case effectively saturates the maximum allowable log number density at a value of 70
@@ -154,28 +145,31 @@ def test_chabrier_subNeptune(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     subneptune_model.solve(state=planet, mass_constraints=mass_constraints)
-    output: Output = subneptune_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
 
-    target: dict[str, float] = {
-        "H2O_g": 4.295071823974879e05,
-        "H2O_g_activity": 4.295071823974879e05,
-        "H2_g": 2.926773356736283e00,
-        "H2_g_activity": 1.956449985411128e04,
-        "H4Si_g": 7.038499826508187e-04,
-        "H4Si_g_activity": 7.038499826508187e-04,
-        "O2Si_l": 4.497910721606553e05,
-        "O2Si_l_activity": 1.0,
-        "O2_g": 1.039725511931324e01,
-        "O2_g_activity": 1.039725511931332e01,
-        "OSi_g": 8.273579821046055e-01,
-        "OSi_g_activity": 8.273579821046055e-01,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 4.295071823974879e05,
+                "H2_g": 2.926773356736283e00,
+                "H4Si_g": 7.038499826508187e-04,
+                "O2_g": 1.039725511931324e01,
+                "OSi_g": 8.273579821046055e-01,
+            },
+            "fugacity_bar": {
+                "H2O_g": 4.295071823974879e05,
+                "H2_g": 1.956449985411128e04,
+                "H4Si_g": 7.038499826508187e-04,
+                "O2_g": 1.039725511931324e01,
+                "OSi_g": 8.273579821046055e-01,
+            },
+        },
+        "condensates": {"activity": {"O2Si_l": 1.0}},
     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert subneptune_model.output.compare(target, rtol=RTOL, atol=ATOL)
 
 
-def test_chabrier_subNeptune_batch(helper) -> None:
+def test_chabrier_subNeptune_batch() -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune for several O masses
 
     As above, this test has questionable physical relevance without the inclusion of more species'
@@ -199,25 +193,33 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    subneptune_model.solve(
-        state=planet, mass_constraints=mass_constraints, solver="basic", solver_recompile=True
-    )
-    output: Output = subneptune_model.output
-    solution: dict[str, ArrayLike] = output.quick_look()
+    subneptune_model.solve(state=planet, mass_constraints=mass_constraints)
 
-    target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([4.477789711513712e05, 4.785890592398898e05, 5.039107471956282e05]),
-        "H2_g": np.array([3.463824822645956e-02, 7.208115634579626e-03, 2.129125602157067e-03]),
-        "H2_g_activity": np.array(
-            [4.081150539627139e02, 2.445386584856476e02, 1.945159917637966e02]
-        ),
-        "O2_g": np.array([2.597033179470946e04, 8.263153509596182e04, 1.447811285078976e05]),
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": np.array(
+                    [4.477789711513712e05, 4.785890592398898e05, 5.039107471956282e05]
+                ),
+                "H2_g": np.array(
+                    [3.463824822645956e-02, 7.208115634579626e-03, 2.129125602157067e-03]
+                ),
+                "O2_g": np.array(
+                    [2.597033179470946e04, 8.263153509596182e04, 1.447811285078976e05]
+                ),
+            },
+            "fugacity_bar": {
+                "H2_g": np.array(
+                    [4.081150539627139e02, 2.445386584856476e02, 1.945159917637966e02]
+                )
+            },
+        }
     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert subneptune_model.output.compare(target, rtol=RTOL, atol=ATOL)
 
 
-def test_pH2_fO2_real_gas(helper) -> None:
+def test_pH2_fO2_real_gas() -> None:
     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
     Applies a constraint to the fugacity of H2.
@@ -250,21 +252,20 @@ def test_pH2_fO2_real_gas(helper) -> None:
         state=planet,
         mass_constraints=mass_constraints,
         fugacity_constraints=fugacity_constraints,
-        solver="basic",
-        # Guide the solver with an improved initial guess, otherwise use solver="robust".
+        # Guide the solver with an improved initial guess
         initial_log_number_moles=np.array([55, 55, 30, 55]),
     )
-    output: Output = model.output
 
     # output.to_excel("pH2_fO2_real_gas")
-    solution: dict[str, ArrayLike] = output.quick_look()
 
-    logger.info("solution = %s", pprint.pformat(solution))
-
-    target: dict[str, float] = {
-        "H2O_g": 1470.2567650857518,
-        "H2_g": 999.9971214963639,
-        "O2_g": 1.045357420958815e-07,
+    target: dict[str, Any] = {
+        "gas": {
+            "partial_pressure_bar": {
+                "H2O_g": 1470.2567650857518,
+                "H2_g": 999.9971214963639,
+                "O2_g": 1.045357420958815e-07,
+            }
+        }
     }
 
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert model.output.compare(target, rtol=RTOL, atol=ATOL)

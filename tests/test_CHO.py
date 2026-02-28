@@ -231,7 +231,7 @@ def test_CHO_highly_oxidised() -> None:
     assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_middle_temperature(helper) -> None:
+def test_CHO_middle_temperature() -> None:
     """Tests C-H-O system at 873 K"""
 
     planet: Planet = Planet(temperature=873)
