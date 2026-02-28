@@ -196,7 +196,7 @@ def test_CHO_oxidised() -> None:
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_highly_oxidised(helper) -> None:
+def test_CHO_highly_oxidised() -> None:
     """Tests C-H-O system at IW+4
 
     Similar to :cite:p:`BHS22{Table E, row 4}`.
@@ -261,7 +261,7 @@ def test_CHO_middle_temperature(helper) -> None:
     assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_low_temperature(helper) -> None:
+def test_CHO_low_temperature() -> None:
     """Tests C-H-O system at 450 K"""
 
     planet: Planet = Planet(temperature=450)
