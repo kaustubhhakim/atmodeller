@@ -28,6 +28,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
@@ -547,19 +548,18 @@ class ReactionSystem(BaseReactionBlock):
         log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_mass_fraction(
             log_number_moles[..., self.melt_slice], log_inert_melt_mass
         )
-        # jax.debug.print("log_activity_melt = {out}", out=log_activity_melt)
+        jax.debug.print("activity_melt_by_mass = {out}", out=jnp.exp(log_activity_melt))
 
+        jax.debug.print("inert_molar_mass = {out}", out=jnp.exp(log_inert_molar_mass))
+        jax.debug.print("inert_melt_mass = {out}", out=jnp.exp(log_inert_melt_mass))
         # Test output for activity by moles
+        log_inert_melt_moles = log_inert_melt_mass - log_inert_molar_mass
         log_activity_melt_by_moles: Float[Array, "... n_melt_species"] = (
             self.melt.get_log_activity(
-                log_number_moles[..., self.melt_slice],
-                temperature,
-                pressure,
-                log_inert_molar_mass,
-                log_inert_melt_mass,
+                log_number_moles[..., self.melt_slice], temperature, pressure, log_inert_melt_moles
             )
         )
-        # jax.debug.print("activity_melt_by_moles = {out}", out=jnp.exp(log_activity_melt_by_moles))
+        jax.debug.print("activity_melt_by_moles = {out}", out=jnp.exp(log_activity_melt_by_moles))
 
         # jax.debug.print(
         #     "melt_phase_mass = {out}",

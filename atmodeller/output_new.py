@@ -114,13 +114,32 @@ class Output(eqx.Module):
             Gas log mole fraction
         """
         gas_slice: slice = self.parameters.reaction_system.gas_slice
-        gas_log_mole_fraction: Float[Array, "... n_species"] = (
+        gas_log_mole_fraction: Float[Array, "... n_gas_species"] = (
             self.parameters.reaction_system.gas.get_log_mole_fraction(
                 self.log_number_moles[..., gas_slice]
             )
         )
 
         return gas_log_mole_fraction
+
+    def get_melt_log_mole_fraction(self) -> Float[Array, "... n_melt_species"]:
+        """Gets melt log mole fraction.
+
+        Returns:
+            Melt log mole fraction
+        """
+        melt_slice: slice = self.parameters.reaction_system.melt_slice
+        log_inert_melt_moles = jnp.log(self.parameters.state.melt_mass) - jnp.log(
+            self.parameters.state.molar_mass
+        )
+        melt_log_mole_fraction: Float[Array, "... n_melt_species"] = (
+            self.parameters.reaction_system.melt.get_log_mole_fraction(
+                self.log_number_moles[..., melt_slice],
+                log_inert_melt_moles,
+            )
+        )
+
+        return melt_log_mole_fraction
 
     def get_gas_log_partial_pressure(self) -> Float[Array, "... n_gas_species"]:
         """Gets gas log partial pressure.
@@ -170,16 +189,27 @@ class Output(eqx.Module):
         """
         gas_names: tuple[str, ...] = self.parameters.reaction_system.gas.species.species_names
         gas_slice: slice = self.parameters.reaction_system.gas_slice
+        melt_names: tuple[str, ...] = self.parameters.reaction_system.melt.species.species_names
+        melt_slice: slice = self.parameters.reaction_system.melt_slice
 
-        # All computation in JAX
-        gas_log_partial_pressure = self.get_gas_log_partial_pressure()
-        gas_log_mole_fraction = self.get_gas_log_mole_fraction()
+        log_activity_with_stability: Float[Array, "... n_species"] = (
+            self.get_log_activity_with_stability()
+        )
+
         total_pressure = get_total_pressure(self.parameters, self.solution)
         gas_log_mass = self.parameters.reaction_system.gas.get_log_phase_mass(
             self.log_number_moles[..., gas_slice]
         )
+        log_inert_molar_mass = jnp.log(self.parameters.state.molar_mass)
+        log_inert_melt_mass = jnp.log(self.parameters.state.melt_mass)
 
-        # condensates_dict: dict[str, Any] = {}
+        melt_log_mass = self.parameters.reaction_system.melt.get_log_phase_mass(
+            self.log_number_moles[..., melt_slice], log_inert_melt_mass
+        )
+        melt_log_solvent_mass = self.parameters.reaction_system.melt.get_log_solvent_mass(
+            self.log_number_moles[..., melt_slice], log_inert_melt_mass
+        )
+
         condensate_names: list[str] = [
             condensate.name for condensate in self.parameters.reaction_system.condensates
         ]
@@ -188,21 +218,65 @@ class Output(eqx.Module):
         # Single conversion boundary: JAX -> NumPy -> dict
         out: dict[str, Any] = {
             "gas": {
-                "partial_pressure_bar": dict(zip(gas_names, np.exp(gas_log_partial_pressure).T)),
+                "partial_pressure_bar": dict(
+                    zip(gas_names, np.exp(self.get_gas_log_partial_pressure()).T)
+                ),
                 "number_moles": dict(
                     zip(gas_names, np.exp(self.log_number_moles[..., gas_slice]).T)
                 ),
-                "mole_fraction": dict(zip(gas_names, np.exp(gas_log_mole_fraction).T)),
+                "mole_fraction": dict(zip(gas_names, np.exp(self.get_gas_log_mole_fraction()).T)),
                 "pressure_bar": np.asarray(total_pressure),
                 "mass_kg": np.squeeze(np.exp(gas_log_mass)),
+                "molar_mass_kg_per_mol": np.squeeze(
+                    np.exp(
+                        self.parameters.reaction_system.gas.get_log_molar_mass(
+                            self.log_number_moles[..., gas_slice]
+                        )
+                    )
+                ),
                 "fugacity_bar": dict(
                     zip(
                         gas_names,
-                        np.exp(self.get_log_activity_with_stability()[..., gas_slice]).T,
+                        np.exp(log_activity_with_stability[..., gas_slice]).T,
                     )
                 ),
             },
-            "melt": {},
+            "melt": {
+                "number_moles": dict(
+                    zip(melt_names, np.exp(self.log_number_moles[..., melt_slice]).T)
+                ),
+                "mole_fraction": dict(
+                    zip(
+                        melt_names,
+                        np.exp(self.get_melt_log_mole_fraction()).T,
+                    )
+                ),
+                "mass_fraction": dict(
+                    zip(
+                        melt_names,
+                        np.exp(
+                            self.parameters.reaction_system.melt.get_log_mass_fraction(
+                                self.log_number_moles[..., melt_slice], log_inert_melt_mass
+                            )
+                        ),
+                    )
+                ),
+                "mass_kg": np.squeeze(np.exp(melt_log_mass)),
+                "molar_mass_kg_per_mol": np.squeeze(
+                    np.exp(
+                        self.parameters.reaction_system.melt.get_log_molar_mass(
+                            self.log_number_moles[..., melt_slice],
+                            log_inert_molar_mass,
+                            log_inert_melt_mass,
+                        )
+                    )
+                ),
+                "solvent_mass_kg": np.squeeze(np.exp(melt_log_solvent_mass)),
+                # Recall that this is currently activity by mass concentration
+                "activity": dict(
+                    zip(melt_names, np.exp(log_activity_with_stability[..., melt_slice]).T)
+                ),
+            },
             "solid": {},
             "condensates": {
                 "activity": dict(
