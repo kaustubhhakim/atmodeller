@@ -376,6 +376,26 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         return logsumexp(log_mass_plus, axis=-1, keepdims=True)
 
+    def get_log_phase_moles(
+        self,
+        log_number_moles: Float[Array, "... n_species"],
+        log_inert_moles: Float[Array, ""] = jnp.asarray(-jnp.inf),
+    ) -> Float[Array, "... 1"]:
+        """Gets the log moles of the phase.
+
+        Args:
+            log_number_moles: Log number of moles of each species in the melt phase
+            log_inert_moles: Log moles of the inert, non-reactive component (e.g., silicate).
+
+        Returns:
+            Log moles of the melt phase
+        """
+        log_moles_plus: Float[Array, "... n_species_plus_1"] = jnp.append(
+            log_number_moles, log_inert_moles
+        )
+
+        return logsumexp(log_moles_plus, axis=-1, keepdims=True)
+
     def get_log_molar_mass(
         self,
         log_number_moles: Float[Array, "... n_species"],
@@ -398,11 +418,11 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
         # Account for an inert, non-reactive melt mass, given by the thermodynamic state
         log_inert_moles: Float[Array, "..."] = log_inert_mass - log_inert_molar_mass
-        log_number_plus: Float[Array, "... n_species_plus_1"] = jnp.append(
+        log_number_total: Float[Array, "... 1"] = self.get_log_phase_moles(
             log_number_moles, log_inert_moles
         )
 
-        return log_phase_mass - logsumexp(log_number_plus, axis=-1, keepdims=True)
+        return log_phase_mass - log_number_total
 
     def get_log_solvent_mass(
         self,

@@ -16,32 +16,11 @@ from jaxtyping import Array, Float
 
 from atmodeller.engine import get_log_activity, get_total_pressure
 from atmodeller.parameters import Parameters
+from atmodeller.phases import GasPhase, MeltPhase, SolidPhase
 from atmodeller.type_aliases import NpArray, NpBool
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-# TODO
-# @eqx.filter_jit
-# def get_melt_log_mole_fraction(
-#     parameters: Parameters, solution: Float[Array, "... solution"]
-# ) -> Float[Array, "... n_species"]:
-#     """Gets melt log mole fraction.
-
-#     Args:
-#         parameters: Parameters
-#         solution: Solution array
-
-#     Returns:
-#         Melt log mole fraction
-#     """
-#     log_number_moles, _ = jnp.split(solution, 2, axis=-1)
-#     melt_slice: slice = parameters.reaction_system.melt_slice
-#     melt_log_mole_fraction: Float[Array, "... n_species"] = (
-#         parameters.reaction_system.melt.get_log_mole_fraction(log_number_moles[..., melt_slice])
-#     )
-
-#     return melt_log_mole_fraction
 
 
 def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
@@ -103,6 +82,21 @@ class Output(eqx.Module):
         return log_stability
 
     @property
+    def gas(self) -> GasPhase:
+        """Gas phase output"""
+        return self.parameters.reaction_system.gas
+
+    @property
+    def melt(self) -> MeltPhase:
+        """Melt phase output"""
+        return self.parameters.reaction_system.melt
+
+    @property
+    def solid(self) -> SolidPhase:
+        """Solid phase output"""
+        return self.parameters.reaction_system.solid
+
+    @property
     def solution(self) -> Float[Array, "... twice_species"]:
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
@@ -114,10 +108,8 @@ class Output(eqx.Module):
             Gas log mole fraction
         """
         gas_slice: slice = self.parameters.reaction_system.gas_slice
-        gas_log_mole_fraction: Float[Array, "... n_gas_species"] = (
-            self.parameters.reaction_system.gas.get_log_mole_fraction(
-                self.log_number_moles[..., gas_slice]
-            )
+        gas_log_mole_fraction: Float[Array, "... n_gas_species"] = self.gas.get_log_mole_fraction(
+            self.log_number_moles[..., gas_slice]
         )
 
         return gas_log_mole_fraction
@@ -133,9 +125,8 @@ class Output(eqx.Module):
             self.parameters.state.molar_mass
         )
         melt_log_mole_fraction: Float[Array, "... n_melt_species"] = (
-            self.parameters.reaction_system.melt.get_log_mole_fraction(
-                self.log_number_moles[..., melt_slice],
-                log_inert_melt_moles,
+            self.melt.get_log_mole_fraction(
+                self.log_number_moles[..., melt_slice], log_inert_melt_moles
             )
         )
 
@@ -187,9 +178,9 @@ class Output(eqx.Module):
         Returns:
             Dictionary of the solution
         """
-        gas_names: tuple[str, ...] = self.parameters.reaction_system.gas.species.species_names
+        gas_names: tuple[str, ...] = self.gas.species.species_names
         gas_slice: slice = self.parameters.reaction_system.gas_slice
-        melt_names: tuple[str, ...] = self.parameters.reaction_system.melt.species.species_names
+        melt_names: tuple[str, ...] = self.melt.species.species_names
         melt_slice: slice = self.parameters.reaction_system.melt_slice
 
         log_activity_with_stability: Float[Array, "... n_species"] = (
@@ -197,16 +188,15 @@ class Output(eqx.Module):
         )
 
         total_pressure = get_total_pressure(self.parameters, self.solution)
-        gas_log_mass = self.parameters.reaction_system.gas.get_log_phase_mass(
-            self.log_number_moles[..., gas_slice]
-        )
+        gas_log_mass = self.gas.get_log_phase_mass(self.log_number_moles[..., gas_slice])
         log_inert_molar_mass = jnp.log(self.parameters.state.molar_mass)
         log_inert_melt_mass = jnp.log(self.parameters.state.melt_mass)
+        log_inert_melt_moles = log_inert_melt_mass - log_inert_molar_mass
 
-        melt_log_mass = self.parameters.reaction_system.melt.get_log_phase_mass(
+        melt_log_mass = self.melt.get_log_phase_mass(
             self.log_number_moles[..., melt_slice], log_inert_melt_mass
         )
-        melt_log_solvent_mass = self.parameters.reaction_system.melt.get_log_solvent_mass(
+        melt_log_solvent_mass = self.melt.get_log_solvent_mass(
             self.log_number_moles[..., melt_slice], log_inert_melt_mass
         )
 
@@ -228,11 +218,7 @@ class Output(eqx.Module):
                 "pressure_bar": np.asarray(total_pressure),
                 "mass_kg": np.squeeze(np.exp(gas_log_mass)),
                 "molar_mass_kg_per_mol": np.squeeze(
-                    np.exp(
-                        self.parameters.reaction_system.gas.get_log_molar_mass(
-                            self.log_number_moles[..., gas_slice]
-                        )
-                    )
+                    np.exp(self.gas.get_log_molar_mass(self.log_number_moles[..., gas_slice]))
                 ),
                 "fugacity_bar": dict(
                     zip(
@@ -255,16 +241,23 @@ class Output(eqx.Module):
                     zip(
                         melt_names,
                         np.exp(
-                            self.parameters.reaction_system.melt.get_log_mass_fraction(
+                            self.melt.get_log_mass_fraction(
                                 self.log_number_moles[..., melt_slice], log_inert_melt_mass
                             )
                         ),
                     )
                 ),
+                "total_moles": np.squeeze(
+                    np.exp(
+                        self.melt.get_log_phase_moles(
+                            self.log_number_moles[..., melt_slice], log_inert_melt_moles
+                        )
+                    )
+                ),
                 "mass_kg": np.squeeze(np.exp(melt_log_mass)),
                 "molar_mass_kg_per_mol": np.squeeze(
                     np.exp(
-                        self.parameters.reaction_system.melt.get_log_molar_mass(
+                        self.melt.get_log_molar_mass(
                             self.log_number_moles[..., melt_slice],
                             log_inert_molar_mass,
                             log_inert_melt_mass,

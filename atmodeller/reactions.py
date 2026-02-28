@@ -332,7 +332,7 @@ class DissolutionNetwork(BaseReactionBlock):
 
         log_Kp: Float[Array, "... reactions"] = (
             jnp.log(species_ppmw) - jnp.log(1e6) - jnp.log(gas_species_activity)
-        )  # NOTE: convert from ppmw to mass fraction
+        )  # NOTE: converts from ppmw to mass fraction
         # jax.debug.print("log_Kp = {out}", out=log_Kp)
 
         return log_Kp
