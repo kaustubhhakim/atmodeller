@@ -196,9 +196,6 @@ class Output(eqx.Module):
         melt_log_mass = self.melt.get_log_phase_mass(
             self.log_number_moles[..., melt_slice], log_inert_melt_mass
         )
-        melt_log_solvent_mass = self.melt.get_log_solvent_mass(
-            self.log_number_moles[..., melt_slice], log_inert_melt_mass
-        )
 
         condensate_names: list[str] = [
             condensate.name for condensate in self.parameters.reaction_system.condensates
@@ -264,8 +261,6 @@ class Output(eqx.Module):
                         )
                     )
                 ),
-                "solvent_mass_kg": np.squeeze(np.exp(melt_log_solvent_mass)),
-                # Recall that this is currently activity by mass concentration
                 "activity": dict(
                     zip(melt_names, np.exp(log_activity_with_stability[..., melt_slice]).T)
                 ),

@@ -28,7 +28,6 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
@@ -309,6 +308,7 @@ class DissolutionNetwork(BaseReactionBlock):
         gas_species_activity: Float[Array, "... n_gas_species"],
         pressure: Float[Array, "..."],
         fO2: Float[Array, "..."],
+        log_solvent_molar_mass: Float[Array, "..."],
     ) -> Float[Array, "... n_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
@@ -317,6 +317,7 @@ class DissolutionNetwork(BaseReactionBlock):
             gas_species_activity: Gas species activity regulating dissolution reactions
             pressure: Pressure in bar
             fO2: Oxygen fugacity in bar
+            log_solvent_molar_mass: Log of the molar mass of the solvent in kg/mol
 
         Returns:
             Log of the equilibrium constant of each reaction
@@ -325,14 +326,20 @@ class DissolutionNetwork(BaseReactionBlock):
         if self.number_reactions == 0:
             return jnp.zeros((*jnp.shape(temperature), 0), dtype=float)
 
-        species_ppmw: Float[Array, "... n_species"] = self.vmap_solubility(
+        species_ppmw_concentration: Float[Array, "... n_species"] = self.vmap_solubility(
             jnp.arange(self.number_reactions), gas_species_activity, temperature, pressure, fO2
         )
-        # jax.debug.print("species_ppmw = {out}", out=species_ppmw)
+        # jax.debug.print("solvent_molar_mass = {out}", out=jnp.exp(log_solvent_molar_mass))
 
+        # Convert from ppmw to mole fraction of melt, which is the activity basis for dissolution
+        # reactions.
         log_Kp: Float[Array, "... reactions"] = (
-            jnp.log(species_ppmw) - jnp.log(1e6) - jnp.log(gas_species_activity)
-        )  # NOTE: converts from ppmw to mass fraction
+            jnp.log(species_ppmw_concentration)
+            - jnp.log(1e6)
+            + log_solvent_molar_mass
+            - jnp.log(self.species.molar_masses[self.reaction_indices_map])
+            - jnp.log(gas_species_activity)
+        )
         # jax.debug.print("log_Kp = {out}", out=log_Kp)
 
         return log_Kp
@@ -544,43 +551,22 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("log_activity_gas = {out}", out=log_activity_gas)
 
-        # Current implementation required this
-        log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_mass_fraction(
-            log_number_moles[..., self.melt_slice], log_inert_melt_mass
-        )
-        jax.debug.print("activity_melt_by_mass = {out}", out=jnp.exp(log_activity_melt))
-
-        jax.debug.print("inert_molar_mass = {out}", out=jnp.exp(log_inert_molar_mass))
-        jax.debug.print("inert_melt_mass = {out}", out=jnp.exp(log_inert_melt_mass))
-        # Test output for activity by moles
         log_inert_melt_moles = log_inert_melt_mass - log_inert_molar_mass
-        log_activity_melt_by_moles: Float[Array, "... n_melt_species"] = (
-            self.melt.get_log_activity(
-                log_number_moles[..., self.melt_slice], temperature, pressure, log_inert_melt_moles
-            )
+        log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_activity(
+            log_number_moles[..., self.melt_slice], temperature, pressure, log_inert_melt_moles
         )
-        jax.debug.print("activity_melt_by_moles = {out}", out=jnp.exp(log_activity_melt_by_moles))
-
-        # jax.debug.print(
-        #     "melt_phase_mass = {out}",
-        #     out=jnp.exp(
-        #         self.melt.get_log_phase_mass(
-        #             log_number_moles[..., self.melt_slice],
-        #             self.dissolution.ignore_condensed_species,
-        #             log_inert_melt_mass,
-        #         )
-        #     ),
-        # )
-        # jax.debug.print("melt inert mass = {out}", out=jnp.exp(log_inert_melt_mass))
+        # jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
 
         log_activity_solid: Float[Array, "... n_solid_species"] = self.solid.get_log_mass_fraction(
             log_number_moles[..., self.solid_slice], log_inert_solid_mass
         )
+        # jax.debug.print("activity_solid = {out}", out=jnp.exp(log_activity_solid))
+
         log_activity_condensates: Float[Array, "... n_condensates"] = jnp.zeros(
             (log_activity_solid.shape[:-1] + (len(self.condensates),))
         )
+        # jax.debug.print("activity_condensates = {out}", out=jnp.exp(log_activity_condensates))
 
-        # FIXME: Hack to get output for debugging
         log_activity: Float[Array, "... n_species"] = jnp.concatenate(
             (log_activity_gas, log_activity_melt, log_activity_solid, log_activity_condensates),
             axis=-1,
@@ -591,9 +577,12 @@ class ReactionSystem(BaseReactionBlock):
 
     def get_log_Kp(
         self,
+        log_number_moles: Float[Array, "... num_species"],
         log_activity: Float[Array, "... num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
+        log_inert_molar_mass: Float[Array, "..."],
+        log_inert_melt_mass: Float[Array, "..."],
     ) -> Float[Array, "... n_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
@@ -601,20 +590,16 @@ class ReactionSystem(BaseReactionBlock):
         different inputs.
 
         Args:
+            log_number_moles: Log number of moles of each species
             log_activity: Log activity of each species
             temperature: Temperature in K
             pressure: Pressure in bar
+            log_inert_molar_mass: Log molar mass of the inert component of melt in kg/mol
+            log_inert_melt_mass: Log mass of the inert component of melt in kg
 
         Returns:
             Log of the equilibrium constant of each reaction
         """
-        # batch_shape: tuple[int, ...] = log_activity.shape[:-1]
-
-        # temperature_broadcast: Float[Array, "..."] = jnp.broadcast_to(temperature, batch_shape)
-        # pressure_broadcast: Float[Array, "..."] = jnp.broadcast_to(pressure, batch_shape)
-
-        # Do NOT broadcast temperature here - reaction.get_log_Kp handles it via einsum
-        # ("temperature.shape = {out}", out=temperature.shape)
         log_Kp_reaction: Float[Array, "... n_core_reactions"] = self.reaction.get_log_Kp(
             temperature
         )
@@ -640,8 +625,15 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("fO2 = {out}", out=fO2)
 
+        log_solvent_molar_mass: Float[Array, "..."] = self.melt.get_log_molar_mass(
+            log_number_moles[..., self.melt_slice], log_inert_molar_mass, log_inert_melt_mass
+        )
+        # jax.debug.print("log_solvent_molar_mass = {out}", out=log_solvent_molar_mass)
+
         log_Kp_dissolution: Float[Array, "... n_dissolution_reactions"] = (
-            self.dissolution.get_log_Kp(temperature, activity_dissolution, pressure, fO2)
+            self.dissolution.get_log_Kp(
+                temperature, activity_dissolution, pressure, fO2, log_solvent_molar_mass
+            )
         )
         # jax.debug.print("log_Kp_dissolution = {out}", out=log_Kp_dissolution)
 
@@ -698,24 +690,35 @@ class ReactionSystem(BaseReactionBlock):
 
     def get_residual(
         self,
+        log_number_moles: Float[Array, "... num_species"],
         log_activity: Float[Array, "... num_species"],
         log_stability: Float[Array, "... num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
+        log_inert_molar_mass: Float[Array, "..."],
+        log_inert_melt_mass: Float[Array, "..."],
     ) -> Float[Array, "... num_reactions"]:
         """Gets the residual of the reaction network.
 
         Args:
+            log_number_moles: Log number of moles of each species
             log_activity: Log activity of each species
             log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
+            log_inert_molar_mass: Log molar mass of the inert component of melt in kg/mol
+            log_inert_melt_mass: Log mass of the inert component of melt in kg
 
         Returns:
             Residual of the reaction network
         """
         log_Kp: Float[Array, "... num_reactions"] = self.get_log_Kp(
-            log_activity, temperature, pressure
+            log_number_moles,
+            log_activity,
+            temperature,
+            pressure,
+            log_inert_molar_mass,
+            log_inert_melt_mass,
         )
         # jax.debug.print("log_Kp = {out}", out=log_Kp)
         residual: Float[Array, "... num_reactions"] = (
@@ -723,7 +726,10 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("reaction residual before stability = {out}", out=residual)
 
-        return self.apply_stability(residual, log_stability)
+        residual = self.apply_stability(residual, log_stability)
+        # jax.debug.print("reaction residual after stability = {out}", out=residual)
+
+        return residual
 
     def phase_slice(self, phase_name: str) -> slice:
         """Slice object for a given phase.

@@ -4,25 +4,32 @@
 
 """Phase container classes for thermodynamic equilibrium calculations.
 
-This module defines high-level phase abstractions used in the equilibrium solver, including gas
-mixtures, silicate melts, solids, and pure unity-activity phases.
+This module defines four concrete phase types used in the equilibrium solver:
 
-Each phase is represented as a `SpeciesCollection` of thermodynamic species (formula + state of
-aggregation). Species are constructed from their Hill formulas and assigned an aggregation state
-consistent with the JANAF/NASA convention:
+- :class:`atmodeller.phases.GasPhase`: ideal mixture of (potentially) non-ideal gases.
+  Tracks the O2 index for redox calculations.
+- :class:`atmodeller.phases.MeltPhase`: multicomponent silicate melt, optionally with
+  dissolved volatiles and/or condensed species treated as additional to the solvent.
+  Phase-level properties (mass, moles, molar mass, and derived fractions) can be computed
+  relative to just the solvent mass, while per-species properties such as activity are
+  always computed from raw species amounts.
+- :class:`atmodeller.phases.SolidPhase`: multicomponent silicate solid.
+- :class:`atmodeller.phases.PurePhase`: single-species, unity-activity phase (e.g., a
+  pure mineral or ice).
 
-    - "g" : gas
-    - "l" : liquid
-    - "s" : solid
+All phases are JAX-compatible :mod:`equinox` modules. Each phase wraps a
+:class:`atmodeller.containers.SpeciesCollection` of thermodynamic species (Hill formula
++ aggregation state). Species are constructed from their Hill formulas and assigned an
+aggregation state consistent with the JANAF/NASA convention:
 
-These phase classes provide a structured interface for grouping species by thermodynamic role (gas,
-melt, solid, pure phase) while keeping the underlying species-level thermodynamic data separate.
+    - ``"g"`` : gas
+    - ``"l"`` : liquid
+    - ``"s"`` : solid
 
-They are used by the equilibrium solver to:
-    - distinguish gas and condensed phases,
-    - apply appropriate activity conventions,
-    - track phase-specific properties (e.g., O2 index in the gas phase),
-    - manage multicomponent phase assemblages.
+Quantities are accumulated in log-space throughout for numerical stability. Many methods
+accept an optional ``log_inert_*`` argument representing a non-reactive bulk component
+(e.g., the silicate melt mass) that contributes to phase totals but is not tracked as an
+explicit species in the solver.
 """
 
 import logging
@@ -113,10 +120,10 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
-    """Multicomponent gas mixture
+    """Multicomponent gas mixture.
 
-    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
-    type checkers (e.g., Pyright) infer types correctly.
+    Models gas species as an ideal mixture of (potentially) non-ideal pure gases, where each
+    species contributes a fugacity-corrected activity based on its equation of state.
     """
 
     O2_index: NpFloat
@@ -155,7 +162,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         Args:
             species: A single gas species name or iterable of names
 
-        Returns
+        Returns:
             An instance
         """
         species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
@@ -262,16 +269,25 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
 
 class MeltPhase(BasePhase[SpeciesProtocol]):
-    """Multicomponent silicate melt with optionally dissolved volatiles
+    """Multicomponent silicate melt with optionally dissolved volatiles.
 
-    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
-    type checkers (e.g., Pyright) infer types correctly.
+    The melt phase can optionally treat dissolved and/or condensed species as additional to the
+    solvent (the bulk melt mass that volatiles dissolve into). When enabled, these species are
+    included on top of the solvent when computing phase-level totals (mass, moles, molar mass,
+    and derived fractions). This is useful in the dilute limit, where their contribution to the
+    total phase mass is negligible, or when the inert bulk component already accounts for them.
+
+    Note that this only affects phase-level aggregations — per-species thermodynamic properties
+    (e.g., activity) are always computed from the raw species amounts and are unaffected. Total
+    mass and mole conservation is therefore always maintained by the solver.
     """
 
-    ignore_dissolved_mass: bool
-    """Ignore dissolved mass when computing phase mass and mass fractions. Defaults to ``True``."""
-    ignore_condensed_mass: bool
-    """Ignore condensed mass when computing phase mass and mass fractions. Defaults to ``True``."""
+    dissolved_is_additional: bool
+    """Whether dissolved species contribute additionally to the solvent. Only affects phase-based
+    properties (mass, moles, molar mass, and derived fractions). Defaults to ``False``."""
+    condensed_is_additional: bool
+    """Whether condensed species contribute additionally to the solvent. Only affects phase-based
+    properties (mass, moles, molar mass, and derived fractions). Defaults to ``False``."""
     vmap_log_activity: Callable
     """Vectorized log activity functions"""
 
@@ -279,12 +295,12 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     def __init__(
         self,
         species: Iterable[SpeciesProtocol],
-        ignore_dissolved_mass: bool = True,
-        ignore_condensed_mass: bool = True,
+        dissolved_is_additional: bool = False,
+        condensed_is_additional: bool = False,
     ):
         self.species = SpeciesCollection(species)
-        self.ignore_dissolved_mass = ignore_dissolved_mass
-        self.ignore_condensed_mass = ignore_condensed_mass
+        self.dissolved_is_additional = dissolved_is_additional
+        self.condensed_is_additional = condensed_is_additional
 
         log_activity_funcs: list[Callable] = [
             to_hashable(species_.activity.log_activity) for species_ in species
@@ -304,21 +320,52 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         )
 
     @classmethod
-    def create(cls, species: str | Iterable[str], ignore_dissolved_mass: bool = False) -> Self:
+    def create(cls, species: str | Iterable[str], dissolved_is_additional: bool = False) -> Self:
         """Creates an instance.
 
         Args:
             species: A single melt species name or iterable of names
-            ignore_dissolved_mass: Whether to ignore dissolved mass when computing phase mass and
-                mass fractions?
-        Returns
+            dissolved_is_additional: Whether dissolved species contribute additionally to the
+                solvent when computing phase-based properties. Defaults to ``False``.
+
+        Returns:
             An instance
         """
         species_collection: SpeciesCollection[SpeciesProtocol] = _build_species_collection(
             species, lambda hill: ChemicalSpecies.create_condensed(hill, state=LIQUID_STATE)
         )
 
-        return cls(species_collection, ignore_dissolved_mass)
+        return cls(species_collection, dissolved_is_additional)
+
+    def apply_solvent_mask_to_array(
+        self, log_array: Float[Array, "... n_species"]
+    ) -> Float[Array, "... n_species"]:
+        """Applies a mask to include contributions of additional (dissolved and/or condensed)
+        species.
+
+        Species flagged as additional are included in the mask (mask=True); all others are zeroed
+        out. The base solvent contribution is always accounted for separately via the inert
+        component.
+
+        Args:
+            log_array: An array with the same number of species as the melt phase
+
+        Returns:
+            The input array with only additional species retained; all other entries set to -inf
+        """
+        mask: Bool[Array, " n_species"] = jnp.zeros(self.species.number_species, dtype=bool)
+
+        if self.dissolved_is_additional:
+            # Dissolved volatiles are additional to the solvent, so include them in the mask
+            mask = jnp.logical_or(mask, self.species.reservoir_species_mask)
+
+        if self.condensed_is_additional:
+            # Condensed species are additional to the solvent, so include them in the mask
+            mask = jnp.logical_or(mask, self.species.reaction_species_mask)
+
+        log_mask: Float[Array, " n_species"] = jnp.where(mask, 0.0, -jnp.inf)
+
+        return log_array + log_mask
 
     def get_log_activity(
         self,
@@ -370,6 +417,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
             Log mass of the melt phase
         """
         log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
+        log_mass = self.apply_solvent_mask_to_array(log_mass)
 
         # Account for an inert, non-reactive melt mass, given by the thermodynamic state
         log_mass_plus: Float[Array, "... n_species_plus_1"] = jnp.append(log_mass, log_inert_mass)
@@ -390,6 +438,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log moles of the melt phase
         """
+        log_number_moles = self.apply_solvent_mask_to_array(log_number_moles)
         log_moles_plus: Float[Array, "... n_species_plus_1"] = jnp.append(
             log_number_moles, log_inert_moles
         )
@@ -402,15 +451,16 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         log_inert_molar_mass: Float[Array, "..."],
         log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
     ) -> Float[Array, "... 1"]:
-        """Gets the log molar mass.
+        """Gets the log molar mass of the melt phase.
 
         Args:
-            log_number_moles: Log number of moles of each species in the gas phase
-            log_inert_molar_mass: Log of the inert, non-reactive bulk component of melt in moles.
+            log_number_moles: Log number of moles of each species in the melt phase
+            log_inert_molar_mass: Log molar mass of the inert bulk component of melt in kg/mol.
             log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
+                Defaults to negative infinity (i.e., no inert component).
 
         Returns:
-            Log molar mass of the gas phase
+            Log molar mass of the melt phase
         """
         log_phase_mass: Float[Array, "... n_species"] = self.get_log_phase_mass(
             log_number_moles, log_inert_mass
@@ -423,44 +473,6 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         )
 
         return log_phase_mass - log_number_total
-
-    def get_log_solvent_mass(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_inert_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    ) -> Float[Array, "... 1"]:
-        """Gets the log solvent mass.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the melt phase
-            log_inert_mass: Log mass of the inert, non-reactive component (e.g., silicate).
-                Defaults to negative infinity (i.e., no inert component).
-
-        Returns:
-            Log solvent mass of the melt phase
-        """
-        # Compute for all species, then mask out contributions of dissolved and/or condensed
-        # species as needed
-        log_effective_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
-        mask: Bool[Array, " n_species"] = jnp.ones(self.species.number_species, dtype=bool)
-
-        if self.ignore_dissolved_mass:
-            # In the dilute limit, we exclude the contribution of dissolved species to the total
-            # mass
-            mask = jnp.logical_and(mask, ~self.species.reservoir_species_mask)
-
-        if self.ignore_condensed_mass:
-            # Ignore condensed species by masking their contributions to the total mass
-            mask = jnp.logical_and(mask, ~self.species.reaction_species_mask)
-
-        log_mask: Float[Array, " n_species"] = jnp.where(mask, 0.0, -jnp.inf)
-
-        # Account for an inert, non-reactive melt mass, given by the thermodynamic state
-        log_mass_plus: Float[Array, "... n_species_plus_1"] = jnp.append(
-            log_effective_mass + log_mask, log_inert_mass
-        )
-
-        return logsumexp(log_mass_plus, axis=-1, keepdims=True)
 
     def get_log_mass_fraction(
         self,
@@ -477,12 +489,12 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log mass fraction of each species in the melt phase
         """
-        log_effective_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
+        log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
         log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
             log_number_moles, log_inert_mass
         )
         # Log mass fraction = log(m_i) − log(total)
-        log_mass_fraction: Float[Array, "... n_species"] = log_effective_mass - log_phase_mass
+        log_mass_fraction: Float[Array, "... n_species"] = log_mass - log_phase_mass
         # jax.debug.print("log_mass_fraction = {out}", out=log_mass_fraction)
 
         return log_mass_fraction
@@ -502,20 +514,16 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             Log mole fraction of each species in the melt phase
         """
-        log_total_moles: Float[Array, "... 1"] = logsumexp(
-            jnp.append(log_number_moles, log_inert_moles), axis=-1, keepdims=True
+        log_phase_moles: Float[Array, "... 1"] = self.get_log_phase_moles(
+            log_number_moles, log_inert_moles
         )
-        log_mole_fraction: Float[Array, "... n_species"] = log_number_moles - log_total_moles
+        log_mole_fraction: Float[Array, "... n_species"] = log_number_moles - log_phase_moles
 
         return log_mole_fraction
 
 
 class SolidPhase(BasePhase[SpeciesProtocol]):
-    """Multicomponent silicate solid
-
-    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
-    type checkers (e.g., Pyright) infer types correctly.
-    """
+    """Multicomponent silicate solid."""
 
     @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
@@ -531,7 +539,7 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         Args:
             species: A single solid species name or iterable of names
 
-        Returns
+        Returns:
             An instance
         """
         species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
@@ -583,10 +591,9 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
 
 class PurePhase(BasePhase[ChemicalSpecies]):
-    """Pure, unity-activity phases
+    """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid).
 
-    Explicit __init__ is needed to specialize the generic BasePhase constructor, ensuring static
-    type checkers (e.g., Pyright) infer types correctly.
+    The activity of the species is fixed at unity by definition, so only one species is permitted.
     """
 
     @override
@@ -612,10 +619,11 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         """Creates an instance.
 
         Args:
-            species: Species
-            state: State of aggregation. Defaults to :const:`~atmodeller.constants.SOLID_STATE`.
+            species: Species Hill formula
+            state: State of aggregation. Defaults to
+                :const:`atmodeller.constants.SOLID_STATE`.
 
-        Returns
+        Returns:
             An instance
         """
         species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
