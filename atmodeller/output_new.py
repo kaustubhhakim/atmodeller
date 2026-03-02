@@ -178,117 +178,68 @@ class Output(eqx.Module):
         Returns:
             Dictionary of the solution
         """
-        gas_names: tuple[str, ...] = self.gas.species.species_names
         gas_slice: slice = self.parameters.reaction_system.gas_slice
-        melt_names: tuple[str, ...] = self.melt.species.species_names
         melt_slice: slice = self.parameters.reaction_system.melt_slice
 
         log_activity_with_stability: Float[Array, "... n_species"] = (
             self.get_log_activity_with_stability()
         )
 
+        temperature = self.parameters.state.temperature
         total_pressure = get_total_pressure(self.parameters, self.solution)
-        gas_log_mass = self.gas.get_log_phase_mass(self.log_number_moles[..., gas_slice])
-        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
-        log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
-        log_inert_melt_moles = log_background_melt_mass - log_background_molar_mass
-
-        melt_log_mass = self.melt.get_log_phase_mass(
-            self.log_number_moles[..., melt_slice], log_background_melt_mass
-        )
 
         condensate_names: list[str] = [
             condensate.name for condensate in self.parameters.reaction_system.condensates
         ]
         condensate_slice: slice = self.parameters.reaction_system.condensates_slice
 
+        out: dict[str, Any] = {}
+
+        # No background component for gas, so no need to pass log_background_molar_mass or
+        # log_background_melt_mass
+        out["gas"] = self.gas.output(
+            self.log_number_moles[gas_slice],
+            self.log_stability[gas_slice],
+            temperature,
+            total_pressure,
+        )
+
+        # Background component for melt
+        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
+        log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
+
+        out["melt"] = self.melt.output(
+            self.log_number_moles[melt_slice],
+            self.log_stability[melt_slice],
+            temperature,
+            total_pressure,
+            log_background_molar_mass,
+            log_background_melt_mass,
+        )
+
         # Single conversion boundary: JAX -> NumPy -> dict
-        out: dict[str, Any] = {
-            "gas": {
-                "partial_pressure_bar": dict(
-                    zip(gas_names, np.exp(self.get_gas_log_partial_pressure()).T)
-                ),
-                "number_moles": dict(
-                    zip(gas_names, np.exp(self.log_number_moles[..., gas_slice]).T)
-                ),
-                "mole_fraction": dict(zip(gas_names, np.exp(self.get_gas_log_mole_fraction()).T)),
-                "pressure_bar": np.asarray(total_pressure),
-                "mass_kg": np.squeeze(np.exp(gas_log_mass)),
-                "molar_mass_kg_per_mol": np.squeeze(
-                    np.exp(
-                        self.gas.get_log_phase_molar_mass(self.log_number_moles[..., gas_slice])
-                    )
-                ),
-                "fugacity_bar": dict(
-                    zip(
-                        gas_names,
-                        np.exp(log_activity_with_stability[..., gas_slice]).T,
-                    )
-                ),
-            },
-            "melt": {
-                "number_moles": dict(
-                    zip(melt_names, np.exp(self.log_number_moles[..., melt_slice]).T)
-                ),
-                "mole_fraction": dict(
-                    zip(
-                        melt_names,
-                        np.exp(self.get_melt_log_mole_fraction()).T,
-                    )
-                ),
-                "mass_fraction": dict(
-                    zip(
-                        melt_names,
-                        np.exp(
-                            self.melt.get_log_mass_fraction(
-                                self.log_number_moles[..., melt_slice], log_background_melt_mass
-                            )
-                        ),
-                    )
-                ),
-                "total_moles": np.squeeze(
-                    np.exp(
-                        self.melt.get_log_phase_moles(
-                            self.log_number_moles[..., melt_slice], log_inert_melt_moles
-                        )
-                    )
-                ),
-                "mass_kg": np.squeeze(np.exp(melt_log_mass)),
-                "molar_mass_kg_per_mol": np.squeeze(
-                    np.exp(
-                        self.melt.get_log_phase_molar_mass(
-                            self.log_number_moles[..., melt_slice],
-                            log_background_molar_mass,
-                            log_background_melt_mass,
-                        )
-                    )
-                ),
-                "activity": dict(
-                    zip(melt_names, np.exp(log_activity_with_stability[..., melt_slice]).T)
-                ),
-            },
-            "solid": {},
-            "condensates": {
-                "activity": dict(
-                    zip(
-                        condensate_names,
-                        np.exp(self.get_log_activity_with_stability()[..., condensate_slice]).T,
-                    )
-                ),
-                "number_moles": dict(
-                    zip(
-                        condensate_names,
-                        np.exp(self.log_number_moles[..., condensate_slice]).T,
-                    )
-                ),
-                "mass_kg": dict(
-                    zip(
-                        condensate_names,
-                        self.get_species_mass()[..., condensate_slice].T,
-                    )
-                ),
-            },
-        }
+
+        #     "condensates": {
+        #         "activity": dict(
+        #             zip(
+        #                 condensate_names,
+        #                 np.exp(self.get_log_activity_with_stability()[..., condensate_slice]).T,
+        #             )
+        #         ),
+        #         "number_moles": dict(
+        #             zip(
+        #                 condensate_names,
+        #                 np.exp(self.log_number_moles[..., condensate_slice]).T,
+        #             )
+        #         ),
+        #         "mass_kg": dict(
+        #             zip(
+        #                 condensate_names,
+        #                 self.get_species_mass()[..., condensate_slice].T,
+        #             )
+        #         ),
+        #     },
+        # }
 
         logger.info(f"Quick look output:\n{pformat(out)}")
 
