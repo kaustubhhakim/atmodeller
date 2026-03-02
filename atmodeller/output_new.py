@@ -189,12 +189,12 @@ class Output(eqx.Module):
 
         total_pressure = get_total_pressure(self.parameters, self.solution)
         gas_log_mass = self.gas.get_log_phase_mass(self.log_number_moles[..., gas_slice])
-        log_inert_molar_mass = jnp.log(self.parameters.state.molar_mass)
-        log_inert_melt_mass = jnp.log(self.parameters.state.melt_mass)
-        log_inert_melt_moles = log_inert_melt_mass - log_inert_molar_mass
+        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
+        log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
+        log_inert_melt_moles = log_background_melt_mass - log_background_molar_mass
 
         melt_log_mass = self.melt.get_log_phase_mass(
-            self.log_number_moles[..., melt_slice], log_inert_melt_mass
+            self.log_number_moles[..., melt_slice], log_background_melt_mass
         )
 
         condensate_names: list[str] = [
@@ -215,7 +215,9 @@ class Output(eqx.Module):
                 "pressure_bar": np.asarray(total_pressure),
                 "mass_kg": np.squeeze(np.exp(gas_log_mass)),
                 "molar_mass_kg_per_mol": np.squeeze(
-                    np.exp(self.gas.get_log_molar_mass(self.log_number_moles[..., gas_slice]))
+                    np.exp(
+                        self.gas.get_log_phase_molar_mass(self.log_number_moles[..., gas_slice])
+                    )
                 ),
                 "fugacity_bar": dict(
                     zip(
@@ -239,7 +241,7 @@ class Output(eqx.Module):
                         melt_names,
                         np.exp(
                             self.melt.get_log_mass_fraction(
-                                self.log_number_moles[..., melt_slice], log_inert_melt_mass
+                                self.log_number_moles[..., melt_slice], log_background_melt_mass
                             )
                         ),
                     )
@@ -254,10 +256,10 @@ class Output(eqx.Module):
                 "mass_kg": np.squeeze(np.exp(melt_log_mass)),
                 "molar_mass_kg_per_mol": np.squeeze(
                     np.exp(
-                        self.melt.get_log_molar_mass(
+                        self.melt.get_log_phase_molar_mass(
                             self.log_number_moles[..., melt_slice],
-                            log_inert_molar_mass,
-                            log_inert_melt_mass,
+                            log_background_molar_mass,
+                            log_background_melt_mass,
                         )
                     )
                 ),

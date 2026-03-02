@@ -212,10 +212,10 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
-    log_inert_molar_mass: Float[Array, "..."] = jnp.log(parameters.state.molar_mass)
-    # jax.debug.print("inert_molar_mass = {out}", out=jnp.exp(log_inert_molar_mass))
-    log_inert_melt_mass: Float[Array, "..."] = jnp.log(parameters.state.melt_mass)
-    # jax.debug.print("inert_melt_mass = {out}", out=jnp.exp(log_inert_melt_mass))
+    log_background_molar_mass: Float[Array, "..."] = jnp.log(parameters.state.molar_mass)
+    # jax.debug.print("background_molar_mass = {out}", out=jnp.exp(log_background_molar_mass))
+    log_background_melt_mass: Float[Array, "..."] = jnp.log(parameters.state.melt_mass)
+    # jax.debug.print("background_melt_mass = {out}", out=jnp.exp(log_background_melt_mass))
 
     reaction_residual: Float[Array, "... reactions"] = parameters.reaction_system.get_residual(
         log_number_moles,
@@ -223,8 +223,8 @@ def objective_function(
         log_stability,
         temperature,
         total_pressure,
-        log_inert_molar_mass,
-        log_inert_melt_mass,
+        log_background_molar_mass,
+        log_background_melt_mass,
     )
     # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 

@@ -527,9 +527,9 @@ class ReactionSystem(BaseReactionBlock):
         log_number_moles: Float[Array, "... n_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
-        log_inert_molar_mass: Float[Array, "..."],
-        log_inert_melt_mass: Float[Array, "..."] = jnp.array(-jnp.inf),
-        log_inert_solid_mass: Float[Array, "..."] = jnp.array(-jnp.inf),
+        log_background_molar_mass: Float[Array, "..."],
+        log_background_melt_mass: Float[Array, "..."] = jnp.array(-jnp.inf),
+        log_background_solid_mass: Float[Array, "..."] = jnp.array(-jnp.inf),
     ) -> Float[Array, "..."]:
         """Gets log activity of each species.
 
@@ -537,11 +537,11 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles: Log number of moles of each species
             temperature: Temperature in K
             pressure: Pressure in bar
-            log_inert_molar_mass: Log of the inert, non-reactive bulk component of melt in moles.
-            log_inert_melt_mass: Log of the inert, non-reactive bulk component of melt. Defaults
-                to negative infinity (i.e., no inert component).
-            log_inert_solid_mass: Log of the inert, non-reactive bulk component of solid.
-                Defaults to negative infinity (i.e., no inert component).
+            log_background_molar_mass: Log molar mass of the background component of melt in moles.
+            log_background_melt_mass: Log of the background component of melt. Defaults
+                to negative infinity (i.e., no background component).
+            log_background_solid_mass: Log of the background component of solid.
+                Defaults to negative infinity (i.e., no background component).
 
         Returns:
             Log activity of each species
@@ -551,14 +551,17 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("log_activity_gas = {out}", out=log_activity_gas)
 
-        log_inert_melt_moles = log_inert_melt_mass - log_inert_molar_mass
+        log_background_melt_moles = log_background_melt_mass - log_background_molar_mass
         log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_activity(
-            log_number_moles[..., self.melt_slice], temperature, pressure, log_inert_melt_moles
+            log_number_moles[..., self.melt_slice],
+            temperature,
+            pressure,
+            log_background_melt_moles,
         )
         # jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
 
         log_activity_solid: Float[Array, "... n_solid_species"] = self.solid.get_log_mass_fraction(
-            log_number_moles[..., self.solid_slice], log_inert_solid_mass
+            log_number_moles[..., self.solid_slice], log_background_solid_mass
         )
         # jax.debug.print("activity_solid = {out}", out=jnp.exp(log_activity_solid))
 
@@ -581,8 +584,8 @@ class ReactionSystem(BaseReactionBlock):
         log_activity: Float[Array, "... num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
-        log_inert_molar_mass: Float[Array, "..."],
-        log_inert_melt_mass: Float[Array, "..."],
+        log_background_molar_mass: Float[Array, "..."],
+        log_background_melt_mass: Float[Array, "..."],
     ) -> Float[Array, "... n_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
@@ -594,8 +597,8 @@ class ReactionSystem(BaseReactionBlock):
             log_activity: Log activity of each species
             temperature: Temperature in K
             pressure: Pressure in bar
-            log_inert_molar_mass: Log molar mass of the inert component of melt in kg/mol
-            log_inert_melt_mass: Log mass of the inert component of melt in kg
+            log_background_molar_mass: Log molar mass of the background component of melt in kg/mol
+            log_background_melt_mass: Log mass of the background component of melt in kg
 
         Returns:
             Log of the equilibrium constant of each reaction
@@ -625,8 +628,10 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("fO2 = {out}", out=fO2)
 
-        log_solvent_molar_mass: Float[Array, "..."] = self.melt.get_log_molar_mass(
-            log_number_moles[..., self.melt_slice], log_inert_molar_mass, log_inert_melt_mass
+        log_solvent_molar_mass: Float[Array, "..."] = self.melt.get_log_phase_molar_mass(
+            log_number_moles[..., self.melt_slice],
+            log_background_molar_mass,
+            log_background_melt_mass,
         )
         # jax.debug.print("log_solvent_molar_mass = {out}", out=log_solvent_molar_mass)
 
@@ -695,8 +700,8 @@ class ReactionSystem(BaseReactionBlock):
         log_stability: Float[Array, "... num_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
-        log_inert_molar_mass: Float[Array, "..."],
-        log_inert_melt_mass: Float[Array, "..."],
+        log_background_molar_mass: Float[Array, "..."],
+        log_background_melt_mass: Float[Array, "..."],
     ) -> Float[Array, "... num_reactions"]:
         """Gets the residual of the reaction network.
 
@@ -706,8 +711,8 @@ class ReactionSystem(BaseReactionBlock):
             log_stability: Log stability of each species
             temperature: Temperature in K
             pressure: Pressure in bar
-            log_inert_molar_mass: Log molar mass of the inert component of melt in kg/mol
-            log_inert_melt_mass: Log mass of the inert component of melt in kg
+            log_background_molar_mass: Log molar mass of the background component of melt in kg/mol
+            log_background_melt_mass: Log mass of the background component of melt in kg
 
         Returns:
             Residual of the reaction network
@@ -717,8 +722,8 @@ class ReactionSystem(BaseReactionBlock):
             log_activity,
             temperature,
             pressure,
-            log_inert_molar_mass,
-            log_inert_melt_mass,
+            log_background_molar_mass,
+            log_background_melt_mass,
         )
         # jax.debug.print("log_Kp = {out}", out=log_Kp)
         residual: Float[Array, "... num_reactions"] = (
