@@ -54,16 +54,20 @@ def test_graphite_stable() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {
-            "partial_pressure_bar": {
-                "O2_g": 1.27e-25,
-                "H2_g": 14.564,
-                "CO_g": 0.07276,
-                "H2O_g": 4.527,
-                "CO2_g": 0.061195,
-                "CH4_g": 96.74,
-            }
+            "species": {
+                "partial_pressure_bar": {
+                    "O2_g": 1.27e-25,
+                    "H2_g": 14.564,
+                    "CO_g": 0.07276,
+                    "H2O_g": 4.527,
+                    "CO2_g": 0.061195,
+                    "CH4_g": 96.74,
+                },
+            },
         },
-        "condensates": {"activity": {"C_s": 1.0}, "mass_kg": {"C_s": 3.54162e20}},
+        "condensates": {
+            "C_s": {"species": {"activity": {"C_s": 1.0}}, "mass_kg": {"C_s": 3.54162e20}},
+        },
     }
 
     assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -88,16 +92,18 @@ def test_graphite_unstable() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {
-            "partial_pressure_bar": {
-                "O2_g": 4.11e-13,
-                "H2_g": 236.98,
-                "CO_g": 46.42,
-                "H2O_g": 337.16,
-                "CO2_g": 30.88,
-                "CH4_g": 28.66,
+            "species": {
+                "partial_pressure_bar": {
+                    "O2_g": 4.11e-13,
+                    "H2_g": 236.98,
+                    "CO_g": 46.42,
+                    "H2O_g": 337.16,
+                    "CO2_g": 30.88,
+                    "CH4_g": 28.66,
+                }
             }
         },
-        "condensates": {"activity": {"C_s": 0.12202}},
+        "condensates": {"C_s": {"species": {"activity": {"C_s": 0.12202}}}},
     }
 
     assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -120,7 +126,9 @@ def test_water_stable() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {"partial_pressure_bar": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
-        "condensates": {"activity": {"H2O_l": 1.0}, "mass_kg": {"H2O_l": 1.247201e21}},
+        "condensates": {
+            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}}, "mass_kg": {"H2O_l": 1.247201e21}}
+        },
     }
 
     assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -144,18 +152,20 @@ def test_graphite_water_stable() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {
-            "partial_pressure_bar": {
-                "CH4_g": 0.3241,
-                "CO2_g": 4.3064,
-                "CO_g": 2.77e-6,
-                "H2_g": 0.0023,
-                "O2_g": 4.74e-48,
-                "H2O_g": 5.3672,
+            "species": {
+                "partial_pressure_bar": {
+                    "CH4_g": 0.3241,
+                    "CO2_g": 4.3064,
+                    "CO_g": 2.77e-6,
+                    "H2_g": 0.0023,
+                    "O2_g": 4.74e-48,
+                    "H2O_g": 5.3672,
+                }
             }
         },
         "condensates": {
-            "activity": {"C_s": 1.0, "H2O_l": 1.0},
-            "mass_kg": {"C_s": 8.75101e19, "H2O_l": 2.74821e21},
+            "C_s": {"species": {"activity": {"C_s": 1.0}, "mass_kg": {"C_s": 8.75101e19}}},
+            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}, "mass_kg": {"H2O_l": 2.74821e21}}},
         },
     }
 
@@ -192,14 +202,18 @@ def test_impose_stable() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {
-            "partial_pressure_bar": {
-                "CH4_g": 0.000194708,
-                "H_g": 0.000201266,
-                "H2_g": 0.49807992,
-                "N2_g": 0.49866269,
+            "species": {
+                "partial_pressure_bar": {
+                    "CH4_g": 0.000194708,
+                    "H_g": 0.000201266,
+                    "H2_g": 0.49807992,
+                    "N2_g": 0.49866269,
+                }
             }
         },
-        "condensates": {"activity": {"C_s": 1.0}},
+        "condensates": {
+            "C_s": {"species": {"activity": {"C_s": 1.0}}},
+        },
     }
 
     assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
