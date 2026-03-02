@@ -57,6 +57,8 @@ class ChemicalSpecies(eqx.Module):
         solve_for_stability: Solve for stability
         number_solution: Number of solution quantities
         thermo: Thermodynamic coefficients
+        include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+            fraction aggregations.
     """
 
     data: ChemicalSpeciesData
@@ -64,6 +66,7 @@ class ChemicalSpecies(eqx.Module):
     solve_for_stability: bool
     number_solution: int
     thermo: ThermodynamicCoefficients
+    include_in_phase_mass: bool
 
     @classmethod
     def create(
@@ -73,6 +76,7 @@ class ChemicalSpecies(eqx.Module):
         activity: ActivityProtocol,
         solve_for_stability: bool,
         number_solution: int,
+        include_in_phase_mass: bool,
     ) -> "ChemicalSpecies":
         """Creates an instance.
 
@@ -82,6 +86,8 @@ class ChemicalSpecies(eqx.Module):
             activity: Activity
             solve_for_stability: Solve for stability
             number_solution: Number of solution quantities
+            include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+                fraction aggregations.
 
         Returns:
             An instance
@@ -98,7 +104,14 @@ class ChemicalSpecies(eqx.Module):
                 f"Available species are {thermodynamic_data_source.available_species()}"
             )
 
-        return cls(species_data, activity, solve_for_stability, number_solution, thermo)
+        return cls(
+            species_data,
+            activity,
+            solve_for_stability,
+            number_solution,
+            thermo,
+            include_in_phase_mass,
+        )
 
     @classmethod
     def create_condensed(
@@ -108,6 +121,7 @@ class ChemicalSpecies(eqx.Module):
         state: str = SOLID_STATE,
         activity: ActivityProtocol = ActivityCoefficient(),
         solve_for_stability: bool = True,
+        include_in_phase_mass: bool = True,
     ) -> "ChemicalSpecies":
         """Creates a condensate with some default values.
 
@@ -117,6 +131,8 @@ class ChemicalSpecies(eqx.Module):
                 :const:`~atmodeller.constants.SOLID_STATE`.
             activity: Activity. Defaults to unity activity.
             solve_for_stability: Solve for stability. Defaults to ``True``.
+            include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+                fraction aggregations. Defaults to ``True``.
 
         Returns:
             A condensed species
@@ -126,7 +142,9 @@ class ChemicalSpecies(eqx.Module):
         # solve for.
         number_solution: int = 2 if solve_for_stability else 0
 
-        return cls.create(formula, state, activity, solve_for_stability, number_solution)
+        return cls.create(
+            formula, state, activity, solve_for_stability, number_solution, include_in_phase_mass
+        )
 
     @classmethod
     def create_gas(
@@ -136,6 +154,7 @@ class ChemicalSpecies(eqx.Module):
         state: str = GAS_STATE,
         activity: ActivityProtocol = IdealGas(),
         solve_for_stability: bool = False,
+        include_in_phase_mass: bool = True,
     ) -> "ChemicalSpecies":
         """Creates a gas species with some default values.
 
@@ -145,6 +164,8 @@ class ChemicalSpecies(eqx.Module):
                 :const:`~atmodeller.constants.GAS_STATE`.
             activity: Activity. Defaults to an ideal gas.
             solve_for_stability: Solve for stability. Defaults to ``False``.
+            include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+                fraction aggregations. Defaults to ``True``.
 
         Returns:
             A gas species
@@ -155,7 +176,9 @@ class ChemicalSpecies(eqx.Module):
         # notably for O2.
         number_solution: int = 2 if solve_for_stability else 1
 
-        return cls.create(formula, state, activity, solve_for_stability, number_solution)
+        return cls.create(
+            formula, state, activity, solve_for_stability, number_solution, include_in_phase_mass
+        )
 
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
@@ -184,12 +207,15 @@ class ReservoirSpecies(eqx.Module):
         activity: Activity
         solubility: Solubility
         number_solution: Number of solution quantities
+        include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+            fraction aggregations.
     """
 
     data: ChemicalSpeciesData
     activity: ActivityProtocol
     solubility: SolubilityProtocol
     number_solution: int
+    include_in_phase_mass: bool
 
     @classmethod
     def create_dissolved(
@@ -198,6 +224,7 @@ class ReservoirSpecies(eqx.Module):
         *,
         activity: ActivityProtocol = ActivityCoefficient(),
         solubility: Optional[SolubilityProtocol] = None,
+        include_in_phase_mass: bool = True,
     ) -> "ReservoirSpecies":
         """Creates a dissolved species with some default values.
 
@@ -205,6 +232,8 @@ class ReservoirSpecies(eqx.Module):
             formula: Formula
             activity: Activity. Defaults to unity activity.
             solubility: Solubility. Defaults to no solubility.
+            include_in_phase_mass: Whether the species is included in phase-level mass, mole, and
+                fraction aggregations. Defaults to ``True``.
 
         Returns:
             A dissolved species
@@ -217,7 +246,7 @@ class ReservoirSpecies(eqx.Module):
         else:
             number_solution = 1
 
-        return cls(species_data, activity, solubility, number_solution)
+        return cls(species_data, activity, solubility, number_solution, include_in_phase_mass)
 
     @property
     def solve_for_stability(self) -> bool:
@@ -242,6 +271,8 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     """Mask for reaction species in the collection"""
     reservoir_species_mask: NpBool
     """Mask for reservoir species in the collection"""
+    phase_mass_mask: NpBool
+    """Mask for species included in phase-level mass, mole, and fraction aggregations"""
     number_solution: int
     """Number of solution quantities, whch cannot depend on traced quantities"""
 
@@ -257,6 +288,9 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         )
         self.reservoir_species_mask = np.array(
             [isinstance(species_, ReservoirSpecies) for species_ in self], dtype=bool
+        )
+        self.phase_mass_mask = np.array(
+            [species.include_in_phase_mass for species in self], dtype=bool
         )
 
         # Ensure number_solution is static

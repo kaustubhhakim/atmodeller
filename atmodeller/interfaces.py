@@ -73,6 +73,9 @@ class SpeciesProtocol(Protocol):
     @property
     def solve_for_stability(self) -> bool: ...
 
+    @property
+    def include_in_phase_mass(self) -> bool: ...
+
 
 @runtime_checkable
 class FugacityConstraintProtocol(Protocol):
