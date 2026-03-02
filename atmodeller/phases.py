@@ -255,8 +255,15 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """
         log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
         log_mass = self.apply_phase_mass_mask(log_mass)
-        log_mass_with_background: Float[Array, "... n_species_plus_1"] = jnp.append(
-            log_mass, log_background_mass
+
+        # jnp.append without axis flattens its inputs, collapsing any batch dimensions.
+        # Instead, broadcast the background scalar to the batch shape and concatenate
+        # along the species axis so the result remains (... n_species+1).
+        background: Float[Array, "... 1"] = jnp.broadcast_to(
+            log_background_mass, log_mass.shape[:-1]
+        )[..., jnp.newaxis]
+        log_mass_with_background: Float[Array, "... n_species_plus_1"] = jnp.concatenate(
+            [log_mass, background], axis=-1
         )
 
         return logsumexp(log_mass_with_background, axis=-1, keepdims=True)
@@ -301,8 +308,15 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             Log moles of the phase in mol
         """
         log_number_moles = self.apply_phase_mass_mask(log_number_moles)
-        log_moles_with_background: Float[Array, "... n_species_plus_1"] = jnp.append(
-            log_number_moles, log_background_moles
+
+        # jnp.append without axis flattens its inputs, collapsing any batch dimensions.
+        # Instead, broadcast the background scalar to the batch shape and concatenate
+        # along the species axis so the result remains (... n_species+1).
+        background: Float[Array, "... 1"] = jnp.broadcast_to(
+            log_background_moles, log_number_moles.shape[:-1]
+        )[..., jnp.newaxis]
+        log_moles_with_background: Float[Array, "... n_species_plus_1"] = jnp.concatenate(
+            [log_number_moles, background], axis=-1
         )
 
         return logsumexp(log_moles_with_background, axis=-1, keepdims=True)
