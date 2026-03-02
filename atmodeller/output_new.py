@@ -124,8 +124,8 @@ class Output(eqx.Module):
         # No background component for gas, so no need to pass log_background_molar_mass or
         # log_background_melt_mass
         out["gas"] = self.gas.output(
-            self.log_number_moles[gas_slice],
-            self.log_stability[gas_slice],
+            self.log_number_moles[..., gas_slice],
+            self.log_stability[..., gas_slice],
             temperature,
             total_pressure,
         )
@@ -135,8 +135,8 @@ class Output(eqx.Module):
         log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
 
         out["melt"] = self.melt.output(
-            self.log_number_moles[melt_slice],
-            self.log_stability[melt_slice],
+            self.log_number_moles[..., melt_slice],
+            self.log_stability[..., melt_slice],
             temperature,
             total_pressure,
             log_background_molar_mass,
@@ -148,8 +148,8 @@ class Output(eqx.Module):
         log_background_solid_mass = jnp.log(self.parameters.state.solid_mass)
 
         out["solid"] = self.solid.output(
-            self.log_number_moles[solid_slice],
-            self.log_stability[solid_slice],
+            self.log_number_moles[..., solid_slice],
+            self.log_stability[..., solid_slice],
             temperature,
             total_pressure,
             log_background_molar_mass,
@@ -167,8 +167,8 @@ class Output(eqx.Module):
         for nn, condensate in enumerate(self.condensates):
             out_condensates.append(
                 condensate.output(
-                    jnp.atleast_1d(self.log_number_moles[condensate_slice][nn]),
-                    jnp.atleast_1d(self.log_stability[condensate_slice][nn]),
+                    jnp.atleast_1d(self.log_number_moles[..., condensate_slice][nn]),
+                    jnp.atleast_1d(self.log_stability[..., condensate_slice][nn]),
                     temperature,
                     total_pressure,
                 )
