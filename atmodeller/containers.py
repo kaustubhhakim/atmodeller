@@ -36,6 +36,7 @@ from atmodeller.interfaces import (
     ChemicalSpeciesData,
     FugacityConstraintProtocol,
     SolubilityProtocol,
+    SpeciesProtocol,
 )
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
@@ -43,7 +44,7 @@ from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
     thermodynamic_coefficients_dictionary,
 )
-from atmodeller.type_aliases import NpArray, NpBool, NpFloat, TSpecies_co
+from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -357,6 +358,35 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
 
     def __str__(self) -> str:
         return str(tuple(str(species) for species in self.species))
+
+
+def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
+    """Gets the formula matrix.
+
+    Elements are given in rows and species in columns following the convention in :cite:t:`LKS17`.
+
+    Args:
+        species: Species collection
+
+    Returns:
+        Formula matrix
+    """
+    formula_matrix: NpInt = np.zeros(
+        (len(species.unique_elements), species.number_species), dtype=int
+    )
+
+    for element_index, element in enumerate(species.unique_elements):
+        for species_index, species_ in enumerate(species):
+            count: int = 0
+            try:
+                count = species_.data.composition[element][0]
+            except KeyError:
+                count = 0
+            formula_matrix[element_index, species_index] = count
+
+    # logger.debug("formula_matrix = %s", formula_matrix)
+
+    return formula_matrix
 
 
 class ThermodynamicState(eqx.Module):

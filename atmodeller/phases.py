@@ -35,22 +35,24 @@ explicit species in the solver.
 import logging
 from abc import abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, cast
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
+from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, Float, Integer
 from molmass import Formula
+from scipy.special import logsumexp as sp_logsumexp
 
 from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
-from atmodeller.containers import ChemicalSpecies, SpeciesCollection
+from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.type_aliases import NpFloat, TSpecies_co
+from atmodeller.type_aliases import NpFloat, NpInt, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -401,6 +403,14 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         """
         log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
 
+        # Elements
+        formula_matrix_: NpInt = get_formula_matrix(self.species)
+        log_stoich_matrix: NpFloat = np.where(
+            formula_matrix_ > 0, np.log(formula_matrix_), -np.inf
+        )
+        log_terms: NpFloat = np.asarray(log_number_moles[..., None, :] + log_stoich_matrix)
+        log_elements: NpFloat = cast(NpFloat, sp_logsumexp(log_terms, axis=-1))
+
         out: dict[str, Any] = {
             "phase": {
                 "number_moles": np.squeeze(
@@ -414,6 +424,15 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
                         self.get_log_phase_molar_mass(
                             log_number_moles, log_background_molar_mass, log_background_mass
                         )
+                    )
+                ),
+            },
+            "elements": {
+                "number_moles": dict(zip(self.species.unique_elements, np.exp(log_elements).T)),
+                "mass_kg": dict(
+                    zip(
+                        self.species.unique_elements,
+                        np.exp(log_elements + np.log(self.species.element_molar_masses)).T,
                     )
                 ),
             },
@@ -529,6 +548,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         return np.array(np.nan, dtype=float)
 
+    @override
     def output(
         self,
         log_number_moles: Float[Array, "... n_species"],
@@ -578,6 +598,11 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         # Rename activity to fugacity for gas phase output
         out["species"]["fugacity_bar"] = out["species"].pop("activity")
+
+        number_moles: NpFloat = np.squeeze(
+            np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
+        )
+        out["phase"]["volume"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
 
         return out
 
@@ -731,6 +756,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
 
         return cls(species_collection)
 
+    @override
     def vmap_log_activity(
         self,
         species_indices: Integer[Array, " n_species"],
@@ -742,26 +768,3 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         del pressure
 
         return jnp.zeros(self.species.number_species)
-
-    # @override
-    # def get_log_mole_fraction(self) -> Float[Array, " n_species"]:
-    #     """Gets the log mole fraction of the pure phase.
-
-    #     The activity of a pure phase is unity by definition, so the log mole fraction is zero.
-
-    #     Returns:
-    #         Log mole fraction of the pure phase (zero)
-    #     """
-    #     return jnp.zeros(self.species.number_species)
-
-    # Although this could be a method, it is more efficient to not have to vmap over such a simple
-    # function that just returns zeros.
-    # def get_log_activity(self) -> Float[Array, " species"]:
-    #     """Gets the log activity of a pure phase.
-
-    #     The activity of a pure phase is unity by definition.
-
-    #     Returns:
-    #         Log activity of a pure phase (zero)
-    #     """
-    #     return jnp.zeros(self.species.number_species)

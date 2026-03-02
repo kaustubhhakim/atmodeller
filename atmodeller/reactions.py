@@ -36,7 +36,7 @@ from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import GAS_STATE
-from atmodeller.containers import ChemicalSpecies, SpeciesCollection
+from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
@@ -44,35 +44,6 @@ from atmodeller.type_aliases import NpBool, NpFloat, NpInt
 from atmodeller.utilities import get_reaction_dictionary
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
-    """Gets the formula matrix.
-
-    Elements are given in rows and species in columns following the convention in :cite:t:`LKS17`.
-
-    Args:
-        species: Species collection
-
-    Returns:
-        Formula matrix
-    """
-    formula_matrix: NpInt = np.zeros(
-        (len(species.unique_elements), species.number_species), dtype=int
-    )
-
-    for element_index, element in enumerate(species.unique_elements):
-        for species_index, species_ in enumerate(species):
-            count: int = 0
-            try:
-                count = species_.data.composition[element][0]
-            except KeyError:
-                count = 0
-            formula_matrix[element_index, species_index] = count
-
-    # logger.debug("formula_matrix = %s", formula_matrix)
-
-    return formula_matrix
 
 
 class BaseReactionBlock(eqx.Module):
@@ -743,7 +714,7 @@ class ReactionSystem(BaseReactionBlock):
             phase_name: Name of the phase
 
         Returns:
-                Slice object for the phase
+            Slice object for the phase
         """
         return self._phase_indices[phase_name].slice
 

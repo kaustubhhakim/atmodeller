@@ -14,7 +14,7 @@ import numpy as np
 from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, Float
 
-from atmodeller.engine import get_total_pressure
+from atmodeller.engine import get_total_pressure, objective_function
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.type_aliases import NpArray, NpBool
@@ -175,6 +175,9 @@ class Output(eqx.Module):
             )
 
         out["condensates"] = dict(zip(condensate_names, out_condensates))
+
+        out["residual"] = np.asarray(objective_function(self.solution, self.parameters))
+        out["solution"] = np.asarray(self.solution)
 
         logger.info(f"Quick look output:\n{pformat(out)}")
 
