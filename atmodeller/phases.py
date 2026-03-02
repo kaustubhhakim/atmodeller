@@ -102,6 +102,18 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
     ) -> Float[Array, "... n_species"]:
+        """Applies the log activity function for each species in the phase.
+
+        Args:
+            species_indices: Integer array of shape (n_species,) containing the indices of the
+                species in the phase. This is passed to the log activity function to identify
+                which species' activity to compute.
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity of each species in the phase
+        """
         del species_indices
         del temperature
         del pressure
@@ -711,18 +723,22 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
     ) -> Float[Array, "... n_species"]:
-        raise NotImplementedError("PurePhase does not implement vmap_log_activity")
+        del species_indices
+        del temperature
+        del pressure
 
-    @override
-    def get_log_mole_fraction(self) -> Float[Array, " n_species"]:
-        """Gets the log mole fraction of the pure phase.
-
-        The activity of a pure phase is unity by definition, so the log mole fraction is zero.
-
-        Returns:
-            Log mole fraction of the pure phase (zero)
-        """
         return jnp.zeros(self.species.number_species)
+
+    # @override
+    # def get_log_mole_fraction(self) -> Float[Array, " n_species"]:
+    #     """Gets the log mole fraction of the pure phase.
+
+    #     The activity of a pure phase is unity by definition, so the log mole fraction is zero.
+
+    #     Returns:
+    #         Log mole fraction of the pure phase (zero)
+    #     """
+    #     return jnp.zeros(self.species.number_species)
 
     # Although this could be a method, it is more efficient to not have to vmap over such a simple
     # function that just returns zeros.

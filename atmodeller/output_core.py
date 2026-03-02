@@ -20,7 +20,6 @@ from jaxtyping import Array, ArrayLike, Float
 from molmass import Formula
 
 from atmodeller.containers import SpeciesCollection
-from atmodeller.engine_vmap import VmappedFunctions
 from atmodeller.interfaces import RedoxBufferProtocol, ThermodynamicStateProtocol
 from atmodeller.parameters import Parameters
 from atmodeller.solvers import LOG_NUMBER_MOLES_VMAP_AXES
@@ -42,7 +41,6 @@ class Output:
         logger.debug("Creating Output")
         self.parameters: Parameters = parameters
         self.solution: NpFloat = np.asarray(solution)
-        self.vmapf: VmappedFunctions = VmappedFunctions(parameters)
 
         # np.split retains dimensions
         log_number_moles, log_stability = np.split(self.solution, 2, axis=1)

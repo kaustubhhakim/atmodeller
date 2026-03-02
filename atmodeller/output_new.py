@@ -14,9 +14,9 @@ import numpy as np
 from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, Float
 
-from atmodeller.engine import get_log_activity, get_total_pressure
+from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, MeltPhase, SolidPhase
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.type_aliases import NpArray, NpBool
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -67,6 +67,7 @@ class Output(eqx.Module):
     def log_number_moles(self) -> Float[Array, "... n_species"]:
         """Log number of moles for each species"""
         log_number_moles, _ = jnp.split(self.multi_attempt_solution.value, 2, axis=-1)
+        # logger.debug("Log number moles = %s", log_number_moles)
 
         return log_number_moles
 
@@ -77,9 +78,13 @@ class Output(eqx.Module):
 
         active_stability: NpBool = self.parameters.reaction_system.species.active_stability
         log_stability = jnp.where(active_stability, log_stability, -jnp.inf)
-        logger.debug("Log stability = %s", log_stability)
+        # logger.debug("Log stability = %s", log_stability)
 
         return log_stability
+
+    @property
+    def condensates(self) -> tuple[PurePhase, ...]:
+        return self.parameters.reaction_system.condensates
 
     @property
     def gas(self) -> GasPhase:
@@ -101,77 +106,6 @@ class Output(eqx.Module):
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
 
-    def get_gas_log_mole_fraction(self) -> Float[Array, "... n_gas_species"]:
-        """Gets gas log mole fraction.
-
-        Returns:
-            Gas log mole fraction
-        """
-        gas_slice: slice = self.parameters.reaction_system.gas_slice
-        gas_log_mole_fraction: Float[Array, "... n_gas_species"] = self.gas.get_log_mole_fraction(
-            self.log_number_moles[..., gas_slice]
-        )
-
-        return gas_log_mole_fraction
-
-    def get_melt_log_mole_fraction(self) -> Float[Array, "... n_melt_species"]:
-        """Gets melt log mole fraction.
-
-        Returns:
-            Melt log mole fraction
-        """
-        melt_slice: slice = self.parameters.reaction_system.melt_slice
-        log_inert_melt_moles = jnp.log(self.parameters.state.melt_mass) - jnp.log(
-            self.parameters.state.molar_mass
-        )
-        melt_log_mole_fraction: Float[Array, "... n_melt_species"] = (
-            self.melt.get_log_mole_fraction(
-                self.log_number_moles[..., melt_slice], log_inert_melt_moles
-            )
-        )
-
-        return melt_log_mole_fraction
-
-    def get_gas_log_partial_pressure(self) -> Float[Array, "... n_gas_species"]:
-        """Gets gas log partial pressure.
-
-        Returns:
-            Gas log partial pressure
-        """
-        total_pressure_log: Float[Array, "..."] = jnp.log(
-            get_total_pressure(self.parameters, self.solution)
-        )
-        gas_log_partial_pressure: Float[Array, "... n_species"] = (
-            self.get_gas_log_mole_fraction() + total_pressure_log[..., None]
-        )
-
-        return gas_log_partial_pressure
-
-    def get_log_activity_with_stability(self) -> Float[Array, "... n_species"]:
-        """Gets the log activity of each species, including stability effects.
-
-        Returns:
-            Log activity of each species, including stability effects
-        """
-        log_activity_with_stability: Float[Array, "... n_species"] = get_log_activity(
-            self.parameters, self.solution
-        ) - jnp.exp(self.log_stability)
-
-        return log_activity_with_stability
-
-    def get_species_mass(self) -> Float[Array, "... n_species"]:
-        """Gets the mass of each species.
-
-        Returns:
-            Log mass of each species in kg
-        """
-        log_molar_mass: Float[Array, " n_species"] = jnp.log(
-            self.parameters.reaction_system.species.molar_masses
-        )
-        log_species_mass: Float[Array, "... n_species"] = self.log_number_moles + log_molar_mass
-
-        return jnp.exp(log_species_mass)
-
     def quick_look(self) -> dict[str, Any]:
         """Quick look at the solution
 
@@ -180,18 +114,10 @@ class Output(eqx.Module):
         """
         gas_slice: slice = self.parameters.reaction_system.gas_slice
         melt_slice: slice = self.parameters.reaction_system.melt_slice
-
-        log_activity_with_stability: Float[Array, "... n_species"] = (
-            self.get_log_activity_with_stability()
-        )
+        solid_slice: slice = self.parameters.reaction_system.solid_slice
 
         temperature = self.parameters.state.temperature
         total_pressure = get_total_pressure(self.parameters, self.solution)
-
-        condensate_names: list[str] = [
-            condensate.name for condensate in self.parameters.reaction_system.condensates
-        ]
-        condensate_slice: slice = self.parameters.reaction_system.condensates_slice
 
         out: dict[str, Any] = {}
 
@@ -217,29 +143,38 @@ class Output(eqx.Module):
             log_background_melt_mass,
         )
 
-        # Single conversion boundary: JAX -> NumPy -> dict
+        # Background component for solid
+        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
+        log_background_solid_mass = jnp.log(self.parameters.state.solid_mass)
 
-        #     "condensates": {
-        #         "activity": dict(
-        #             zip(
-        #                 condensate_names,
-        #                 np.exp(self.get_log_activity_with_stability()[..., condensate_slice]).T,
-        #             )
-        #         ),
-        #         "number_moles": dict(
-        #             zip(
-        #                 condensate_names,
-        #                 np.exp(self.log_number_moles[..., condensate_slice]).T,
-        #             )
-        #         ),
-        #         "mass_kg": dict(
-        #             zip(
-        #                 condensate_names,
-        #                 self.get_species_mass()[..., condensate_slice].T,
-        #             )
-        #         ),
-        #     },
-        # }
+        out["solid"] = self.solid.output(
+            self.log_number_moles[solid_slice],
+            self.log_stability[solid_slice],
+            temperature,
+            total_pressure,
+            log_background_molar_mass,
+            log_background_solid_mass,
+        )
+
+        # Condensates
+        condensate_names: list[str] = [
+            condensate.name for condensate in self.parameters.reaction_system.condensates
+        ]
+        condensate_slice: slice = self.parameters.reaction_system.condensates_slice
+
+        out_condensates: list[dict[str, Any]] = []
+
+        for nn, condensate in enumerate(self.condensates):
+            out_condensates.append(
+                condensate.output(
+                    jnp.atleast_1d(self.log_number_moles[condensate_slice][nn]),
+                    jnp.atleast_1d(self.log_stability[condensate_slice][nn]),
+                    temperature,
+                    total_pressure,
+                )
+            )
+
+        out["condensates"] = dict(zip(condensate_names, out_condensates))
 
         logger.info(f"Quick look output:\n{pformat(out)}")
 
