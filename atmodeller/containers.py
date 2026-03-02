@@ -668,6 +668,7 @@ class FixedFugacityConstraint(eqx.Module):
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
             jnp.shape(temperature), jnp.shape(pressure)
         )
+        # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
 
         return jnp.broadcast_to(jnp.log(self.fugacity), broadcast_shape)
 

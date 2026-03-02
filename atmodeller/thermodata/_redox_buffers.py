@@ -106,8 +106,9 @@ class RedoxBuffer(eqx.Module):
         Returns:
             Log fugacity
         """
-        broadcast_shape = jnp.broadcast_shapes(jnp.shape(temperature), jnp.shape(pressure))
-
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
+            jnp.shape(temperature), jnp.shape(pressure)
+        )
         log_fugacity = jnp.log(10) * self.log10_fugacity(temperature, pressure)
 
         return jnp.broadcast_to(log_fugacity, broadcast_shape)
