@@ -212,6 +212,7 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
+    # NOTE: Molar mass is assumed the same for the background melt and solid components
     log_background_molar_mass: Float[Array, "..."] = jnp.log(parameters.state.molar_mass)
     # jax.debug.print("background_molar_mass = {out}", out=jnp.exp(log_background_molar_mass))
     log_background_melt_mass: Float[Array, "..."] = jnp.log(parameters.state.melt_mass)

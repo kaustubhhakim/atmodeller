@@ -17,7 +17,7 @@ This module defines four concrete phase types used in the equilibrium solver:
 - :class:`atmodeller.phases.PurePhase`: single-species, unity-activity phase (e.g., a
   pure mineral or ice).
 
-All phases are JAX-compatible :mod:`equinox` modules. Each phase wraps a
+All phases are JAX-compatible :class:`equinox.Module` subclasses. Each phase wraps a
 :class:`atmodeller.containers.SpeciesCollection` of thermodynamic species (Hill formula
 + aggregation state). Species are constructed from their Hill formulas and assigned an
 aggregation state consistent with the JANAF/NASA convention:
@@ -58,7 +58,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 def _build_species_collection(
     species: str | Iterable[str], factory: Callable[[str], TSpecies_co]
 ) -> SpeciesCollection[TSpecies_co]:
-    """Normalizes input and build a species collection using a factory.
+    """Normalizes input and builds a species collection using a factory.
 
     Args:
         species: A single species name or an iterable of names
@@ -80,7 +80,7 @@ def _build_species_collection(
 
 
 class BasePhase(eqx.Module, Generic[TSpecies_co]):
-    """Base class for all phases"""
+    """Base class for all phases."""
 
     species: SpeciesCollection[TSpecies_co]
     """Collection of species in the phase"""
@@ -107,7 +107,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         passed through unchanged.
 
         Args:
-            log_array: Log-space array
+            log_array: Log-space values whose entries for non-contributing species are to be masked
 
         Returns:
             The input array with non-contributing species set to ``-inf``.
@@ -144,7 +144,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
-            log_background_mass: Log mass of a background component in kg. Defaults to negative
+            log_background_mass: Log mass of the background component in kg. Defaults to negative
                 infinity (i.e., no background mass).
 
         Returns:
@@ -191,7 +191,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
-            log_background_moles: Log moles of a background component. Defaults to negative
+            log_background_moles: Log moles of the background component. Defaults to negative
                 infinity (i.e., no background moles).
 
         Returns:
@@ -229,7 +229,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
     def get_log_phase_molar_mass(
         self,
         log_number_moles: Float[Array, "... n_species"],
-        log_background_molar_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
+        log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
         log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
     ) -> Float[Array, "... 1"]:
         r"""Gets the log molar mass of the phase.
@@ -237,15 +237,15 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         Args:
             log_number_moles: Log number of moles of each species in the phase
             log_background_molar_mass: Log molar mass of the background component in
-                :math:`\mathrm{kg}\ \mathrm{mol}^{-1}`. Defaults to negative infinity (i.e., no
-                background component).
+                kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of
+                1 kg mol\ :sup:`-1`); only meaningful when ``log_background_mass`` is finite.
             log_background_mass: Log mass of the background component in kg. Defaults to negative
                 infinity (i.e., no background component).
 
         Returns:
-            Log molar mass of the phase in :math:`\mathrm{kg}\ \mathrm{mol}^{-1}`
+            Log molar mass of the phase in kg mol\ :sup:`-1`
         """
-        log_phase_mass: Float[Array, "... n_species"] = self.get_log_phase_mass(
+        log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
             log_number_moles, log_background_mass
         )
         log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
@@ -267,9 +267,9 @@ class GasPhase(BasePhase[ChemicalSpecies]):
     """
 
     O2_index: NpFloat
-    """Index of O2 or np.nan if not present"""
+    """Index of O2 or ``np.nan`` if not present"""
     vmap_log_activity: Callable
-    """Vectorized log activity functions"""
+    """Vectorized log activity function"""
 
     @override
     def __init__(self, species: Iterable[ChemicalSpecies]):
@@ -313,7 +313,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
     def get_log_activity(
         self,
-        log_number_moles: Float[Array, " ... n_species"],
+        log_number_moles: Float[Array, "... n_species"],
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
     ) -> Float[Array, "... n_species"]:
@@ -351,7 +351,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             This returns a float array for type consistency.
 
         Returns:
-            Index of diatomic oxygen, or np.nan if diatomic oxygen is not in the species
+            Index of diatomic oxygen, or ``np.nan`` if diatomic oxygen is not in the species
         """
         for nn, species_ in enumerate(self.species):
             if species_.data.hill_formula == "O2":
@@ -376,7 +376,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
     """
 
     vmap_log_activity: Callable
-    """Vectorized log activity functions"""
+    """Vectorized log activity function"""
 
     @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
@@ -426,14 +426,14 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         pressure: Float[Array, "..."],
         log_background_moles: Float[Array, ""] = jnp.array(-jnp.inf),
     ) -> Float[Array, "... n_species"]:
-        """Gets the log activity of the species.
+        """Gets the log activity of each species in the melt phase.
 
         Args:
             log_number_moles: Log number of moles of each species in the melt phase
             temperature: Temperature in K
             pressure: Pressure in bar
             log_background_moles: Log moles of the background component. Defaults to negative
-            infinity (i.e., no background component).
+                infinity (i.e., no background component).
 
         Returns:
             Log activity of each species in the melt phase
@@ -511,7 +511,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         """Creates an instance.
 
         Args:
-            species: Species Hill formula
+            species: A single species Hill formula
             state: State of aggregation. Defaults to
                 :const:`atmodeller.constants.SOLID_STATE`.
 
