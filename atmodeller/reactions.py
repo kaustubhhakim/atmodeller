@@ -32,6 +32,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
+from jaxmod.type_aliases import NpBool, NpFloat, NpInt
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
 
@@ -40,7 +41,6 @@ from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formul
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
-from atmodeller.type_aliases import NpBool, NpFloat, NpInt
 from atmodeller.utilities import get_reaction_dictionary
 
 logger: logging.Logger = logging.getLogger(__name__)

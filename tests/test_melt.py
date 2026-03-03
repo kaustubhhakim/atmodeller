@@ -48,7 +48,7 @@ def test_H2O_no_dilute_limit() -> None:
     H2O_di: ReservoirSpecies = ReservoirSpecies.create_dissolved(
         "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
-    melt: MeltPhase = MeltPhase((H2O_di,), ignore_dissolved_mass=False)
+    melt: MeltPhase = MeltPhase((H2O_di,))
     planet: Planet = Planet()
     model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
 
@@ -89,9 +89,7 @@ def test_subNeptune() -> None:
     H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
         "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
-    melt: MeltPhase = MeltPhase(
-        (H2O_d, O2Si_l), ignore_dissolved_mass=False, ignore_condensed_mass=False
-    )
+    melt: MeltPhase = MeltPhase((H2O_d, O2Si_l))
 
     subneptune_model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
 

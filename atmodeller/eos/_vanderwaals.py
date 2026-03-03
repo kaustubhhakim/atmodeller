@@ -8,6 +8,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
 from jaxmod.constants import GAS_CONSTANT_BAR
+from jaxmod.type_aliases import OptxSolver
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
@@ -20,7 +21,6 @@ from atmodeller.eos import (
 )
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.type_aliases import OptxSolver
 from atmodeller.utilities import ExperimentalCalibration
 
 

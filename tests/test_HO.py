@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
+from jaxmod.type_aliases import NpFloat
 from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
@@ -18,7 +19,6 @@ from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.type_aliases import NpFloat
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()

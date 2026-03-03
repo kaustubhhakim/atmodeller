@@ -43,6 +43,7 @@ import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
 from jaxmod.constants import GAS_CONSTANT_BAR
+from jaxmod.type_aliases import NpFloat, NpInt
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, Float, Integer
 from molmass import Formula
@@ -50,9 +51,13 @@ from scipy.special import logsumexp as sp_logsumexp
 
 from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
-from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
+from atmodeller.containers import (
+    ChemicalSpecies,
+    SpeciesCollection,
+    TSpecies_co,
+    get_formula_matrix,
+)
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.type_aliases import NpFloat, NpInt, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -595,10 +600,6 @@ class GasPhase(BasePhase[ChemicalSpecies]):
                 * np.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
             )
         )
-
-        # Rename activity to fugacity for gas phase output
-        out["species"]["fugacity_bar"] = out["species"].pop("activity")
-
         number_moles: NpFloat = np.squeeze(
             np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
         )

@@ -5,19 +5,22 @@
 """New core functionality for output"""
 
 import logging
+import pickle
+from pathlib import Path
 from pprint import pformat
 from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
+from jaxmod.type_aliases import NpArray, NpBool
 from jaxtyping import Array, Float
 
 from atmodeller.engine import get_total_pressure, objective_function
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
-from atmodeller.type_aliases import NpArray, NpBool
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -176,8 +179,15 @@ class Output(eqx.Module):
 
         out["condensates"] = dict(zip(condensate_names, out_condensates))
 
+        out["constraints"] = {}
+        out["constraints"].update(self.parameters.mass_constraints.asdict())
+        out["constraints"].update(
+            self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
+        )
+
         out["residual"] = np.asarray(objective_function(self.solution, self.parameters))
         out["solution"] = np.asarray(self.solution)
+        out["solver"] = self.multi_attempt_solution.asdict()
 
         logger.info(f"Quick look output:\n{pformat(out)}")
 
@@ -220,3 +230,121 @@ class Output(eqx.Module):
         logger.info(f"All matching keys agree within tolerance: {all_match}")
 
         return all_match
+
+
+# TODO: Below are functions used by the previous output module, but not yet integrated into the new
+# output module. They may be useful for future development, but are not currently used.
+
+
+def broadcast_arrays_in_dict(some_dict: dict[str, NpArray], shape: int) -> dict[str, NpArray]:
+    """Gets a dictionary of broadcasted arrays.
+
+    Args:
+        some_dict: Some dictionary
+        size: Shape (size) of the desired array
+
+    Returns:
+        A dictionary with broadcasted arrays
+    """
+    expanded_dict: dict[str, NpArray] = {}
+    for key, value in some_dict.items():
+        expanded_dict[key] = np.broadcast_to(value, shape)
+
+    return expanded_dict
+
+
+def split_dict_by_columns(dict_to_split: dict[str, NpArray]) -> list[dict[str, NpArray]]:
+    """Splits a dictionary based on columns in the values.
+
+    Args:
+        dict_to_split: A dictionary to split
+
+    Returns:
+        A list of dictionaries split by column
+    """
+    # Assume all arrays have the same number of columns
+    first_key: str = next(iter(dict_to_split))
+    num_columns: int = dict_to_split[first_key].shape[1]
+
+    # Preallocate list of dicts
+    split_dicts: list[dict] = [{} for _ in range(num_columns)]
+
+    for key, array in dict_to_split.items():
+        for i in range(num_columns):
+            split_dicts[i][key] = array[:, i]
+
+    return split_dicts
+
+
+def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[str, pd.DataFrame]:
+    """Creates a dictionary of dataframes from a nested dictionary.
+
+    Args:
+        nested_dict: A nested dictionary
+
+    Returns:
+        A dictionary of dataframes
+    """
+    dataframes: dict[str, pd.DataFrame] = {}
+
+    for outer_key, inner_dict in nested_dict.items():
+        # Convert inner dictionary to DataFrame
+        df: pd.DataFrame = pd.DataFrame(inner_dict)
+        dataframes[outer_key] = df
+
+    return dataframes
+
+
+# TODO: These were previously methods of the old output class, but are not yet integrated into the
+# new output class. They may be useful for future development, but are not currently used.
+
+
+def to_dataframes(self) -> dict[str, pd.DataFrame]:
+    """Gets the output in a dictionary of dataframes.
+
+    Returns:
+        Output in a dictionary of dataframes
+    """
+    if self._cached_dataframes is not None:
+        logger.debug("Returning cached to_dataframes output")
+        dataframes: dict[str, pd.DataFrame] = self._cached_dataframes  # Return cached result
+    else:
+        logger.info("Computing to_dataframes output")
+        dataframes = nested_dict_to_dataframes(self.asdict())
+        self._cached_dataframes = dataframes
+        # logger.debug("to_dataframes = %s", self._cached_dataframes)
+
+    return dataframes
+
+
+def to_excel(self, file_prefix: Path | str = "atmodeller_out") -> None:
+    """Writes the output to an Excel file.
+
+    Args:
+        file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+    """
+    logger.info("Writing output to excel")
+    out: dict[str, pd.DataFrame] = self.to_dataframes()
+    output_file: Path = Path(f"{file_prefix}.xlsx")
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        for df_name, df in out.items():
+            df.to_excel(writer, sheet_name=df_name, index=True)
+
+    logger.info("Output written to %s", output_file)
+
+
+def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
+    """Writes the output to a pickle file.
+
+    Args:
+        file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+    """
+    logger.info("Writing output to pickle")
+    out: dict[str, pd.DataFrame] = self.to_dataframes()
+    output_file: Path = Path(f"{file_prefix}.pkl")
+
+    with open(output_file, "wb") as handle:
+        pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    logger.info("Output written to %s", output_file)
