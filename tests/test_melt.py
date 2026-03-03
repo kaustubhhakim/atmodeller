@@ -118,6 +118,4 @@ def test_subNeptune() -> None:
 
     subneptune_model.output.quick_look()
 
-    subneptune_model.output.group_by_species
-
-    subneptune_model.output.to_excel("test_subNeptune")
+    subneptune_model.output.to_excel("test_subNeptune")  # , keys=("phases", "species"))
