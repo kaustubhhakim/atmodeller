@@ -7,7 +7,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Generic, Literal, Optional
+from typing import Any, Generic, Literal, Optional, TypeVar
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -15,6 +15,7 @@ import numpy as np
 from jax import lax
 from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
+from jaxmod.type_aliases import NpArray, NpBool, NpFloat, NpInt
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
@@ -44,9 +45,10 @@ from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
     thermodynamic_coefficients_dictionary,
 )
-from atmodeller.type_aliases import NpArray, NpBool, NpFloat, NpInt, TSpecies_co
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
 
 
 class ChemicalSpecies(eqx.Module):
@@ -766,27 +768,28 @@ class FugacityConstraintSet(eqx.Module):
 
         return active_constraints
 
-    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
-        """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
+        """Gets an output dictionary of the evaluated fugacity constraints
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            A dictionary of the evaluated fugacity constraints
+            An output dictionary
         """
-        log_fugacity_list: list[NpFloat] = []
-
-        for constraint in self.constraints:
-            log_fugacity: NpFloat = np.asarray(constraint.log_fugacity(temperature, pressure))
-            log_fugacity_list.append(log_fugacity)
-
-        out: dict[str, NpArray] = {
-            # Subtle, but np.exp will collapse scalar array to 0-D, violating the type hint.
-            f"{key}_fugacity": np.exp(np.atleast_1d(log_fugacity_list[idx]))
-            for idx, key in enumerate(self.species.species_names)
-            if not np.all(np.isnan(log_fugacity_list[idx]))
+        out: dict[str, Any] = {
+            "species": {
+                "activity": dict(
+                    zip(
+                        self.species.species_names,
+                        [
+                            np.exp(constraint.log_fugacity(temperature, pressure))
+                            for constraint in self.constraints
+                        ],
+                    )
+                )
+            }
         }
 
         return out
@@ -935,22 +938,19 @@ class MassConstraintSet(eqx.Module):
 
         return log_abundance
 
-    def asdict(self) -> dict[str, NpArray]:
-        """Gets a dictionary of the values as NumPy arrays
+    def asdict(self) -> dict[str, Any]:
+        """Gets an output dictionary
 
         Returns:
-            A dictionary of the values
+            An output dictionary with the abundance by moles and mass for all elements
         """
-        abundance_mol: NpArray = np.asarray(self.abundance_mol())
-        abundance_mass: NpArray = np.asarray(self.abundance_mass())
-
-        out: dict[str, NpArray] = {}
-
-        for label, arr in [("number", abundance_mol), ("mass", abundance_mass)]:
-            for idx, element in enumerate(self.species.unique_elements):
-                col = arr[..., idx]
-                if not np.all(np.isnan(col)):
-                    out[f"{element}_{label}"] = col
+        elements: tuple[str, ...] = self.species.unique_elements
+        out: dict[str, Any] = {
+            "elements": {
+                "number_moles": dict(zip(elements, np.asarray(self.abundance_mol()).T)),
+                "mass_kg": dict(zip(elements, np.asarray(self.abundance_mass()).T)),
+            }
+        }
 
         return out
 

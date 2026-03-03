@@ -32,6 +32,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxmod.solvers import MultiAttemptSolution
+from jaxmod.type_aliases import NpFloat
 from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
@@ -43,7 +44,6 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import solve_with_jit
-from atmodeller.type_aliases import NpFloat
 
 logger: logging.Logger = logging.getLogger(__name__)
 
