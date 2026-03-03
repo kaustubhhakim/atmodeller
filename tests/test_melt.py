@@ -8,6 +8,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
 from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
@@ -107,8 +108,16 @@ def test_subNeptune() -> None:
     logger.info("si_kg = %s", si_kg)
     logger.info("o_kg = %s", o_kg)
 
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
+    mass_constraints: dict[str, ArrayLike] = {
+        "H": np.array([h_kg, h_kg * 2, h_kg * 3]),
+        "Si": si_kg,
+        "O": o_kg,
+    }
 
     subneptune_model.solve(state=planet, mass_constraints=mass_constraints)
 
     subneptune_model.output.quick_look()
+
+    subneptune_model.output.group_by_species
+
+    subneptune_model.output.to_excel("test_subNeptune")

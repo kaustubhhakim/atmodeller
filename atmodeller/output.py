@@ -19,14 +19,12 @@ from jaxtyping import Array, Float
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
-from atmodeller.output_core import Output
-from atmodeller.output_new import broadcast_arrays_in_dict
 from atmodeller.parameters import Parameters
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class OutputDisequilibrium(Output):
+class OutputDisequilibrium:
     """Output disequilibrium calculations
 
     Args:
@@ -156,7 +154,7 @@ class OutputDisequilibrium(Output):
         return out
 
 
-class OutputSolution(Output):
+class OutputSolution:
     """Output equilibrium solution(s)
 
     Args:

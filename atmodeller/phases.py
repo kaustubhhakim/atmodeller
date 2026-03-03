@@ -417,20 +417,35 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         log_terms: NpFloat = np.asarray(log_number_moles[..., None, :] + log_stoich_matrix)
         log_elements: NpFloat = cast(NpFloat, sp_logsumexp(log_terms, axis=-1))
 
+        log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
+            log_number_moles, log_background_mass
+        )
+
+        # Sum of all species mass (no background, no mask), for comparison with the phase total.
+        # For a true dilute system, this provides a check that the dissolved content is in the
+        # dilute approximation. Otherwise, depending on the assumptions and objectives of the user,
+        # it provides a metric of how much the tracked species contribute to the total phase mass.
+        log_species_mass_sum: Float[Array, "... 1"] = logsumexp(
+            self.get_log_mass(log_number_moles), axis=-1, keepdims=True
+        )
+
         out: dict[str, Any] = {
             "phase": {
                 "number_moles": np.squeeze(
                     np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
                 ),
-                "mass_kg": np.squeeze(
-                    np.exp(self.get_log_phase_mass(log_number_moles, log_background_mass))
-                ),
+                "mass_kg": np.squeeze(np.exp(log_phase_mass)),
                 "molar_mass_kg_per_mol": np.squeeze(
                     np.exp(
                         self.get_log_phase_molar_mass(
                             log_number_moles, log_background_molar_mass, log_background_mass
                         )
                     )
+                ),
+                "background_molar_mass_kg_per_mol": np.exp(log_background_molar_mass),
+                "background_mass_kg": np.exp(log_background_mass),
+                "species_to_phase_mass_ratio": np.squeeze(
+                    np.exp(log_species_mass_sum - log_phase_mass)
                 ),
             },
             "elements": {
@@ -607,7 +622,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         number_moles: NpFloat = np.squeeze(
             np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
         )
-        out["phase"]["volume"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
+        out["phase"]["volume_m3"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
 
         # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
         if not jnp.isnan(self.O2_index):
