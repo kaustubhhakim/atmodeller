@@ -57,7 +57,8 @@ from atmodeller.containers import (
     TSpecies_co,
     get_formula_matrix,
 )
-from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -476,6 +477,9 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
                         ).T,
                     )
                 ),
+                "include_in_phase_mass": dict(
+                    zip(self.species_names, self.species.phase_mass_mask.astype(bool))
+                ),
             },
         }
 
@@ -604,6 +608,21 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
         )
         out["phase"]["volume"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
+
+        # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
+        if not jnp.isnan(self.O2_index):
+            log10_fugacity = np.log10(out["species"]["activity"]["O2_g"])
+            buffer: RedoxBufferProtocol = IronWustiteBuffer()
+            # Shift at 1 bar
+            buffer_at_one_bar = np.asarray(buffer.log10_fugacity(temperature, 1.0))
+            log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
+            # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+            out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
+            # Shift at actual pressure
+            buffer_at_P = np.asarray(buffer.log10_fugacity(temperature, pressure))
+            log10_shift_at_P = log10_fugacity - buffer_at_P
+            # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+            out["phase"]["log10dIW_P"] = log10_shift_at_P
 
         return out
 

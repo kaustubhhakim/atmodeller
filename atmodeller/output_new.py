@@ -6,6 +6,7 @@
 
 import logging
 import pickle
+from collections.abc import Iterable
 from pathlib import Path
 from pprint import pformat
 from typing import Any
@@ -45,6 +46,42 @@ def _set_nested(d: dict, path: tuple, value: Any) -> None:
         d = d.setdefault(key, {})
 
     d[path[-1]] = value
+
+
+_SUMMABLE_KEYS: frozenset[str] = frozenset({"mass_kg", "number_moles"})
+
+
+def sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Sums summable quantities across an iterable of phase output dicts.
+
+    Only leaves under a ``"mass_kg"`` or ``"number_moles"`` sub-category are included, preserving
+    the ``elements``, ``species``, and ``phase`` sub-structure. Values at the same path are summed;
+    ``np.nan`` values are treated as zero so that a phase with unconstrained moles does not
+    contaminate the total.
+
+    Args:
+        phase_outputs: Iterable of phase output dicts as returned by
+            :meth:`~atmodeller.phases.BasePhase.output`.
+
+    Returns:
+        A nested dict with the same sub-structure as the inputs but restricted to the summable
+        keys, holding the element-wise sum across all phases.
+    """
+    totals: dict[tuple, Any] = {}
+
+    for phase_out in phase_outputs:
+        for path, value in _flatten_dict(phase_out).items():
+            if not any(k in _SUMMABLE_KEYS for k in path):
+                continue
+            scalar = np.asarray(value)
+            addend = np.where(np.isnan(scalar), 0.0, scalar)
+            totals[path] = totals.get(path, 0.0) + addend
+
+    out: dict[str, Any] = {}
+    for path, value in totals.items():
+        _set_nested(out, path, value)
+
+    return out
 
 
 class Output(eqx.Module):
@@ -178,6 +215,11 @@ class Output(eqx.Module):
             )
 
         out["condensates"] = dict(zip(condensate_names, out_condensates))
+
+        totals: dict[str, Any] = sum_phase_outputs(
+            [out["gas"], out["melt"], out["solid"], *out["condensates"].values()]
+        )
+        out["totals"] = totals
 
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict())
