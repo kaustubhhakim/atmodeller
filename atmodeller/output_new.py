@@ -94,6 +94,12 @@ def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any
                 continue
             scalar = np.asarray(value)
             addend = np.where(np.isnan(scalar), 0.0, scalar)
+            # For species, strip the trailing phase suffix (e.g. _g, _d, _s) so that
+            # H2O_g and H2O_d both accumulate under the base formula H2O.
+            if "species" in path:
+                species_name = str(path[-1])
+                base = species_name.rsplit("_", 1)[0] if "_" in species_name else species_name
+                path = path[:-1] + (base,)
             totals[path] = totals.get(path, 0.0) + addend
 
     out: dict[str, Any] = {}
@@ -201,7 +207,7 @@ def _group_by_all(
             phase_key: str = ".".join(str(k) for k in path[1:])
             result.setdefault(phase_name, {})[phase_key] = value
 
-        if include_species and "species" in path:
+        if include_species and "species" in path and path[0] != "totals":
             name: str = str(path[-1])
             species_key: str = ".".join(str(k) for k in path[:-1] if k != "species")
             result.setdefault(name, {})[species_key] = value
