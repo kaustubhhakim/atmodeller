@@ -9,7 +9,7 @@ import pickle
 from collections.abc import Iterable
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -163,8 +163,8 @@ def _group_by_all(
     Args:
         nested_dict: A nested dict as returned by
             :func:`~atmodeller.output_new.expand_to_batch`.
-        keys: Categories to include.  Any combination of ``"phases"``, ``"species"``, and
-            ``"elements"``.  Defaults to all three.
+        keys: Categories to include.  Any combination of ``"phases"``, ``"species"``,
+            ``"elements"``, and ``"other"``.  Defaults to all four.
 
     Returns:
         A combined dict with phase names, species names, and element symbols as primary keys.
@@ -243,32 +243,30 @@ class Output(eqx.Module):
 
     parameters: Parameters
     multi_attempt_solution: MultiAttemptSolution
-    _cached_dict: Optional[dict[str, Any]]
 
     def __init__(self, parameters: Parameters, multi_attempt_solution: MultiAttemptSolution):
         self.parameters = parameters
         self.multi_attempt_solution = multi_attempt_solution
 
-        # Caching output to avoid recomputation
-        self._cached_dict = None
-        # self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
+    @property
+    def _split_solution(self) -> list[Float[Array, "... n_species"]]:
+        """Log number of moles and log stability, split from the solution array in one pass."""
+        return jnp.split(self.multi_attempt_solution.value, 2, axis=-1)
 
     @property
     def log_number_moles(self) -> Float[Array, "... n_species"]:
         """Log number of moles for each species"""
-        log_number_moles, _ = jnp.split(self.multi_attempt_solution.value, 2, axis=-1)
-        # logger.debug("Log number moles = %s", log_number_moles)
+        log_number_moles, _ = self._split_solution
 
         return log_number_moles
 
     @property
     def log_stability(self) -> Float[Array, "... n_species"]:
         """Log stability for each species"""
-        _, log_stability = jnp.split(self.multi_attempt_solution.value, 2, axis=-1)
+        _, log_stability = self._split_solution
 
         active_stability: NpBool = self.parameters.reaction_system.species.active_stability
         log_stability = jnp.where(active_stability, log_stability, -jnp.inf)
-        # logger.debug("Log stability = %s", log_stability)
 
         return log_stability
 
@@ -302,10 +300,6 @@ class Output(eqx.Module):
         Returns:
             Dictionary of the solution
         """
-        if self._cached_dict is not None:
-            logger.info("Returning cached asdict output")
-            return self._cached_dict
-
         gas_slice: slice = self.parameters.reaction_system.gas_slice
         melt_slice: slice = self.parameters.reaction_system.melt_slice
         solid_slice: slice = self.parameters.reaction_system.solid_slice
@@ -405,9 +399,9 @@ class Output(eqx.Module):
 
         Args:
             keys: Categories to include in the output.  Any combination of ``"phases"``,
-                ``"species"``, ``"elements"``, and ``"other"``.  ``"other"`` collects the
-                remaining top-level entries (``solution``, ``residual``, ``constraints``,
-                ``solver``, etc.) into a single sheet.  Defaults to all four.
+                ``"species"``, ``"elements"``, and ``"other"``.  ``"other"`` produces one
+                DataFrame per non-phase top-level key (``solution``, ``residual``,
+                ``constraints``, ``solver``, etc.).  Defaults to all four.
 
         Returns:
             Output in a dictionary of dataframes
