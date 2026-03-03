@@ -126,7 +126,7 @@ from atmodeller.containers import (  # noqa: E402, F401
     ThermodynamicState,
 )
 from atmodeller.parameters import Parameters  # noqa: E402, F401
-from atmodeller.phases import GasPhase, MeltPhase  # noqa: E402, F401
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase  # noqa: E402, F401
 from atmodeller.reactions import (  # noqa: E402, F401
     DissolutionNetwork,
     ReactionNetwork,
