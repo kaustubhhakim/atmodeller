@@ -28,7 +28,16 @@ logger.setLevel(logging.INFO)
 
 
 def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
-    """Iteratively flattens a nested dict to {path_tuple: leaf} mapping."""
+    """Iteratively flattens a nested dict to {path_tuple: leaf} mapping.
+
+    Args:
+        d: The nested dictionary to flatten.
+        parent_keys: A tuple of keys representing the path prefix to prepend to all
+            entries.  Defaults to an empty tuple (top-level traversal).
+
+    Returns:
+        A flat dictionary mapping each leaf's full key path (as a tuple) to its value.
+    """
     result: dict[tuple, Any] = {}
     stack: list[tuple[tuple, dict]] = [(parent_keys, d)]
     while stack:
@@ -43,7 +52,14 @@ def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
 
 
 def _set_nested(d: dict, path: tuple, value: Any) -> None:
-    """Sets a value in a nested dict given a path tuple, creating intermediate dicts."""
+    """Sets a value in a nested dict given a path tuple, creating intermediate dicts.
+
+    Args:
+        d: The nested dictionary to modify in place.
+        path: A tuple of keys describing the location of the value.  Intermediate
+            dicts are created as needed.
+        value: The value to assign at the leaf position identified by ``path``.
+    """
     for key in path[:-1]:
         d = d.setdefault(key, {})
 
@@ -51,6 +67,7 @@ def _set_nested(d: dict, path: tuple, value: Any) -> None:
 
 
 _SUMMABLE_KEYS: frozenset[str] = frozenset({"mass_kg", "number_moles"})
+"""Leaf-level keys whose values are summed across phases by :func:`_sum_phase_outputs`."""
 
 
 def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -133,13 +150,16 @@ def _expand_to_batch(nested_dict: dict[str, Any]) -> dict[str, Any]:
     return _map(nested_dict)
 
 
-# Top-level keys in quick_look output that represent physically meaningful phases or aggregations
 _PHASE_KEYS: frozenset[str] = frozenset({"gas", "melt", "solid", "condensates", "totals"})
+"""Top-level keys in the :meth:`~atmodeller.output_new.Output.quick_look` output that represent
+physically meaningful phases or phase aggregations."""
 
 _OutputKey = Literal["phases", "species", "elements", "other"]
 """Valid category selectors for :func:`_group_by_all` and :meth:`Output.to_dataframes`."""
 
 _ALL_OUTPUT_KEYS: tuple[_OutputKey, ...] = ("phases", "species", "elements", "other")
+"""Default set of all output category selectors passed to 
+:meth:`~atmodeller.output_new.Output.to_dataframes`."""
 
 
 def _group_by_all(
