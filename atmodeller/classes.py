@@ -26,7 +26,7 @@ Typical usage:
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
-from typing import Literal, Optional
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
@@ -64,7 +64,6 @@ class EquilibriumModel:
     reaction_system: ReactionSystem
     _solver: Optional[Callable] = None
     _output: Optional[Output] = None
-    _selected_solver: Literal["basic", "robust"] = "basic"
 
     def __init__(
         self,
@@ -186,8 +185,7 @@ class EquilibriumModel:
         num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
 
         logger.info(
-            "Solve (%s) complete: %d (%0.2f%%) successful model(s)",
-            self._selected_solver,
+            "Solve complete: %d (%0.2f%%) successful model(s)",
             num_successful_models,
             num_successful_models * 100 / parameters.batch_size,
         )
