@@ -32,7 +32,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxmod.type_aliases import NpBool, NpFloat, NpInt
+from jaxmod.type_aliases import NpArray, NpBool, NpFloat, NpInt
 from jaxmod.utils import partial_rref, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Float, Integer
 
@@ -323,13 +323,16 @@ class DissolutionNetwork(BaseReactionBlock):
         return np.zeros_like(self.dissolution_matrix, dtype=float)
 
 
-class PhaseIndex:
+class PhaseIndex(eqx.Module):
     """Stores start and stop indices of a phase in the full species collection.
 
     Args:
         start: Starting index of the phase in the full species collection
         stop: Stopping index of the phase in the full species collection
     """
+
+    start: int
+    stop: int
 
     def __init__(self, start: int, stop: int):
         self.start = start
@@ -340,7 +343,7 @@ class PhaseIndex:
         """Slice object for indexing arrays."""
         return slice(self.start, self.stop)
 
-    def mask(self, n_total: int) -> np.ndarray:
+    def mask(self, n_total: int) -> NpArray:
         """Boolean mask for this phase
 
         Args:
