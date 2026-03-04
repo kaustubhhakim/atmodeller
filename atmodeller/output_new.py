@@ -381,8 +381,8 @@ class Output(eqx.Module):
         for nn, condensate in enumerate(self.condensates):
             out_condensates.append(
                 condensate.output(
-                    jnp.atleast_1d(self.log_number_moles[..., condensate_slice][nn]),
-                    jnp.atleast_1d(self.log_stability[..., condensate_slice][nn]),
+                    jnp.atleast_1d(self.log_number_moles[..., condensate_slice][..., nn]),
+                    jnp.atleast_1d(self.log_stability[..., condensate_slice][..., nn]),
                     temperature,
                     total_pressure,
                 )
