@@ -19,6 +19,7 @@ import optimistix as optx
 from equinox._enum import EnumerationItem
 from jax import lax
 from jaxmod.solvers import MultiAttemptSolution, make_batch_retry_solver
+from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
@@ -26,8 +27,8 @@ from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
 from atmodeller.engine import objective_function
 from atmodeller.parameters import Parameters
 
-# TODO: Can remove after refactoring but required for previous output routines
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
+"""Axis index for the log number of moles in the vmapped solver."""
 
 
 # @eqx.filter_jit
@@ -55,6 +56,44 @@ def solve_single(
     )
 
     return sol
+
+
+def make_independent_solver(parameters: Parameters) -> Callable:
+    """Gets a vmapped, JIT-compiled solver for independent batch systems.
+
+    Wraps :func:`solve_single` with :func:`equinox.filter_vmap` and
+    :func:`equinox.filter_jit` so that it can solve multiple independent systems in a batch
+    efficiently. Each batch element is solved separately, producing per-element convergence
+    statistics.
+
+    Args:
+        parameters: Parameters
+
+    Returns:
+        Callable that returns a :class:`MultiAttemptSolution` object
+    """
+    solver_function_vmapped: Callable = eqx.filter_vmap(
+        solve_single, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
+    )
+
+    @eqx.filter_jit
+    def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
+        """Solver
+
+        Args:
+            solution: Solution
+            parameters: Parameters
+            *args: Unused positional arguments for consistency with the solver interface
+
+        Returns:
+            :class:`MultiAttemptSolution` object
+        """
+        del args
+        sol: optx.Solution = solver_function_vmapped(solution, parameters)
+
+        return MultiAttemptSolution(sol, _attempts=1)
+
+    return solver
 
 
 batch_retry_solver: Callable = make_batch_retry_solver(solve_single, objective_function)
