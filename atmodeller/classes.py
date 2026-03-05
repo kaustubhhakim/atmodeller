@@ -43,7 +43,7 @@ from atmodeller.output_new import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.solvers import solve_with_jit
+from atmodeller.solvers import make_independent_solver, solve_with_jit
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ class EquilibriumModel:
             self.reaction_system.species.number_species,
             parameters.batch_size,
         )
-        # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
+        jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
@@ -174,7 +174,16 @@ class EquilibriumModel:
         #        raise ValueError(f"Unknown solver type: {solver}")
         #    self._selected_solver = solver
 
-        multi_sol: MultiAttemptSolution = solve_with_jit(base_solution_array, parameters, subkey)
+        if 1:
+            # For testing vmapping option
+            solver = make_independent_solver(parameters)
+            multi_sol = solver(base_solution_array, parameters)
+        else:
+            multi_sol: MultiAttemptSolution = solve_with_jit(
+                base_solution_array, parameters, subkey
+            )
+
+        jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
         # previous
         # multi_sol: MultiAttemptSolution = MultiAttemptSolution(
@@ -307,9 +316,11 @@ def broadcast_initial_solution(
 
     solution = jnp.concatenate((number_moles, stability), axis=-1)
 
+    # FIXME: commented out, since the IC must also have a batch dimension to align with the
+    # mass constraints.
     # TODO: Bit hacky. This is new since the objective supports broadcasting naturally now. To
     # clean up.
-    if batch_size == 1:
-        return solution.squeeze(axis=0)
+    # if batch_size == 1:
+    #    return solution.squeeze(axis=0)
 
     return solution

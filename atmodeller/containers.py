@@ -898,6 +898,9 @@ class MassConstraintSet(eqx.Module):
                 # Broadcasts scalar along that column
                 abundance[..., nn] = element_sum
 
+        # HACK: Added to ensure that mass constraints are always batched over the first
+        # dimension.
+        abundance = np.atleast_2d(abundance)
         # jax.debug.print("abundance = {out}", out=abundance)
 
         return cls(abundance, species, units)
@@ -935,6 +938,13 @@ class MassConstraintSet(eqx.Module):
             Log abundance by moles for all elements
         """
         log_abundance: Float[Array, "... elements"] = jnp.log(self.abundance_mol())
+
+        # Ensure stable 1-D output:
+        #  - Unbatched case: shape (1, elements) --> (elements,)
+        #  - Vmapped case: shape (elements,) --> already correct
+        # ``squeeze`` removes the leading singleton, and ``atleast_1d`` guards against collapse
+        # when only a single element exists.
+        log_abundance = jnp.atleast_1d(log_abundance.squeeze())
 
         return log_abundance
 

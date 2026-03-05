@@ -26,7 +26,7 @@ DISSOLVED_STATE: str = "d"
 """Suffix to identify dissolved species for output purposes"""
 
 # Initial solution guess
-INITIAL_LOG_NUMBER_MOLES: float = 50.0
+INITIAL_LOG_NUMBER_MOLES: float = 45.0
 """Initial log number of moles
 
 Empiricially determined. This value is mid-range for Earth-like planets.

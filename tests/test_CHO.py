@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from jaxmod.type_aliases import NpFloat
 from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
@@ -61,8 +62,14 @@ def test_H_and_C() -> None:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
+    # Need to steer the initial guess away from the default for this test to converge
+    initial_log_number_moles: NpFloat = np.array([45, 45, 30, 50, 50, 52, 48], dtype=float)
+
     model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        state=planet,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+        initial_log_number_moles=initial_log_number_moles,
     )
 
     target: dict[str, Any] = {
