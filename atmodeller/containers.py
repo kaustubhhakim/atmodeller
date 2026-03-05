@@ -925,16 +925,21 @@ class MassConstraintSet(eqx.Module):
     def log_abundance(self) -> Float[Array, "... elements"]:
         """Element abundances in log-space
 
+        The output shape depends on the calling context:
+
+        - **Unbatched** (``abundance`` shape ``(1, elements)``): the leading singleton is squeezed
+          away, returning a 1-D array of shape ``(elements,)``.
+        - **Batched, not vmapped** (``abundance`` shape ``(batch, elements)``): returns a 2-D array
+          of shape ``(batch, elements)``.
+        - **Vmapped** (``abundance`` shape ``(elements,)`` inside the vmap): returns a 1-D array of
+          shape ``(elements,)``.
+
+        ``atleast_1d`` guards against collapse to a scalar when there is only a single element.
+
         Returns:
-            Log abundance by moles for all elements
+            Log abundance by moles
         """
         log_abundance: Float[Array, "... elements"] = jnp.log(self.abundance_mol())
-
-        # Ensure stable 1-D output:
-        #  - Unbatched case: shape (1, elements) --> (elements,)
-        #  - Vmapped case: shape (elements,) --> already correct
-        # ``squeeze`` removes the leading singleton, and ``atleast_1d`` guards against collapse
-        # when only a single element exists.
         log_abundance = jnp.atleast_1d(log_abundance.squeeze())
 
         return log_abundance
