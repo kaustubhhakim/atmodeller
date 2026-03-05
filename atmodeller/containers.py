@@ -869,13 +869,9 @@ class MassConstraintSet(eqx.Module):
         # Determine the maximum length of any array in mass_constraints_
         max_len: int = get_batch_size(mass_constraints_)
 
-        # Initialise to all nans — shape (elements,) for scalar, (batch, elements) for batched
-        shape: tuple[int, ...] = (
-            (len(species.unique_elements),)
-            if max_len == 1
-            else (max_len, len(species.unique_elements))
-        )
-        abundance: NpFloat = np.full(shape, np.nan, dtype=np.float64)
+        # Initialise to all nans — shape (batch, elements), always 2-D
+        shape: tuple[int, int] = (max_len, len(species.unique_elements))
+        abundance: NpFloat = np.full(shape, np.nan, dtype=float)
 
         # Populate mass constraints. This accommodates mass constraints given as mass or moles of
         # species as well as elements
@@ -896,12 +892,7 @@ class MassConstraintSet(eqx.Module):
 
             if np.any(element_sum != 0):
                 # Broadcasts scalar along that column
-                abundance[..., nn] = element_sum
-
-        # HACK: Added to ensure that mass constraints are always batched over the first
-        # dimension.
-        abundance = np.atleast_2d(abundance)
-        # jax.debug.print("abundance = {out}", out=abundance)
+                abundance[:, nn] = element_sum
 
         return cls(abundance, species, units)
 
