@@ -253,6 +253,7 @@ class ReservoirSpecies(eqx.Module):
 
     @property
     def solve_for_stability(self) -> bool:
+        """Always ``False`` — reservoir species have no stability variable."""
         return False
 
     def __str__(self) -> str:
@@ -277,11 +278,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     phase_mass_mask: NpBool
     """Mask for species included in phase-level mass, mole, and fraction aggregations"""
     number_solution: int
-    """Number of solution quantities, whch cannot depend on traced quantities"""
+    """Number of solution quantities, which cannot depend on traced quantities"""
 
     def __init__(self, species: Iterable[TSpecies_co]):
         self.species = tuple(species)
-        self.species_names = tuple([species_.data.name for species_ in self])
+        self.species_names = tuple(species_.data.name for species_ in self)
         self.molar_masses = np.array([species_.data.molar_mass for species_ in self], dtype=float)
         self.active_stability = np.array(
             [species.solve_for_stability for species in self], dtype=bool
@@ -297,7 +298,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         )
 
         # Ensure number_solution is static
-        self.number_solution = sum([species.number_solution for species in self])
+        self.number_solution = sum(species.number_solution for species in self)
 
         logger.debug(
             f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
@@ -323,7 +324,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     @property
     def number_species(self) -> int:
         """Number of species"""
-        return self.__len__()
+        return len(self)
 
     @property
     def reaction_species(self) -> "SpeciesCollection[ChemicalSpecies]":
@@ -457,7 +458,7 @@ class ThermodynamicState(eqx.Module):
         """Moles of the solid"""
         return self.solid_mass / self.molar_mass
 
-    def get_pressure(self, gas_mass: Array) -> Array:
+    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
         """Gets the pressure.
 
         Args:
@@ -503,7 +504,7 @@ class ThinAtmospherePlanet(eqx.Module):
     Args:
         planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
         core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to ``0.3`` kg/kg (Earth).
+            to ``0.295334691460966`` kg/kg (Earth).
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to ``1.0`` kg/kg.
         surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
         temperature: Temperature in K. Defaults to ``2000`` K.
@@ -548,7 +549,7 @@ class ThinAtmospherePlanet(eqx.Module):
 
     @property
     def mantle_mass(self) -> Array:
-        """Mantle mass"""
+        """Mantle mass in kg"""
         return self.planet_mass * self.mantle_mass_fraction
 
     @property
@@ -558,7 +559,7 @@ class ThinAtmospherePlanet(eqx.Module):
 
     @property
     def mantle_mass_fraction(self) -> Array:
-        """Mantle mass fraction"""
+        """Mantle mass fraction in kg/kg"""
         return 1 - self.core_mass_fraction
 
     @property
@@ -594,26 +595,32 @@ class ThinAtmospherePlanet(eqx.Module):
     # The following properties ensure compliance with ThermodynamicStateProtocol
     @property
     def mass(self) -> Array:
+        """Mantle mass in kg (alias for :attr:`mantle_mass`)"""
         return self.mantle_mass
 
     @property
     def melt_fraction(self) -> Array:
+        """Mantle melt fraction in kg/kg (alias for :attr:`mantle_melt_fraction`)"""
         return self.mantle_melt_fraction
 
     @property
     def melt_mass(self) -> Array:
+        """Mass of the molten mantle in kg (alias for :attr:`mantle_melt_mass`)"""
         return self.mantle_melt_mass
 
     @property
     def melt_moles(self) -> Array:
+        """Moles of the molten mantle (alias for :attr:`mantle_melt_moles`)"""
         return self.mantle_melt_moles
 
     @property
     def solid_mass(self) -> Array:
+        """Mass of the solid mantle in kg (alias for :attr:`mantle_solid_mass`)"""
         return self.mantle_solid_mass
 
     @property
     def solid_moles(self) -> Array:
+        """Moles of the solid mantle (alias for :attr:`mantle_solid_moles`)"""
         return self.mantle_solid_moles
 
     def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
@@ -726,7 +733,7 @@ class FugacityConstraintSet(eqx.Module):
         species: SpeciesCollection,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
     ) -> "FugacityConstraintSet":
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: Species collection
@@ -851,7 +858,7 @@ class MassConstraintSet(eqx.Module):
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
     ) -> "MassConstraintSet":
-        """Creates an instance
+        """Creates an instance.
 
         Args:
             species: Species collection
