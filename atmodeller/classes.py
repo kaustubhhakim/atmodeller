@@ -43,7 +43,7 @@ from atmodeller.output_new import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.solvers import make_independent_solver, solve_with_jit
+from atmodeller.solvers import make_independent_solver, make_solve_with_jit
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -174,14 +174,13 @@ class EquilibriumModel:
         #        raise ValueError(f"Unknown solver type: {solver}")
         #    self._selected_solver = solver
 
-        if 1:
+        if 0:
             # For testing vmapping option
             solver = make_independent_solver(parameters)
             multi_sol = solver(base_solution_array, parameters)
         else:
-            multi_sol: MultiAttemptSolution = solve_with_jit(
-                base_solution_array, parameters, subkey
-            )
+            solver = make_solve_with_jit(parameters)
+            multi_sol: MultiAttemptSolution = solver(base_solution_array, parameters, subkey)
 
         jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
