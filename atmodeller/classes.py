@@ -43,7 +43,7 @@ from atmodeller.output_new import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.solvers import make_independent_solver, make_solve_with_jit
+from atmodeller.solvers import make_solve_with_jit
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ class EquilibriumModel:
 
     reaction_system: ReactionSystem
     _solver: Optional[Callable] = None
+    _solver_shapes: Optional[tuple] = None
     _output: Optional[Output] = None
 
     def __init__(
@@ -81,6 +82,9 @@ class EquilibriumModel:
             condensates = ()
 
         self.reaction_system = ReactionSystem(gas, melt=melt, solid=solid, condensates=condensates)
+        self._solver: Optional[Callable] = None
+        self._solver_shapes: Optional[tuple] = None
+        self._output: Optional[Output] = None
 
     @property
     def output(self) -> Output:
@@ -162,25 +166,17 @@ class EquilibriumModel:
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
 
-        # Previous
-        # if self._solver is None or solver_recompile:
-        #    if solver == "basic":
-        #        self._solver = make_independent_solver(parameters)
-        #        # Alternatively, could use the batch solver
-        #        # self._solver = make_batch_solver(parameters)
-        #    elif solver == "robust":
-        #        self._solver = make_solver(parameters)
-        #    else:
-        #        raise ValueError(f"Unknown solver type: {solver}")
-        #    self._selected_solver = solver
+        # Rebuild the solver only when the shape of any array leaf changes; this covers both
+        # batch_size changes and structural changes (e.g. a scalar buffer becoming batched)
+        # that affect vmap_axes_spec. filter_jit handles value-only changes automatically.
+        solver_shapes: tuple = tuple(
+            leaf.shape for leaf in jax.tree_util.tree_leaves(parameters) if hasattr(leaf, "shape")
+        )
+        if self._solver is None or self._solver_shapes != solver_shapes:
+            self._solver = make_solve_with_jit(parameters)
+            self._solver_shapes = solver_shapes
 
-        if 0:
-            # For testing vmapping option
-            solver = make_independent_solver(parameters)
-            multi_sol = solver(base_solution_array, parameters)
-        else:
-            solver = make_solve_with_jit(parameters)
-            multi_sol: MultiAttemptSolution = solver(base_solution_array, parameters, subkey)
+        multi_sol: MultiAttemptSolution = self._solver(base_solution_array, parameters, subkey)
 
         jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
