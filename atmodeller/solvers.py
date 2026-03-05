@@ -238,49 +238,66 @@ def tau_sweep_solver(
     return multi_sol
 
 
-@eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=3)
-def solve_with_jit(
-    base_solution_array: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
-) -> MultiAttemptSolution:
-    """Wrapped version of the solve function with JIT compilation for branching logic.
+def make_solve_with_jit(parameters: Parameters) -> Callable:
+    """Gets a JIT-compiled solver function that conditionally applies the tau sweep solver.
 
     Args:
-        base_solution_array: Base solution array
         parameters: Parameters
-        key: Random key
 
     Returns:
-        :class:`~jaxmod.solvers.MultiAttemptSolution` object
+        Callable that returns a :class:`MultiAttemptSolution` object
     """
-    # Define the condition to check if active stability is enabled
-    condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
-    # jax.debug.print("condition (active stability) = {out}", out=condition)
 
-    def solve_with_stability_multistart(key):
-        """Function for multistart with stability"""
-        subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
-        return tau_sweep_solver(base_solution_array, parameters, subkey)
+    batch_solver: Callable = make_independent_solver(parameters)
+    batch_retry_solver: Callable = make_batch_retry_solver(batch_solver, objective_function)
 
-    def solve_with_generic_multistart(key):
-        """Function for generic multistart"""
-        _, subkey = jax.random.split(key)  # Split only once and pass subkey
-        return batch_retry_solver(
-            base_solution_array,
-            parameters,
-            subkey,
-            parameters.solver_parameters.multistart_perturbation,
-            parameters.solver_parameters.multistart,
-            parameters.solver_parameters.atol,
+    @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=3)
+    def solve_with_jit(
+        base_solution_array: Float[Array, "... solution"],
+        parameters: Parameters,
+        key: PRNGKeyArray,
+    ) -> MultiAttemptSolution:
+        """Wrapped version of the solve function with JIT compilation for branching logic.
+
+        Args:
+            base_solution_array: Base solution array
+            parameters: Parameters
+            key: Random key
+
+        Returns:
+            :class:`~jaxmod.solvers.MultiAttemptSolution` object
+        """
+        # Define the condition to check if active stability is enabled
+        condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
+        # jax.debug.print("condition (active stability) = {out}", out=condition)
+
+        def solve_with_stability_multistart(key):
+            """Function for multistart with stability"""
+            subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
+            return tau_sweep_solver(base_solution_array, parameters, subkey)
+
+        def solve_with_generic_multistart(key):
+            """Function for generic multistart"""
+            _, subkey = jax.random.split(key)  # Split only once and pass subkey
+            return batch_retry_solver(
+                base_solution_array,
+                parameters,
+                subkey,
+                parameters.solver_parameters.multistart_perturbation,
+                parameters.solver_parameters.multistart,
+                parameters.solver_parameters.atol,
+            )
+
+        multi_sol = lax.cond(
+            condition,
+            lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
+            # lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
+            # lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
+            lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
+            operand=None,  # Operand not used for decision making
         )
 
-    multi_sol = lax.cond(
-        condition,
-        lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
-        # lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
-        # lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
-        lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
-        operand=None,  # Operand not used for decision making
-    )
+        return multi_sol
 
-    return multi_sol
+    return solve_with_jit
