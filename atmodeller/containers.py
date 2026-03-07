@@ -183,6 +183,10 @@ class ChemicalSpecies(eqx.Module):
             formula, state, activity, solve_for_stability, number_solution, include_in_phase_mass
         )
 
+    @property
+    def name(self) -> str:
+        return self.data.name
+
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
 
