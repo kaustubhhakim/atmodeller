@@ -101,6 +101,26 @@ def make_batch_solver(parameters: Parameters) -> Callable:
     return solver
 
 
+def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
+    """Gets a batch retry solver with a vmapped objective function.
+
+    Args:
+        parameters: Parameters
+
+    Returns:
+        Callable
+    """
+    batch_solver: Callable = make_batch_solver(parameters)
+    objective_function_vmapped: Callable = eqx.filter_vmap(
+        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
+    )
+    batch_retry_solver: Callable = make_batch_retry_solver(
+        batch_solver, objective_function_vmapped
+    )
+
+    return batch_retry_solver
+
+
 def make_tau_sweep_solver(parameters: Parameters) -> Callable:
     """Gets a solver function that performs a tau sweep for active stability systems.
 
@@ -115,13 +135,7 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
     Returns:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
-    batch_solver: Callable = make_batch_solver(parameters)
-    objective_function_vmapped: Callable = eqx.filter_vmap(
-        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
-    )
-    batch_retry_solver: Callable = make_batch_retry_solver(
-        batch_solver, objective_function_vmapped
-    )
+    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
 
     def tau_sweep_solver(
         initial_guess: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
@@ -275,14 +289,7 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
     Returns:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
-
-    batch_solver: Callable = make_batch_solver(parameters)
-    objective_function_vmapped: Callable = eqx.filter_vmap(
-        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
-    )
-    batch_retry_solver: Callable = make_batch_retry_solver(
-        batch_solver, objective_function_vmapped
-    )
+    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
     tau_sweep_solver: Callable = make_tau_sweep_solver(parameters)
 
     @eqx.filter_jit
