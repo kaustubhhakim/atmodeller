@@ -757,6 +757,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
 
     @override
     def __init__(self, species: Iterable[ChemicalSpecies]):
+        # TODO: Accept a non-iterable since only a single species is consistent with a pure phase?
         self.species = SpeciesCollection(species)
 
         if self.species.number_species != 1:
