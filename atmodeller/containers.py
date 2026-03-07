@@ -989,15 +989,15 @@ class SolverParameters(RootFindParameters):
         max_steps: The maximum number of steps the solver can take. Defaults to ``256``.
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either ``fwd`` or ``bwd``. Defaults to ``fwd``.
-        multistart: Number of multistarts. Defaults to ``10``.
-        multistart_perturbation: Perturbation for multistart. Defaults to ``30``.
+        max_starts: Maximum number of starts. Defaults to ``10``.
+        retry_perturbation: Perturbation for retry. Defaults to ``30``.
         tau: Tau factor for species stability. Defaults to :const:`~atmodeller.constants.TAU`.
     """
 
-    multistart: int = 10
-    """Number of multistarts"""
-    multistart_perturbation: float = 30.0
-    """Perturbation for multistart"""
+    max_starts: int = 10
+    """Maximum number of starts"""
+    retry_perturbation: float = 30.0
+    """Perturbation for retry"""
     tau: Array = eqx.field(converter=as_j64, default=TAU)
     """Tau factor for species stability"""
 
