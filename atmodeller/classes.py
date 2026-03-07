@@ -194,11 +194,12 @@ class EquilibriumModel:
                 num_failed_models * 100 / parameters.batch_size,
             )
 
-        # Count unique values and their frequencies
-        unique_vals, counts = jnp.unique(multi_sol.attempts, return_counts=True)
+        # Count unique values and their frequencies, ignoring failed models (attempts == 0)
+        successful_attempts = multi_sol.attempts[multi_sol.attempts > 0]
+        unique_vals, counts = jnp.unique(successful_attempts, return_counts=True)
         for val, count in zip(unique_vals.tolist(), counts.tolist()):
             logger.info(
-                "Multistart summary: %d (%0.2f%%) models(s) required %d attempt(s)",
+                "Attempt summary (solved): %d (%0.2f%%) model(s) required %d attempt(s)",
                 count,
                 count * 100 / parameters.batch_size,
                 val,
