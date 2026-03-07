@@ -131,6 +131,7 @@ from atmodeller.reactions import (  # noqa: E402, F401
     ReactionNetwork,
     ReactionSystem,
 )
+from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
     earth_oceans_to_hydrogen_mass,
