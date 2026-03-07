@@ -243,10 +243,23 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
 
 
 def make_solve_with_jit(parameters: Parameters) -> Callable:
-    """Gets a JIT-compiled solver function that conditionally applies the tau sweep solver.
+    """General assembly function that constructs and returns the JIT-compiled solver.
+
+    Closes over a vmapped batch solver, a batch retry solver, and a tau sweep solver, all built
+    from ``parameters`` at construction time. The returned callable dispatches at runtime via
+    :func:`jax.lax.cond` based on whether any species have active stability — routing to the tau
+    sweep solver when stability species are present, or to the generic multistart solver otherwise.
+
+    Note:
+        ``active_stability`` is currently not a traced JAX array; its size must be fixed at
+        compile time because it determines the shape of the residual vector. The :func:`lax.cond`
+        branch therefore compiles *both* paths even though only one will execute at runtime. This
+        retains generality for future capabilities (e.g. dynamically switching solver strategy)
+        at the expense of additional — currently unnecessary — compile time.
 
     Args:
-        parameters: Parameters
+        parameters: Parameters used to derive the vmapping axes and build the sub-solvers at
+            construction time
 
     Returns:
         Callable that returns a :class:`MultiAttemptSolution` object
