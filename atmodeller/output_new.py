@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
 from jaxmod.type_aliases import NpArray, NpBool
+from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Float
 
 from atmodeller.engine import get_total_pressure, objective_function
@@ -403,7 +404,14 @@ class Output(eqx.Module):
             self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
         )
 
-        out["residual"] = np.asarray(objective_function(self.solution, self.parameters))
+        # Must vmap the residual evaluation to match what the solver did: parameters contains a
+        # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
+        # solution gives incorrect results. vmap_axes_spec maps None/0 per leaf appropriately.
+        objective_function_vmapped = eqx.filter_vmap(
+            objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
+        )
+        out["residual"] = np.asarray(objective_function_vmapped(self.solution, self.parameters))
+
         out["solution"] = np.asarray(self.solution)
         out["solver"] = self.multi_attempt_solution.asdict()
 
