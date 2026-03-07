@@ -30,7 +30,7 @@ from jaxtyping import Array, Bool, Float, Integer
 from atmodeller.parameters import Parameters
 
 
-def get_active_mask(parameters: Parameters) -> Bool[Array, "... dim"]:
+def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     """Gets the mask of active residual quantities.
 
     Args:
@@ -39,37 +39,30 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, "... dim"]:
     Returns:
         Active mask
     """
-    fugacity_mask: Bool[Array, "..."] = jnp.asarray(
+    fugacity_mask: Bool[Array, " species"] = jnp.asarray(
         parameters.fugacity_constraints.active(), dtype=bool
     )
-    mass_mask: Bool[Array, "..."] = jnp.asarray(parameters.mass_constraints.active(), dtype=bool)
-
-    # Infer batch shape from the potentially 2-D masks
-    batch_shape: tuple[int, ...] = jnp.broadcast_shapes(
-        fugacity_mask.shape[:-1], mass_mask.shape[:-1]
-    )
-
     reactions_mask: Bool[Array, " reactions"] = jnp.ones(
         parameters.reaction_system.number_reactions, dtype=bool
     )
-    # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
+    mass_mask: Bool[Array, " mass_constraints"] = jnp.asarray(
+        parameters.mass_constraints.active(), dtype=bool
+    )
     stability_mask: Bool[Array, " species"] = jnp.asarray(
         parameters.reaction_system.species.active_stability, dtype=bool
     )
+
+    # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
+    # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
+    # jax.debug.print("mass_mask = {out}", out=mass_mask)
     # jax.debug.print("stability_mask = {out}", out=stability_mask)
 
-    # Broadcast 1-D masks to batch shape + their own last dim
-    reactions_mask = jnp.broadcast_to(reactions_mask, batch_shape + reactions_mask.shape)
-    # jax.debug.print("reactions_mask (broadcast) = {out}", out=reactions_mask)
-    stability_mask = jnp.broadcast_to(stability_mask, batch_shape + stability_mask.shape)
-    # jax.debug.print("stability_mask (broadcast) = {out}", out=stability_mask)
-    fugacity_mask = jnp.broadcast_to(fugacity_mask, batch_shape + fugacity_mask.shape[-1:])
-    # jax.debug.print("fugacity_mask (broadcast) = {out}", out=fugacity_mask)
-    mass_mask = jnp.broadcast_to(mass_mask, batch_shape + mass_mask.shape[-1:])
-    # jax.debug.print("mass_mask (broadcast) = {out}", out=mass_mask)
+    active_mask: Bool[Array, " dim"] = jnp.concatenate(
+        (fugacity_mask, reactions_mask, mass_mask, stability_mask), axis=-1
+    )
+    # jax.debug.print("active_mask = {out}", out=active_mask)
 
-    # NOTE: Order must be identical to objective_function() residual concatenation
-    return jnp.concatenate([fugacity_mask, reactions_mask, mass_mask, stability_mask], axis=-1)
+    return active_mask
 
 
 def get_min_log_elemental_abundance_per_species(
@@ -122,7 +115,7 @@ def get_total_pressure(
         Total pressure in bar
     """
     log_number_moles, _ = jnp.split(solution, 2, axis=-1)
-    log_number_moles_gas: Float[Array, "... n_gas_species"] = log_number_moles[
+    log_number_moles_gas: Float[Array, "... gas_species"] = log_number_moles[
         ..., parameters.reaction_system.gas_slice
     ]
     gas_mass: Float[Array, "... 1"] = jnp.exp(
@@ -150,7 +143,7 @@ def get_log_activity(
     temperature: Float[Array, "..."] = parameters.state.temperature
     total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
 
-    log_activity: Float[Array, "... n_species"] = parameters.reaction_system.get_log_activity(
+    log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
         log_number_moles,
         temperature,
         total_pressure,
@@ -305,20 +298,13 @@ def objective_function(
     # jax.debug.print("active_mask = {out}", out=active_mask)
     size: int = parameters.reaction_system.species.number_solution
     # jax.debug.print("size = {out}", out=size)
-    dim: int = active_mask.shape[-1]
 
-    # Replace inactive positions with sentinel `dim`, sort so active indices come first, slice
-    # This is a way to get fixed-size index arrays without dynamic shapes.
-    active_indices: Integer[Array, "... size"] = jnp.sort(
-        jnp.where(active_mask, jnp.arange(dim), dim), axis=-1
-    )[..., :size]
+    active_indices: Integer[Array, " indices"] = jnp.where(active_mask, size=size)[0]
     # jax.debug.print("active_indices = {out}", out=active_indices)
 
-    # Broadcast active_indices to match residual ndim
-    active_indices = jnp.broadcast_to(active_indices, residual.shape[:-1] + (size,))
-    # jax.debug.print("active_indices = {out}", out=active_indices)
-
-    residual = jnp.take_along_axis(residual, active_indices, axis=-1)
+    residual = jnp.take(
+        residual, indices=active_indices, unique_indices=True, indices_are_sorted=True
+    )
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual
