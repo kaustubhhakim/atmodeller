@@ -116,7 +116,12 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
     batch_solver: Callable = make_batch_solver(parameters)
-    batch_retry_solver: Callable = make_batch_retry_solver(batch_solver, objective_function)
+    objective_function_vmapped: Callable = eqx.filter_vmap(
+        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
+    )
+    batch_retry_solver: Callable = make_batch_retry_solver(
+        batch_solver, objective_function_vmapped
+    )
 
     def tau_sweep_solver(
         initial_guess: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
@@ -272,7 +277,12 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
     """
 
     batch_solver: Callable = make_batch_solver(parameters)
-    batch_retry_solver: Callable = make_batch_retry_solver(batch_solver, objective_function)
+    objective_function_vmapped: Callable = eqx.filter_vmap(
+        objective_function, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
+    )
+    batch_retry_solver: Callable = make_batch_retry_solver(
+        batch_solver, objective_function_vmapped
+    )
     tau_sweep_solver: Callable = make_tau_sweep_solver(parameters)
 
     @eqx.filter_jit
