@@ -122,7 +122,6 @@ from atmodeller.containers import (  # noqa: E402, F401
     Planet,
     ReservoirSpecies,
     SolverParameters,
-    SpeciesCollection,
     ThermodynamicState,
 )
 from atmodeller.parameters import Parameters  # noqa: E402, F401
