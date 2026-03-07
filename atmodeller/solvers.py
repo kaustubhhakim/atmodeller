@@ -28,20 +28,21 @@ from atmodeller.engine import objective_function
 from atmodeller.parameters import Parameters
 
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
-"""Axis index for the solution array for vmapping"""
-POSTCHECK_TOLERANCE: float = 1.0e-6
-"""Default tolerance for the objective-based convergence validation performed after each solve
-attempt"""
+"""Axis index for the solution array in the vmapped batch solver"""
 
 
 def solve_single(
     initial_guess: Float[Array, "... n_solution"], parameters: Parameters
 ) -> optx.Solution:
-    """Solves a single system.
+    """Solves a single (unbatched) system via :func:`optimistix.root_find`.
+
+    Intended to be wrapped with :func:`equinox.filter_vmap` by :func:`make_batch_solver`
+    rather than called directly. All solver configuration is read from
+    ``parameters.solver_parameters``.
 
     Args:
-        initial_guess: Initial guess for the solution
-        parameters: Parameters
+        initial_guess: 1-D initial guess for the solution vector
+        parameters: Parameters providing the solver instance, step limit, and options
 
     Returns:
         :class:`~optimistix.Solution` object
@@ -60,32 +61,37 @@ def solve_single(
 
 
 def make_batch_solver(parameters: Parameters) -> Callable:
-    """Gets a vmapped, JIT-compiled solver for batch systems.
+    """Gets a vmapped batch solver for independent systems.
 
-    Wraps :func:`solve_single` so that it can solve multiple independent systems in a batch
-    efficiently. Each batch element is solved separately, producing per-element convergence
-    statistics.
+    Wraps :func:`solve_single` with :func:`equinox.filter_vmap` so that each batch element is
+    solved independently, producing per-element convergence statistics. The vmapping axes are
+    fixed from ``parameters`` at construction time. JIT compilation is applied by the outer
+    :func:`make_solve_with_jit` context.
 
     Args:
-        parameters: Parameters
+        parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable that returns a :class:`MultiAttemptSolution` object
+        Callable that accepts ``(solution, parameters)`` and returns a
+        :class:`MultiAttemptSolution` with ``attempts=1``
     """
     solver_function_vmapped: Callable = eqx.filter_vmap(
         solve_single, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
     )
 
     def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
-        """Solver
+        """Runs the vmapped single-pass batch solve.
+
+        ``_attempts`` is set to ``1`` unconditionally; objective-based per-element convergence
+        checking is delegated to the retry wrapper in ``batch_retry_solver``.
 
         Args:
-            solution: Solution
-            parameters: Parameters
-            *args: Unused positional arguments for consistency with the solver interface
+            solution: Batched initial guess with shape ``(batch, solution)``
+            parameters: Parameters passed through to each vmapped :func:`solve_single` call
+            *args: Unused; present for interface consistency with :func:`make_batch_retry_solver`
 
         Returns:
-            :class:`MultiAttemptSolution` object
+            :class:`MultiAttemptSolution` with ``attempts=1`` for all batch elements
         """
         del args
         sol: optx.Solution = solver_function_vmapped(solution, parameters)
@@ -134,6 +140,8 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
             :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
 
+        get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
+
         def solve_tau_step(carry: tuple, tau: Float[Array, " ..."]) -> tuple[tuple, tuple]:
             """Performs a single batched solver step for one scalar tau value.
 
@@ -155,7 +163,6 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
             key, subkey = jax.random.split(key)
 
             # Get new parameters with tau value
-            get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
             new_parameters: Parameters = eqx.tree_at(get_leaf, parameters, tau)
             # jax.debug.print("tau = {out}", out=new_parameters.solver_parameters.tau)
 
@@ -182,7 +189,6 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
 
         # Initial solve at TAU to check which entries need the sweep
         key, subkey = jax.random.split(key)
-        get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
         initial_parameters: Parameters = eqx.tree_at(get_leaf, parameters, jnp.array(TAU))
 
         first_sol: MultiAttemptSolution = batch_retry_solver(
@@ -276,12 +282,17 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         parameters: Parameters,
         key: PRNGKeyArray,
     ) -> MultiAttemptSolution:
-        """Wrapped version of the solve function with JIT compilation for branching logic.
+        """JIT-compiled entry point that dispatches to the appropriate solver branch.
+
+        Checks whether any species have active stability and routes accordingly via
+        :func:`jax.lax.cond`: the tau sweep solver is used when stability species are
+        present, otherwise the generic multistart retry solver is used. Both branches are
+        compiled at trace time.
 
         Args:
-            base_solution_array: Base solution array
-            parameters: Parameters
-            key: Random key
+            base_solution_array: Batched initial guess with shape ``(batch, solution)``
+            parameters: Parameters; array leaves are traced, non-array leaves are static
+            key: JAX PRNG key
 
         Returns:
             :class:`~jaxmod.solvers.MultiAttemptSolution` object
@@ -291,13 +302,13 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         # jax.debug.print("condition (active stability) = {out}", out=condition)
 
         def solve_with_stability_multistart(key):
-            """Function for multistart with stability"""
-            subkey: PRNGKeyArray = jax.random.split(key)[1]  # Split only once and pass subkey
+            """Routes to the tau sweep solver for systems with active stability species."""
+            _, subkey = jax.random.split(key)
             return tau_sweep_solver(base_solution_array, parameters, subkey)
 
         def solve_with_generic_multistart(key):
-            """Function for generic multistart"""
-            _, subkey = jax.random.split(key)  # Split only once and pass subkey
+            """Routes to the generic multistart retry solver for systems without stability."""
+            _, subkey = jax.random.split(key)
             return batch_retry_solver(
                 base_solution_array,
                 parameters,
