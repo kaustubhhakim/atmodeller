@@ -395,6 +395,8 @@ class Output(eqx.Module):
         )
         out["totals"] = totals
 
+        out["state"] = self.parameters.state.asdict()
+
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict())
         out["constraints"].update(
