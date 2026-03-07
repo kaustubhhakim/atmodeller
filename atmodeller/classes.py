@@ -33,7 +33,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxmod.solvers import MultiAttemptSolution
 from jaxmod.type_aliases import NpFloat
-from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
+from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import SolverParameters
@@ -161,7 +161,7 @@ class EquilibriumModel:
             self.reaction_system.species.number_species,
             parameters.batch_size,
         )
-        jax.debug.print("base_solution_array = {out}", out=base_solution_array)
+        # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
@@ -177,13 +177,7 @@ class EquilibriumModel:
             self._solver_shapes = solver_shapes
 
         multi_sol: MultiAttemptSolution = self._solver(base_solution_array, parameters, subkey)
-
-        jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
-
-        # previous
-        # multi_sol: MultiAttemptSolution = MultiAttemptSolution(
-        #    sol
-        # )  # self._solver(base_solution_array, parameters, subkey)
+        # jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
         num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
         num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
@@ -210,13 +204,12 @@ class EquilibriumModel:
                 val,
             )
 
-        # Want the maximum number of steps for cases that solved
-        mask_num_steps: Bool[Array, "..."] = (
-            multi_sol.num_steps < parameters.solver_parameters.max_steps
+        # Steps of 0 indicate no solution; replace with nan and report the max over solved models
+        steps_float: Array = jnp.where(
+            multi_sol.num_steps == 0, jnp.nan, multi_sol.num_steps.astype(jnp.float64)
         )
-        # Replace invalid values with -inf so they never win in the max
-        max_less_than_max: Array = jnp.where(mask_num_steps, multi_sol.num_steps, -jnp.inf).max()
-        logger.info("Solver steps (max) = %s", int(max_less_than_max.item()))
+        max_steps: Array = jnp.nanmax(steps_float)
+        logger.info("Solver steps (max) = %s", int(max_steps.item()))
 
         self._output = Output(parameters, multi_sol)
 
@@ -310,12 +303,5 @@ def broadcast_initial_solution(
     )
 
     solution = jnp.concatenate((number_moles, stability), axis=-1)
-
-    # FIXME: commented out, since the IC must also have a batch dimension to align with the
-    # mass constraints.
-    # TODO: Bit hacky. This is new since the objective supports broadcasting naturally now. To
-    # clean up.
-    # if batch_size == 1:
-    #    return solution.squeeze(axis=0)
 
     return solution
