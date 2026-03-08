@@ -961,7 +961,7 @@ class MassConstraintSet(eqx.Module):
         # batch dimension, making shape errors impossible by construction.
 
         # Only squeeze the leading batch axis when unbatched (shape[0] == 1). A bare .squeeze()
-        # would also remove a trailing size-1 elements axis, collapsing (batch, 1) → (batch,) and
+        # would also remove a trailing size-1 elements axis, collapsing (batch, 1) --> (batch,) and
         # causing incorrect broadcasting against (batch, 1) totals.
         if log_abundance.ndim == 2 and log_abundance.shape[0] == 1:
             return log_abundance.squeeze(axis=0)
