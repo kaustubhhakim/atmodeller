@@ -16,7 +16,7 @@ from typing import Optional, Protocol, runtime_checkable
 
 import equinox as eqx
 from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool
+from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 
 
@@ -250,6 +250,6 @@ class ThermodynamicStateProtocol(Protocol):
         """Pressure in bar"""
         ...
 
-    def asdict(self) -> dict:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict:
         """Dictionary representation"""
         ...

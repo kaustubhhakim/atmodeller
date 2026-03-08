@@ -475,12 +475,17 @@ class ThermodynamicState(eqx.Module):
 
         return self.pressure
 
-    def asdict(self) -> dict[str, NpArray]:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays.
+
+        Args:
+            gas_mass: Gas mass in kg. Unused but required by the interface.
 
         Returns:
             A dictionary of the values
         """
+        del gas_mass
+
         base_dict: dict[str, ArrayLike] = asdict(self)
         base_dict["melt_mass"] = self.melt_mass
         base_dict["solid_mass"] = self.solid_mass
@@ -655,13 +660,17 @@ class ThinAtmospherePlanet(eqx.Module):
 
         return pressure
 
-    def asdict(self) -> dict[str, NpArray]:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays.
+
+        Args:
+            gas_mass: Gas mass in kg
 
         Returns:
             A dictionary of the values
         """
         base_dict: dict[str, ArrayLike] = asdict(self)
+        base_dict["pressure"] = self.get_pressure(gas_mass)
         base_dict["mantle_mass"] = self.mantle_mass
         base_dict["mantle_melt_mass"] = self.mantle_melt_mass
         base_dict["mantle_solid_mass"] = self.mantle_solid_mass
