@@ -121,21 +121,23 @@ def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
     return batch_retry_solver
 
 
-def make_tau_sweep_solver(parameters: Parameters) -> Callable:
+def make_tau_sweep_solver(base_parameters: Parameters) -> Callable:
     """Gets a solver function that performs a tau sweep for active stability systems.
 
     Constructs and closes over a vmapped batch solver and a batch retry solver, both bound to the
-    ``vmap`` axes derived from ``parameters`` at construction time. The returned callable first
-    attempts a solve at ``TAU``; if all batch elements converge it returns immediately, otherwise
-    it runs a full log-spaced sweep from ``TAU_MAX`` down to ``TAU`` for every batch element.
+    ``vmap`` axes derived from ``base_parameters`` at construction time. The returned callable
+    first attempts a solve at ``TAU``; if all batch elements converge it returns immediately,
+    otherwise it runs a full log-spaced sweep from ``TAU_MAX`` down to ``TAU`` for every batch
+    element.
 
     Args:
-        parameters: Parameters used to derive the vmapping axes at construction time
+        base_parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
-    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
+    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(base_parameters)
+    get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
 
     def tau_sweep_solver(
         initial_guess: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
@@ -158,8 +160,6 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
         Returns:
             :class:`~jaxmod.solvers.MultiAttemptSolution` object
         """
-
-        get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
 
         def solve_tau_step(carry: tuple, tau: Float[Array, " ..."]) -> tuple[tuple, tuple]:
             """Performs a single batched solver step for one scalar tau value.
@@ -238,8 +238,8 @@ def make_tau_sweep_solver(parameters: Parameters) -> Callable:
             ``varying_schedule`` scan. The final solution, result, and the maximum step count
             and attempt index across all tau steps are returned.
             """
-            key_, _ = key_and_guess  # _ is first_solution — same as closure, so fine
-            initial_carry_: tuple[Array, Array] = (key_, first_solution)
+            (key, solution) = key_and_guess
+            initial_carry_: tuple[Array, Array] = (key, solution)
             _, results_ = jax.lax.scan(solve_tau_step, initial_carry_, varying_schedule)
             solution_, result_value_, steps_, attempts_ = results_
             final_result_: optx.RESULTS = cast(
