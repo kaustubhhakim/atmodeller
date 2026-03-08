@@ -93,15 +93,6 @@ class Parameters(eqx.Module):
             SolverParameters() if solver_parameters is None else solver_parameters
         )
 
-        # FIXME: This was previous
-        # Always broadcast tau so we can apply vmap to the solver once, even if some calculations
-        # need to be repeated due to failures.
-        # tau_broadcasted: Float[Array, " batch"] = jnp.broadcast_to(
-        #    solver_parameters_.tau, (batch_size,)
-        # )
-        # get_leaf: Callable = lambda t: t.tau  # noqa: E731
-        # solver_parameters_ = eqx.tree_at(get_leaf, solver_parameters_, tau_broadcasted)
-
         return cls(
             reaction_system,
             state_,

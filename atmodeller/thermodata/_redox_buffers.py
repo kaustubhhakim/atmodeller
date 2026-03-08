@@ -56,7 +56,7 @@ class RedoxBuffer(eqx.Module):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log10 fugacity at the buffer
@@ -89,7 +89,7 @@ class RedoxBuffer(eqx.Module):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log10 fugacity
@@ -101,7 +101,7 @@ class RedoxBuffer(eqx.Module):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
@@ -144,7 +144,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log10 fugacity
@@ -314,7 +314,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log10 fugacity
@@ -387,7 +387,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
             Log10 fugacity at the buffer

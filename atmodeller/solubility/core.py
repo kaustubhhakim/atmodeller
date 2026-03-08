@@ -33,13 +33,13 @@ class Solubility(eqx.Module):
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
     ) -> Array:
-        r"""Concentration in ppmw
+        """Concentration in ppmw
 
         Args:
             fugacity: Fugacity in bar
             temperature: Temperature in K. Defaults to ``None`` for not used.
             pressure: Pressure in bar. Defaults to ``None`` for not used.
-            fO2: :math:`\log_{10} f\rm{O}_2` in bar. Defaults to ``None`` for not used.
+            fO2: Oxygen fugacity in bar. Defaults to ``None`` for not used.
 
         Returns:
             Concentration in ppmw
@@ -48,13 +48,13 @@ class Solubility(eqx.Module):
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> Array:
-        r"""Wrapper to pass concentration arguments by position to use with JAX lax.switch
+        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:
             fugacity: Fugacity in bar
             temperature: Temperature in K
             pressure: Pressure in bar
-            fO2: :math:`\log_{10} f\rm{O}_2` in bar
+            fO2: Oxygen fugacity in bar
 
         Returns:
             Concentration in ppmw
@@ -96,9 +96,15 @@ class SolubilityPowerLaw(Solubility):
     """Exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> Array:
-        del args
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
+    ) -> Array:
+        del temperature, pressure, fO2
 
         return power_law(fugacity, self.constant, self.exponent)
 
@@ -118,8 +124,15 @@ class SolubilityPowerLawLog10(Solubility):
     """Log10 exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
+    ) -> Array:
+        del temperature, pressure, fO2
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 

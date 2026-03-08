@@ -6,6 +6,10 @@
 
 This module defines formal protocol classes (via :class:`typing.Protocol`) that specify the
 expected interfaces for different thermodynamic components.
+
+It also contains :class:`ChemicalSpeciesData`, a concrete :class:`equinox.Module` that holds
+per-species formula and composition data. It lives here rather than in ``containers.py`` because
+``containers.py`` imports from this module — moving it there would create a circular import.
 """
 
 from typing import Optional, Protocol, runtime_checkable
@@ -57,43 +61,101 @@ class ChemicalSpeciesData(eqx.Module):
 
 @runtime_checkable
 class ActivityProtocol(Protocol):
-    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Log activity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity, which is dimensionless
+        """
+        ...
 
 
 @runtime_checkable
 class SpeciesProtocol(Protocol):
-    @property
-    def activity(self) -> ActivityProtocol: ...
-    @property
-    def data(self) -> ChemicalSpeciesData: ...
+    """Protocol for a chemical species that participates in reactions"""
 
     @property
-    def number_solution(self) -> int: ...
+    def activity(self) -> ActivityProtocol:
+        """Activity model"""
+        ...
 
     @property
-    def solve_for_stability(self) -> bool: ...
+    def data(self) -> ChemicalSpeciesData:
+        """Chemical species data"""
+        ...
 
     @property
-    def include_in_phase_mass(self) -> bool: ...
+    def number_solution(self) -> int:
+        """Number of solution quantities"""
+        ...
+
+    @property
+    def solve_for_stability(self) -> bool:
+        """Whether to solve for stability"""
+        ...
+
+    @property
+    def include_in_phase_mass(self) -> bool:
+        """Whether the species is included in phase-level mass, mole, and fraction aggregations"""
+        ...
 
 
 @runtime_checkable
 class FugacityConstraintProtocol(Protocol):
-    def active(self) -> Bool[Array, "..."]: ...
+    def active(self) -> Bool[Array, "..."]:
+        """True if the constraint is active, otherwise False"""
+        ...
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Log fugacity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
+        """
+        ...
 
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     evaluation_pressure: Optional[float]
+    """Pressure at which to evaluate the buffer, or None to use the total pressure"""
 
     @property
-    def log10_shift(self) -> Array: ...
+    def log10_shift(self) -> Array:
+        """Log10 shift relative to the buffer"""
+        ...
 
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log10 fugacity at the unshifted buffer
 
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log10 fugacity at the buffer
+        """
+        ...
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log10 fugacity including any shift
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log10 fugacity
+        """
+        ...
 
 
 @runtime_checkable
@@ -111,39 +173,83 @@ class SolubilityProtocol(Protocol):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array: ...
+    ) -> Array:
+        r"""Concentration in ppmw
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K. Defaults to ``None`` for not used.
+            pressure: Pressure in bar. Defaults to ``None`` for not used.
+            fO2: Oxygen fugacity in bar. Defaults to ``None`` for not used.
+
+        Returns:
+            Concentration in ppmw
+        """
+        ...
 
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> Array: ...
+    ) -> Array:
+        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            fO2: Oxygen fugacity in bar
+
+        Returns:
+            Concentration in ppmw
+        """
+        ...
 
 
 @runtime_checkable
 class ThermodynamicStateProtocol(Protocol):
     @property
-    def mass(self) -> Array: ...
+    def mass(self) -> Array:
+        """Total mass in kg"""
+        ...
 
     @property
-    def melt_fraction(self) -> Array: ...
+    def melt_fraction(self) -> Array:
+        """Melt mass fraction"""
+        ...
 
     @property
-    def melt_mass(self) -> Array: ...
+    def melt_mass(self) -> Array:
+        """Melt mass in kg"""
+        ...
 
     @property
-    def melt_moles(self) -> Array: ...
+    def melt_moles(self) -> Array:
+        """Moles of melt"""
+        ...
 
     @property
-    def molar_mass(self) -> Array: ...
+    def molar_mass(self) -> Array:
+        """Molar mass of the solvent in kg/mol"""
+        ...
 
     @property
-    def solid_mass(self) -> Array: ...
+    def solid_mass(self) -> Array:
+        """Solid mass in kg"""
+        ...
 
     @property
-    def solid_moles(self) -> Array: ...
+    def solid_moles(self) -> Array:
+        """Moles of solid"""
+        ...
 
     @property
-    def temperature(self) -> Array: ...
+    def temperature(self) -> Array:
+        """Temperature in K"""
+        ...
 
-    def get_pressure(self, gas_mass: Array) -> Array: ...
+    def get_pressure(self, gas_mass: Array) -> Array:
+        """Pressure in bar"""
+        ...
 
-    def asdict(self) -> dict: ...
+    def asdict(self) -> dict:
+        """Dictionary representation"""
+        ...

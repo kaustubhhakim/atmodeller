@@ -26,7 +26,6 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 
 logger: logging.Logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
@@ -425,7 +424,7 @@ class Output(eqx.Module):
             A nested dictionary of the output, suitable for quick inspection and comparison.
         """
         out: dict[str, Any] = self.asdict()
-        logger.info(f"Quick look output:\n{pformat(out)}")
+        logger.info("Quick look output:\n%s", pformat(out))
 
         return out
 
@@ -488,7 +487,7 @@ class Output(eqx.Module):
 
         # Get the indices where the successful_solves mask is False
         unsuccessful_indices: NpArray = np.where(
-            np.asarray(self.multi_attempt_solution.solver_success) == False  # noqa: E712
+            ~np.asarray(self.multi_attempt_solution.solver_success)
         )[0]
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -570,8 +569,8 @@ class Output(eqx.Module):
             _set_nested(result, path, match)
             all_match = all_match and match
 
-        logger.info(f"\nComparison result:\n{pformat(result)}")
-        logger.info(f"All matching keys agree within tolerance: {all_match}")
+        logger.info("\nComparison result:\n%s", pformat(result))
+        logger.info("All matching keys agree within tolerance: %s", all_match)
 
         return all_match
 

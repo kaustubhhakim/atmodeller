@@ -537,7 +537,9 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
+            "Creating %s: %s",
+            self.__class__.__name__,
+            tuple(str(species) for species in self.species),
         )
 
     @classmethod
@@ -678,7 +680,9 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         )
 
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
+            "Creating %s: %s",
+            self.__class__.__name__,
+            tuple(str(species) for species in self.species),
         )
 
     @classmethod
@@ -728,7 +732,9 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         )
 
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
+            "Creating %s: %s",
+            self.__class__.__name__,
+            tuple(str(species) for species in self.species),
         )
 
     @classmethod
@@ -770,7 +776,9 @@ class PurePhase(BasePhase[ChemicalSpecies]):
             )
 
         logger.info(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self.species)}"
+            "Creating %s: %s",
+            self.__class__.__name__,
+            tuple(str(species) for species in self.species),
         )
 
     @property

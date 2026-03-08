@@ -53,7 +53,8 @@ class BaseReactionBlock(eqx.Module):
     """Species collection"""
 
     @property
-    def number_reactions(self) -> int:  # pyright: ignore
+    @abstractmethod
+    def number_reactions(self) -> int:
         """Number of reactions in the reaction block"""
 
     @abstractmethod
@@ -78,9 +79,10 @@ class BaseReactionBlock(eqx.Module):
 
     def output_to_logger(self):
         """Outputs the reaction block to the logger"""
-        logger.debug(f"{self.__class__.__name__} matrix = %s", self.get_matrix())
+        logger.debug("%s matrix = %s", self.__class__.__name__, self.get_matrix())
         logger.info(
-            f"{self.__class__.__name__} network = %s",
+            "%s network = %s",
+            self.__class__.__name__,
             pprint.pformat(self.get_reaction_dictionary()),
         )
 

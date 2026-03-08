@@ -24,7 +24,6 @@ override = _override
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
-print("Atmodeller initialized with double precision (float64)")
 
 # For debugging
 # jax.config.update("jax_debug_nans", True)
@@ -48,6 +47,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 # https://docs.python.org/3/howto/logging.html#library-config
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+logger.debug("Initialized with double precision (float64)")
 
 
 def complex_formatter() -> logging.Formatter:

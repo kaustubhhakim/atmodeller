@@ -305,7 +305,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         self.number_solution = sum(species.number_solution for species in self)
 
         logger.debug(
-            f"Creating {self.__class__.__name__}: {tuple(str(species) for species in self)}"
+            "Creating %s: %s", self.__class__.__name__, tuple(str(species) for species in self)
         )
 
     @property
