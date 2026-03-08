@@ -951,9 +951,22 @@ class MassConstraintSet(eqx.Module):
             Log abundance by moles
         """
         log_abundance: Float[Array, "... elements"] = jnp.log(self.abundance_mol())
-        log_abundance = jnp.atleast_1d(log_abundance.squeeze())
+        # Below was a consideration for handling native batching with an objective function that
+        # accepts 2-D arrays of shape (batch, elements), but this would require every operation
+        # in the full call chain — solubility laws, real-gas EOS, phase activity calculations - to
+        # be consistently broadcast-compatible with an arbitrary leading batch dimension. This is
+        # fragile: a single stray ``.squeeze()``, ``reshape``, or assumption of 1-D input anywhere
+        # in the pipeline silently produces wrong shapes. Vmapping is safer and more robust because
+        # each function only ever sees scalar (0-D) or 1-D inputs and JAX mechanically handles the
+        # batch dimension, making shape errors impossible by construction.
 
-        return log_abundance
+        # Only squeeze the leading batch axis when unbatched (shape[0] == 1). A bare .squeeze()
+        # would also remove a trailing size-1 elements axis, collapsing (batch, 1) → (batch,) and
+        # causing incorrect broadcasting against (batch, 1) totals.
+        if log_abundance.ndim == 2 and log_abundance.shape[0] == 1:
+            return log_abundance.squeeze(axis=0)
+
+        return jnp.atleast_1d(log_abundance)
 
     def asdict(self) -> dict[str, Any]:
         """Gets an output dictionary
