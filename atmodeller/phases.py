@@ -28,7 +28,7 @@ aggregation state consistent with the JANAF/NASA convention:
 
 Quantities are accumulated in log-space throughout for numerical stability. Many methods
 accept an optional ``log_background_*`` argument representing a background component
-(e.g., the silicate melt mass) that contributes to phase totals but is not tracked as an
+(e.g., the silicate melt mass) that contributes to phase total but is not tracked as an
 explicit species in the solver.
 """
 

@@ -87,7 +87,7 @@ def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any
         A nested dict with the same sub-structure as the inputs but restricted to the summable
         keys, holding the element-wise sum across all phases.
     """
-    totals: dict[tuple, Any] = {}
+    total: dict[tuple, Any] = {}
 
     for phase_out in phase_outputs:
         for path, value in _flatten_dict(phase_out).items():
@@ -101,10 +101,10 @@ def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any
                 species_name = str(path[-1])
                 base = species_name.rsplit("_", 1)[0] if "_" in species_name else species_name
                 path = path[:-1] + (base,)
-            totals[path] = totals.get(path, 0.0) + addend
+            total[path] = total.get(path, 0.0) + addend
 
     out: dict[str, Any] = {}
-    for path, value in totals.items():
+    for path, value in total.items():
         _set_nested(out, path, value)
 
     # Logarithmic abundance of all elements relative to hydrogen (A(X) = log10(n_X/n_H) + 12)
@@ -157,7 +157,7 @@ def _expand_to_batch(nested_dict: dict[str, Any]) -> dict[str, Any]:
     return _map(nested_dict)
 
 
-_PHASE_KEYS: frozenset[str] = frozenset({"gas", "melt", "solid", "condensates", "totals"})
+_PHASE_KEYS: frozenset[str] = frozenset({"gas", "melt", "solid", "condensates", "total"})
 """Top-level keys in the :meth:`~atmodeller.output.Output.quick_look` output that represent
 physically meaningful phases or phase aggregations."""
 
@@ -183,7 +183,7 @@ def _group_by_all(
             "gas":   {"phase.mass_kg": ..., "species.activity.H2O_g": ...,
                       "phase.log10dIW_1_bar": ..., ...},
             "H2O_g": {"gas.activity": ..., "gas.mass_kg": ..., ...},
-            "H":     {"gas.mass_kg": ..., "totals.logarithmic_abundance": ..., ...},
+            "H":     {"gas.mass_kg": ..., "total.logarithmic_abundance": ..., ...},
             ...
         }
 
@@ -208,7 +208,7 @@ def _group_by_all(
             phase_key: str = ".".join(str(k) for k in path[1:])
             result.setdefault(phase_name, {})[phase_key] = value
 
-        if include_species and "species" in path and path[0] != "totals":
+        if include_species and "species" in path and path[0] != "total":
             name: str = str(path[-1])
             species_key: str = ".".join(str(k) for k in path[:-1] if k != "species")
             result.setdefault(name, {})[species_key] = value
@@ -391,10 +391,10 @@ class Output(eqx.Module):
 
         out["condensates"] = dict(zip(condensate_names, out_condensates))
 
-        totals: dict[str, Any] = _sum_phase_outputs(
+        total: dict[str, Any] = _sum_phase_outputs(
             [out["gas"], out["melt"], out["solid"], *out["condensates"].values()]
         )
-        out["totals"] = totals
+        out["total"] = total
 
         out["state"] = self.parameters.state.asdict()
 
