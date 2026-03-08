@@ -102,13 +102,19 @@ def make_batch_solver(parameters: Parameters) -> Callable:
 
 
 def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
-    """Gets a batch retry solver with a vmapped objective function.
+    """Gets a batch retry solver, constructing the vmapped batch solver and objective internally.
+
+    A convenience wrapper around :func:`~jaxmod.solvers.make_batch_retry_solver` that accepts
+    ``parameters`` directly, deriving the ``vmap`` axes and building both the batch solver and
+    vmapped objective function at construction time. Use this in preference to calling
+    :func:`~jaxmod.solvers.make_batch_retry_solver` directly when the vmap axes are not already
+    available.
 
     Args:
-        parameters: Parameters
+        parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable
+        Callable with the same interface as :func:`~jaxmod.solvers.batch_retry_solver`
     """
     batch_solver: Callable = make_batch_solver(parameters)
     objective_function_vmapped: Callable = eqx.filter_vmap(
@@ -121,23 +127,24 @@ def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
     return batch_retry_solver
 
 
-def make_tau_sweep_solver(base_parameters: Parameters) -> Callable:
+def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
     """Gets a solver function that performs a tau sweep for active stability systems.
 
-    Constructs and closes over a vmapped batch solver and a batch retry solver, both bound to the
-    ``vmap`` axes derived from ``base_parameters`` at construction time. The returned callable
-    first attempts a solve at ``TAU``; if all batch elements converge it returns immediately,
-    otherwise it runs a full log-spaced sweep from ``TAU_MAX`` down to ``TAU`` for every batch
-    element.
+    Closes over the provided ``batch_retry_solver``. The returned callable first attempts a solve
+    at ``TAU``; if all batch elements converge it returns immediately, otherwise it runs a
+    full log-spaced sweep from ``TAU_MAX`` down to ``TAU`` for every batch element.
 
     Args:
-        base_parameters: Parameters used to derive the vmapping axes at construction time
+        batch_retry_solver: Pre-built batch retry solver, e.g. from
+            :func:`make_batch_retry_solver_from_parameters`
 
     Returns:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
-    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(base_parameters)
     get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
+    varying_schedule: Float[Array, " tau"] = jnp.logspace(
+        jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
+    )
 
     def tau_sweep_solver(
         initial_guess: Float[Array, "... solution"], parameters: Parameters, key: PRNGKeyArray
@@ -224,12 +231,6 @@ def make_tau_sweep_solver(base_parameters: Parameters) -> Callable:
         first_converged: Bool[Array, "..."] = first_sol.attempts > 0
         # jax.debug.print("first_converged = {out}", out=first_converged)
 
-        # Build tau schedules for the scan
-        varying_schedule: Float[Array, " tau"] = jnp.logspace(
-            jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
-        )
-        # jax.debug.print("varying_schedule = {out}", out=varying_schedule)
-
         def run_scan(key_and_guess: tuple) -> MultiAttemptSolution:
             """Run the full tau sweep scan across all batch elements.
 
@@ -238,8 +239,7 @@ def make_tau_sweep_solver(base_parameters: Parameters) -> Callable:
             ``varying_schedule`` scan. The final solution, result, and the maximum step count
             and attempt index across all tau steps are returned.
             """
-            (key, solution) = key_and_guess
-            initial_carry_: tuple[Array, Array] = (key, solution)
+            initial_carry_: tuple[PRNGKeyArray, Float[Array, "... solution"]] = key_and_guess
             _, results_ = jax.lax.scan(solve_tau_step, initial_carry_, varying_schedule)
             solution_, result_value_, steps_, attempts_ = results_
             final_result_: optx.RESULTS = cast(
@@ -270,10 +270,11 @@ def make_tau_sweep_solver(base_parameters: Parameters) -> Callable:
 def make_solve_with_jit(parameters: Parameters) -> Callable:
     """General assembly function that constructs and returns the JIT-compiled solver.
 
-    Closes over a vmapped batch solver, a batch retry solver, and a tau sweep solver, all built
-    from ``parameters`` at construction time. The returned callable dispatches at runtime via
-    :func:`jax.lax.cond` based on whether any species have active stability — routing to the tau
-    sweep solver when stability species are present, or to the generic multistart solver otherwise.
+    Builds a :func:`make_batch_retry_solver_from_parameters` and a tau sweep solver from
+    ``parameters`` at construction time, sharing the same ``batch_retry_solver`` instance between
+    both paths. The returned callable dispatches at runtime via :func:`jax.lax.cond` based on
+    whether any species have active stability — routing to the tau sweep solver when stability
+    species are present, or to the generic multistart solver otherwise.
 
     Note:
         ``active_stability`` is currently not a traced JAX array; its size must be fixed at
@@ -290,7 +291,7 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         Callable that returns a :class:`MultiAttemptSolution` object
     """
     batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
-    tau_sweep_solver: Callable = make_tau_sweep_solver(parameters)
+    tau_sweep_solver: Callable = make_tau_sweep_solver(batch_retry_solver)
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
@@ -336,10 +337,7 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
             )
 
         multi_sol = lax.cond(
-            condition,
-            lambda _: solve_with_stability_multistart(key),  # True: Use stability solver
-            lambda _: solve_with_generic_multistart(key),  # False: Use generic solver
-            operand=None,  # Operand not used for decision making
+            condition, solve_with_stability_multistart, solve_with_generic_multistart, operand=key
         )
 
         return multi_sol
