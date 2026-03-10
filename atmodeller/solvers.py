@@ -341,37 +341,8 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     return jnp.concatenate((log_number_moles, log_stability))
 
 
-def solve_single(
-    initial_guess: Float[Array, "... n_solution"], parameters: Parameters
-) -> optx.Solution:
-    """Solves a single (unbatched) system via :func:`optimistix.root_find`.
-
-    Intended to be wrapped with :func:`equinox.filter_vmap` by :func:`make_batch_solver`
-    rather than called directly. All solver configuration is read from
-    ``parameters.solver_parameters``.
-
-    Args:
-        initial_guess: 1-D initial guess for the solution vector
-        parameters: Parameters providing the solver instance, step limit, and options
-
-    Returns:
-        :class:`~optimistix.Solution` object
-    """
-    sol: optx.Solution = optx.root_find(
-        objective_function,
-        parameters.solver_parameters.get_solver_instance(),
-        initial_guess,
-        args=parameters,
-        throw=parameters.solver_parameters.throw,
-        max_steps=parameters.solver_parameters.max_steps,
-        options=parameters.solver_parameters.get_options(parameters.species.number_species),
-    )
-
-    return sol
-
-
 def solve_single_with_auto_guess(
-    initial_guess_in: Float[Array, "... n_solution"], parameters: Parameters
+    initial_guess: Float[Array, "... n_solution"], parameters: Parameters
 ) -> optx.Solution:
     """Solves a single (unbatched) system via :func:`optimistix.root_find`, generating an initial
     guess automatically from ``parameters``.
@@ -381,16 +352,21 @@ def solve_single_with_auto_guess(
     ``parameters.solver_parameters``.
 
     Args:
-        initial_guess_in: Initial guess for the solution vector
+        initial_guess_in: Initial guess for the solution vector. If any element is ``NaN``,
+            the initial guess is replaced by the auto-generated guess from
+            :func:`_auto_initial_guess`.
         parameters: Parameters providing the solver instance, step limit, and options
 
     Returns:
         :class:`~optimistix.Solution` object
     """
-
-    jax.debug.print("Initial guess in = {out}", out=initial_guess_in)
-    initial_guess: Float[Array, " n_solution"] = _auto_initial_guess(parameters)
-    jax.debug.print("Auto-generated initial guess = {out}", out=initial_guess)
+    initial_guess = lax.cond(
+        jnp.any(jnp.isnan(initial_guess)),
+        lambda _: _auto_initial_guess(parameters),
+        lambda ig: ig,
+        operand=initial_guess,
+    )
+    # jax.debug.print("initial_guess = {out}", out=initial_guess)
 
     sol: optx.Solution = optx.root_find(
         objective_function,
@@ -401,33 +377,20 @@ def solve_single_with_auto_guess(
         max_steps=parameters.solver_parameters.max_steps,
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
-    jax.debug.print("Solution = {out}", out=sol.value)
+    # jax.debug.print("solution = {out}", out=sol.value)
 
-    n: int = parameters.species.number_species
-    solution_moles: Float[Array, " n_species"] = sol.value[:n]
-    solution_stability: Float[Array, " n_species"] = sol.value[n:]
-    rms_auto_moles: Float[Array, ""] = jnp.sqrt(
-        jnp.mean((initial_guess[:n] - solution_moles) ** 2)
-    )
-    rms_input_moles: Float[Array, ""] = jnp.sqrt(
-        jnp.mean((initial_guess_in[:n] - solution_moles) ** 2)
-    )
-    rms_auto_stability: Float[Array, ""] = jnp.sqrt(
-        jnp.mean((initial_guess[n:] - solution_stability) ** 2)
-    )
-    rms_input_stability: Float[Array, ""] = jnp.sqrt(
-        jnp.mean((initial_guess_in[n:] - solution_stability) ** 2)
-    )
-    jax.debug.print(
-        "RMS log_n:      auto={auto:.4f}  input={inp:.4f}",
-        auto=rms_auto_moles,
-        inp=rms_input_moles,
-    )
-    jax.debug.print(
-        "RMS log_stab:   auto={auto:.4f}  input={inp:.4f}",
-        auto=rms_auto_stability,
-        inp=rms_input_stability,
-    )
+    # n: int = parameters.species.number_species
+    # solution_moles: Float[Array, " n_species"] = sol.value[:n]
+    # solution_stability: Float[Array, " n_species"] = sol.value[n:]
+    # rms_moles: Float[Array, ""] = jnp.sqrt(jnp.mean((initial_guess[:n] - solution_moles) ** 2))
+    # rms_stability: Float[Array, ""] = jnp.sqrt(
+    #     jnp.mean((initial_guess[n:] - solution_stability) ** 2)
+    # )
+    # jax.debug.print(
+    #     "RMS log number of moles: = {moles:.4f}, log stability = {stability:.4f}",
+    #     moles=rms_moles,
+    #     stability=rms_stability,
+    # )
 
     return sol
 
