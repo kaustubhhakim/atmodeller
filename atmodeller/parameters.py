@@ -5,7 +5,7 @@
 """Parameters"""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Optional
 
 import equinox as eqx
@@ -24,6 +24,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -55,7 +56,74 @@ class Parameters(eqx.Module):
     """Batch size"""
 
     @classmethod
-    def create(
+    def from_phases(
+        cls,
+        gas_phase: GasPhase,
+        melt_phase: Optional[MeltPhase] = None,
+        solid_phase: Optional[SolidPhase] = None,
+        condensate_phases: Optional[Iterable[PurePhase]] = None,
+        state: Optional[ThermodynamicStateProtocol] = None,
+        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        solver_parameters: Optional[SolverParameters] = None,
+    ):
+        """Creates an instance from individual phase definitions.
+
+        Args:
+            gas_phase: Gas phase
+            melt_phase: Melt phase. Defaults to an empty melt phase if not provided.
+            solid_phase: Solid phase. Defaults to an empty solid phase if not provided.
+            condensate_phases: Pure condensate phases. Defaults to an empty tuple if not provided.
+            state: Thermodynamic state. Defaults to a new instance of ``Planet``.
+            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
+                a new instance of ``FugacityConstraints``.
+            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
+                a new instance of ``MassConstraints``.
+            solver_parameters: Solver parameters. Defaults to a new instance of
+                ``SolverParameters``.
+
+        Returns:
+            An instance
+        """
+        if melt_phase is None:
+            melt_phase = MeltPhase.empty()
+        if solid_phase is None:
+            solid_phase = SolidPhase.empty()
+        if condensate_phases is None:
+            condensate_phases = ()
+
+        reaction_system: ReactionSystem = ReactionSystem(
+            gas=gas_phase,
+            melt=melt_phase,
+            solid=solid_phase,
+            condensates=condensate_phases,
+        )
+        state_: ThermodynamicStateProtocol = Planet() if state is None else state
+        fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
+            reaction_system.species, fugacity_constraints
+        )
+        mass_constraints_: MassConstraintSet = MassConstraintSet.create(
+            reaction_system.species, mass_constraints
+        )
+
+        # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
+        # that should remain scalar)
+        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
+        solver_parameters_: SolverParameters = (
+            SolverParameters() if solver_parameters is None else solver_parameters
+        )
+
+        return cls(
+            reaction_system,
+            state_,
+            fugacity_constraints_,
+            mass_constraints_,
+            solver_parameters_,
+            batch_size,
+        )
+
+    @classmethod
+    def from_reaction_system(
         cls,
         reaction_system: ReactionSystem,
         state: Optional[ThermodynamicStateProtocol] = None,
@@ -63,7 +131,7 @@ class Parameters(eqx.Module):
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
     ):
-        """Creates an instance
+        """Creates an instance from a pre-built reaction system.
 
         Args:
             reaction_system: Full reaction network

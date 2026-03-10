@@ -106,7 +106,7 @@ class EquilibriumModel:
             state: Thermodynamic state
             log_number_moles: Log number of moles
         """
-        parameters: Parameters = Parameters.create(self.reaction_system, state)
+        parameters: Parameters = Parameters.from_reaction_system(self.reaction_system, state)
         solution_array: Array = broadcast_initial_solution(
             log_number_moles,
             None,
@@ -147,7 +147,7 @@ class EquilibriumModel:
             mass_constraints: Mass constraints. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
         """
-        parameters: Parameters = Parameters.create(
+        parameters: Parameters = Parameters.from_reaction_system(
             self.reaction_system,
             state,
             fugacity_constraints,

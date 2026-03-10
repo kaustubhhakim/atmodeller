@@ -396,7 +396,9 @@ class Output(eqx.Module):
         )
         out["total"] = total
 
-        out["state"] = self.parameters.state.asdict(out["gas"]["phase"]["mass_kg"])
+        # Convert array to JAX for typing consistency; the arrays will be converted to NumPy when
+        # the output is returned from this method
+        out["state"] = self.parameters.state.asdict(jnp.asarray(out["gas"]["phase"]["mass_kg"]))
 
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict())
