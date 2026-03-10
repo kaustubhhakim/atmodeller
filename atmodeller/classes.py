@@ -26,16 +26,13 @@ Typical usage:
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
-from typing import Optional
+from typing import Optional, cast
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from jaxmod.solvers import MultiAttemptSolution
-from jaxmod.type_aliases import NpFloat
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
-from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output
@@ -55,9 +52,9 @@ class EquilibriumModel:
 
     Args:
         gas: Gas phase
-        melt: Melt phase. Defaults to an empty melt phase if not provided.
-        solid: Solid phase. Defaults to an empty solid phase if not provided.
-        condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
+        melt: Melt phase. Defaults to ``None``.
+        solid: Solid phase. Defaults to ``None``.
+        condensates: Pure condensate phases. Defaults to ``None``.
     """
 
     reaction_system: ReactionSystem
@@ -73,13 +70,6 @@ class EquilibriumModel:
         solid: Optional[SolidPhase] = None,
         condensates: Optional[Iterable[PurePhase]] = None,
     ):
-        if melt is None:
-            melt = MeltPhase.empty()
-        if solid is None:
-            solid = SolidPhase.empty()
-        if condensates is None:
-            condensates = ()
-
         self.reaction_system = ReactionSystem(gas, melt=melt, solid=solid, condensates=condensates)
         self._solver: Optional[Callable] = None
         self._solver_shapes: Optional[tuple] = None
@@ -154,13 +144,6 @@ class EquilibriumModel:
             mass_constraints,
             solver_parameters,
         )
-        base_solution_array: Array = broadcast_initial_solution(
-            initial_log_number_moles,
-            initial_log_stability,
-            self.reaction_system.species.number_species,
-            parameters.batch_size,
-        )
-        # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
         key: PRNGKeyArray = jax.random.PRNGKey(0)
         key, subkey = jax.random.split(key)  # Split the key for use in this function
@@ -175,7 +158,13 @@ class EquilibriumModel:
             self._solver = make_solve_with_jit(parameters)
             self._solver_shapes = solver_shapes
 
-        multi_sol: MultiAttemptSolution = self._solver(base_solution_array, parameters, subkey)
+        # TODO: bit hacky, but trips the auto initial guess
+        trigger_autogen: Float[Array, "batch_size twice_species"] = jnp.broadcast_to(
+            jnp.nan, (parameters.batch_size, self.reaction_system.species.number_species * 2)
+        )
+        jax.debug.print("Trigger for auto initial guess = {out}", out=trigger_autogen)
+
+        multi_sol: MultiAttemptSolution = self._solver(trigger_autogen, parameters, subkey)
         # jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
         num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
@@ -205,8 +194,8 @@ class EquilibriumModel:
             )
 
         # Steps of 0 indicate no solution; replace with nan and report the max over solved models
-        steps_float: Array = jnp.where(
-            multi_sol.num_steps == 0, jnp.nan, multi_sol.num_steps.astype(jnp.float64)
+        steps_float: Array = cast(
+            Array, jnp.where(multi_sol.num_steps == 0, jnp.nan, multi_sol.num_steps.astype(float))
         )
         max_steps: Array = jnp.nanmax(steps_float)
         logger.info("Solver steps (max) = %s", int(max_steps.item()))
@@ -214,94 +203,3 @@ class EquilibriumModel:
         self._output = Output(parameters, multi_sol)
 
         return multi_sol.value
-
-
-# TODO: Make JAX compatible and can return a 1-D array
-def _broadcast_component(
-    component: Optional[ArrayLike], default_value: float, dim: int, batch_size: int, name: str
-) -> NpFloat:
-    """Broadcasts a scalar, 1D, or 2D input array to shape ``(batch_size, dim)``.
-
-    This function standardizes inputs that may be:
-        - ``None`` (in which case ``default_value`` is used),
-        - a scalar (promoted to a 1D array of length ``dim``),
-        - a 1D array of shape ``(dim,)`` (broadcast across the batch),
-        - or a 2D array of shape ``(batch_size``, dim)`` (used as-is).
-
-    Args:
-        component: The input data (or ``None``), representing either a scalar, 1D array, or 2D array
-        default_value: The default scalar value to use if ``component`` is ``None``
-        dim: The number of features or dimensions per batch item
-        batch_size: The number of batch items
-        name: Name of the component (used for error messages)
-
-    Returns:
-        A numpy array of shape ``(batch_size, dim)``, with values broadcast as needed
-
-    Raises:
-        ValueError: If the input array has an unexpected shape or inconsistent dimensions
-    """
-    if component is None:
-        base: NpFloat = np.full((dim,), default_value, dtype=np.float64)
-    else:
-        component = np.asarray(component, dtype=np.float64)
-        if component.ndim == 0:
-            base = np.full((dim,), component.item(), dtype=np.float64)
-        elif component.ndim == 1:
-            if component.shape[0] != dim:
-                raise ValueError(f"{name} should have shape ({dim},), got {component.shape}")
-            base = component
-        elif component.ndim == 2:
-            if component.shape[0] != batch_size or component.shape[1] != dim:
-                raise ValueError(
-                    f"{name} should have shape ({batch_size}, {dim}), got {component.shape}"
-                )
-            # Replace NaNs with default_value
-            component = np.where(np.isnan(component), default_value, component)
-            return component
-        else:
-            raise ValueError(
-                f"{name} must be a scalar, 1D, or 2D array, got shape {component.shape}"
-            )
-
-    # Promote 1D base to (batch_size, dim)
-    return np.broadcast_to(base[None, :], (batch_size, dim))
-
-
-def broadcast_initial_solution(
-    initial_log_number_moles: Optional[ArrayLike],
-    initial_log_stability: Optional[ArrayLike],
-    number_of_species: int,
-    batch_size: int,
-) -> Float[Array, "... solution"]:
-    """Creates and broadcasts the initial solution to shape ``(batch_size, solution)``
-
-    ``D = number_of_species + number_of_stability``, i.e. the total number of solution quantities
-
-    Args:
-        initial_log_number_moles: Initial log number moles or ``None``
-        initial_log_stability: Initial log stability or ``None``
-        number_of_species: Number of species
-        batch_size: Batch size
-
-    Returns:
-        Initial solution with shape ``(batch_size, solution)`` or a 1-D array
-    """
-    number_moles: NpFloat = _broadcast_component(
-        initial_log_number_moles,
-        INITIAL_LOG_NUMBER_MOLES,
-        number_of_species,
-        batch_size,
-        name="initial_log_number_moles",
-    )
-    stability: NpFloat = _broadcast_component(
-        initial_log_stability,
-        INITIAL_LOG_STABILITY,
-        number_of_species,
-        batch_size,
-        name="initial_log_stability",
-    )
-
-    solution = jnp.concatenate((number_moles, stability), axis=-1)
-
-    return solution
