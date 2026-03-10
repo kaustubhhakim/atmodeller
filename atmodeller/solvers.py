@@ -18,17 +18,124 @@ import jax.numpy as jnp
 import optimistix as optx
 from equinox._enum import EnumerationItem
 from jax import lax
+from jax.scipy.special import logsumexp
 from jaxmod.solvers import MultiAttemptSolution, make_batch_retry_solver
 from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
-from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
+from atmodeller.constants import (
+    INITIAL_LOG_NUMBER_MOLES,
+    INITIAL_LOG_STABILITY,
+    TAU,
+    TAU_MAX,
+    TAU_NUM,
+)
 from atmodeller.engine import objective_function
 from atmodeller.parameters import Parameters
 
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
 """Axis index for the solution array in the vmapped batch solver"""
+
+
+def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
+    """Generates an initial solution vector from element mass constraints and fugacity constraints.
+
+    **Step 1 — mass-constrained species:** For each constrained element, distributes its mole
+    budget equally across all species that contain it (weighted by total stoichiometric demand). A
+    species containing multiple constrained elements takes the minimum implied mole count across
+    those elements — a limiting-reagent estimate that avoids over-allocating the tightest element
+    budget. Species not covered by any constrained element fall back to
+    :const:`~atmodeller.constants.INITIAL_LOG_NUMBER_MOLES`.
+
+    **Step 2 — fugacity-constrained gas species:** The total moles of mass-constrained gas species
+    (from step 1) are used to estimate the gas volume via the ideal gas law. The pressure is
+    estimated from the gas mass of those species via :meth:`~atmodeller.interfaces.ThermodynamicStateProtocol.get_pressure`.
+    Fugacity-constrained gas species (e.g. O₂ set by a redox buffer) are then assigned mole
+    counts via :math:`n_i = f_i \\cdot n_\\mathrm{gas,known} / P`.
+
+    Log stability is initialised to :const:`~atmodeller.constants.INITIAL_LOG_STABILITY` for all
+    species.
+
+    Intended to be called inside a vmapped context (one batch element at a time).
+
+    Args:
+        parameters: Parameters for a single batch element
+
+    Returns:
+        Concatenated ``[log_number_moles, log_stability]`` of length ``2 * n_species``
+    """
+    # formula_matrix: (n_elements, n_species)  — integer stoichiometric counts
+    A: Float[Array, "n_elements n_species"] = jnp.asarray(
+        parameters.reaction_system.formula_matrix, dtype=float
+    )
+
+    # element moles: (n_elements,) — NaN where element is not mass-constrained.
+    # log_abundance() squeezes the leading batch dimension when unbatched, giving a 1-D array.
+    b: Float[Array, " n_elements"] = jnp.exp(parameters.mass_constraints.log_abundance())
+
+    # Total stoichiometric count per element summed across all species;
+    # guard against zero (element absent from all species) to avoid NaN.
+    total_stoich: Float[Array, " n_elements"] = jnp.sum(A, axis=1)
+    safe_total: Float[Array, " n_elements"] = jnp.where(total_stoich > 0, total_stoich, 1.0)
+
+    # For each constrained element e, each species s that contains it gets:
+    #   b_e / total_stoich_e  moles
+    # i.e. the element budget divided evenly by the total stoichiometric demand.
+    share: Float[Array, " n_elements"] = b / safe_total
+
+    # Broadcast to (n_elements, n_species); use +inf where a species does not contain the element
+    # or where the element is not mass-constrained (NaN in b).
+    constrained: Bool[Array, "n_elements n_species"] = (A > 0) & ~jnp.isnan(b[:, None])
+    implied: Float[Array, "n_elements n_species"] = jnp.where(constrained, share[:, None], jnp.inf)
+
+    # Limiting-reagent estimate: the tightest element budget for a species caps its mole count
+    n_estimate: Float[Array, " n_species"] = jnp.min(implied, axis=0)
+
+    # Fall back for species not covered by any constrained element
+    fallback: Float[Array, ""] = jnp.exp(jnp.array(INITIAL_LOG_NUMBER_MOLES, dtype=float))
+    n_estimate = jnp.where(jnp.isinf(n_estimate), fallback, n_estimate)
+
+    log_number_moles: Float[Array, " n_species"] = jnp.log(n_estimate)
+
+    # --- Incorporate fugacity constraints for gas species ---
+    # Identify which gas species have active fugacity constraints
+    gas_mask: Bool[Array, " n_species"] = jnp.asarray(parameters.reaction_system.gas_species_mask)
+    fug_active: Bool[Array, " n_species"] = parameters.fugacity_constraints.active()
+    gas_no_fug: Bool[Array, " n_species"] = gas_mask & ~fug_active
+
+    # Estimate total moles of mass-constrained gas species in log-space (numerically stable)
+    log_n_gas_known_total: Float[Array, ""] = logsumexp(
+        jnp.where(gas_no_fug, log_number_moles, -jnp.inf)
+    )
+
+    # Estimate pressure from the gas mass of mass-constrained species.  This handles both a
+    # fixed pressure (ThermodynamicState) and the mechanical-balance mode (ThinAtmospherePlanet).
+    molar_masses: Float[Array, " n_species"] = jnp.asarray(parameters.species.molar_masses)
+    mass_gas_known: Float[Array, ""] = jnp.sum(
+        jnp.where(gas_no_fug, jnp.exp(log_number_moles), 0.0) * molar_masses
+    )
+    pressure: Float[Array, ""] = parameters.state.get_pressure(mass_gas_known)
+
+    # Log fugacity for all species; NaN for unconstrained species (FixedFugacityConstraint)
+    temperature: Float[Array, ""] = parameters.state.temperature
+    log_fug: Float[Array, " n_species"] = parameters.fugacity_constraints.log_fugacity(
+        temperature, pressure
+    )
+
+    # Ideal gas: n_i = f_i * V / (RT), with V estimated from mass-constrained gas:
+    #   V = n_gas_known * RT / P  =>  n_i_fug = f_i * n_gas_known / P
+    # In log-space:
+    log_n_fug: Float[Array, " n_species"] = log_fug + log_n_gas_known_total - jnp.log(pressure)
+
+    # Update only the gas species that are fugacity-constrained
+    log_number_moles = jnp.where(gas_mask & fug_active, log_n_fug, log_number_moles)
+
+    log_stability: Float[Array, " n_species"] = jnp.full_like(
+        log_number_moles, INITIAL_LOG_STABILITY
+    )
+
+    return jnp.concatenate((log_number_moles, log_stability))
 
 
 def solve_single(
@@ -60,6 +167,52 @@ def solve_single(
     return sol
 
 
+def solve_single_with_auto_guess(
+    initial_guess_in: Float[Array, "... n_solution"], parameters: Parameters
+) -> optx.Solution:
+    """Solves a single (unbatched) system via :func:`optimistix.root_find`, generating an initial
+    guess automatically from ``parameters``.
+
+    Intended to be wrapped with :func:`equinox.filter_vmap` by :func:`make_batch_solver`
+    rather than called directly. All solver configuration is read from
+    ``parameters.solver_parameters``.
+
+    Args:
+        initial_guess_in: Initial guess for the solution vector
+        parameters: Parameters providing the solver instance, step limit, and options
+
+    Returns:
+        :class:`~optimistix.Solution` object
+    """
+
+    jax.debug.print("Initial guess in = {out}", out=initial_guess_in)
+    initial_guess: Float[Array, " n_solution"] = _auto_initial_guess(parameters)
+    jax.debug.print("Auto-generated initial guess = {out}", out=initial_guess)
+
+    sol: optx.Solution = optx.root_find(
+        objective_function,
+        parameters.solver_parameters.get_solver_instance(),
+        initial_guess,
+        args=parameters,
+        throw=parameters.solver_parameters.throw,
+        max_steps=parameters.solver_parameters.max_steps,
+        options=parameters.solver_parameters.get_options(parameters.species.number_species),
+    )
+    jax.debug.print("Solution = {out}", out=sol.value)
+
+    n: int = parameters.species.number_species
+    solution_moles: Float[Array, " n_species"] = sol.value[:n]
+    rms_auto: Float[Array, ""] = jnp.sqrt(jnp.mean((initial_guess[:n] - solution_moles) ** 2))
+    rms_input: Float[Array, ""] = jnp.sqrt(jnp.mean((initial_guess_in[:n] - solution_moles) ** 2))
+    jax.debug.print(
+        "RMS(auto_guess - solution) = {auto:.4f}  |  RMS(input_guess - solution) = {inp:.4f}",
+        auto=rms_auto,
+        inp=rms_input,
+    )
+
+    return sol
+
+
 def make_batch_solver(parameters: Parameters) -> Callable:
     """Gets a vmapped batch solver for independent systems.
 
@@ -76,7 +229,8 @@ def make_batch_solver(parameters: Parameters) -> Callable:
         :class:`MultiAttemptSolution` with ``attempts=1``
     """
     solver_function_vmapped: Callable = eqx.filter_vmap(
-        solve_single, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
+        solve_single_with_auto_guess,
+        in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters)),
     )
 
     def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
