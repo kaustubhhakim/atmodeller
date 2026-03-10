@@ -31,7 +31,7 @@ from atmodeller.constants import (
     TAU_MAX,
     TAU_NUM,
 )
-from atmodeller.engine import objective_function
+from atmodeller.engine import get_min_log_elemental_abundance_per_species, objective_function
 from atmodeller.parameters import Parameters
 
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
@@ -320,11 +320,21 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     log_n_fug: Float[Array, " n_species"] = log_fug + log_n_gas_known_total - jnp.log(pressure)
     log_number_moles = jnp.where(gas_mask & fug_active, log_n_fug, log_number_moles)
 
-    # Log stability: strongly stable (-60) for predicted-stable condensates so the solver starts
-    # near the correct stability regime; INITIAL_LOG_STABILITY for everything else.
+    # Log stability for predicted-stable condensates: initialise at the value that makes the
+    # stability residual (log_n + log_s - (min_log_abundance + log_tau)) exactly zero given the
+    # current mole estimate. This automatically scales with tau so no magic constant is needed.
+    # Falls back to INITIAL_LOG_STABILITY where the expression is non-finite (e.g. zero-budget
+    # elements, though those species should not be predicted stable anyway).
+    log_tau_val: Float[Array, ""] = jnp.log(parameters.solver_parameters.tau)
+    min_log_abundance_per_species: Float[Array, " n_species"] = (
+        get_min_log_elemental_abundance_per_species(parameters)
+    )
+    log_stability_stable: Float[Array, " n_species"] = (
+        min_log_abundance_per_species + log_tau_val - log_number_moles
+    )
     log_stability: Float[Array, " n_species"] = jnp.where(
-        condensate_stable_predicted,
-        jnp.full_like(log_number_moles, -60.0),
+        condensate_stable_predicted & jnp.isfinite(log_stability_stable),
+        log_stability_stable,
         jnp.full_like(log_number_moles, INITIAL_LOG_STABILITY),
     )
 
