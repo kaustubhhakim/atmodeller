@@ -267,7 +267,7 @@ def objective_function(
     log_tau: Float[Array, "..."] = jnp.log(parameters.solver_parameters.tau)
     # jax.debug.print("log_tau = {out}", out=log_tau)
     log_min_number_moles: Float[Array, "... species"] = (
-        get_min_log_elemental_abundance_per_species(parameters) + log_tau[..., None]
+        get_min_log_elemental_abundance_per_species(parameters) + log_tau
     )
     # jax.debug.print("log_min_number_moles = {out}", out=log_min_number_moles)
 
