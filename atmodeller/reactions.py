@@ -26,6 +26,7 @@ import logging
 import pprint
 from abc import abstractmethod
 from collections.abc import Callable, Iterable
+from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -373,9 +374,9 @@ class ReactionSystem(BaseReactionBlock):
 
     Args:
         gas: Gas phase
-        melt: Melt phase
-        solid: Solid phase
-        condensates: Iterable of pure phases (condensates)
+        melt: Melt phase. Defaults to an empty melt phase if not provided.
+        solid: Solid phase. Defaults to an empty solid phase if not provided.
+        condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
     """
 
     species: SpeciesCollection[SpeciesProtocol]
@@ -407,14 +408,21 @@ class ReactionSystem(BaseReactionBlock):
         self,
         gas: GasPhase,
         *,
-        melt: MeltPhase,
-        solid: SolidPhase,
-        condensates: Iterable[PurePhase],
+        melt: Optional[MeltPhase] = None,
+        solid: Optional[SolidPhase] = None,
+        condensates: Optional[Iterable[PurePhase]] = None,
     ):
         # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
         # preserved because reaction matrices, phase slices, and activity concatenation rely on
         # this ordering.
         phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
+
+        if melt is None:
+            melt = MeltPhase.empty()
+        if solid is None:
+            solid = SolidPhase.empty()
+        if condensates is None:
+            condensates = ()
 
         self.gas = gas
         self.melt = melt
