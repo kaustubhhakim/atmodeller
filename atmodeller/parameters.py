@@ -93,10 +93,10 @@ class Parameters(eqx.Module):
             condensate_phases = ()
 
         reaction_system: ReactionSystem = ReactionSystem(
-            gas=gas_phase,
-            melt=melt_phase,
-            solid=solid_phase,
-            condensates=condensate_phases,
+            gas_phase=gas_phase,
+            melt_phase=melt_phase,
+            solid_phase=solid_phase,
+            condensate_phases=condensate_phases,
         )
 
         return cls.from_reaction_system(

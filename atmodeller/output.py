@@ -299,22 +299,22 @@ class Output(eqx.Module):
 
     @property
     def condensates(self) -> tuple[PurePhase, ...]:
-        return self.parameters.reaction_system.condensates
+        return self.parameters.reaction_system.condensate_phases
 
     @property
     def gas(self) -> GasPhase:
         """Gas phase output"""
-        return self.parameters.reaction_system.gas
+        return self.parameters.reaction_system.gas_phase
 
     @property
     def melt(self) -> MeltPhase:
         """Melt phase output"""
-        return self.parameters.reaction_system.melt
+        return self.parameters.reaction_system.melt_phase
 
     @property
     def solid(self) -> SolidPhase:
         """Solid phase output"""
-        return self.parameters.reaction_system.solid
+        return self.parameters.reaction_system.solid_phase
 
     @property
     def solution(self) -> Float[Array, "... twice_species"]:
@@ -373,7 +373,7 @@ class Output(eqx.Module):
 
         # Condensates
         condensate_names: list[str] = [
-            condensate.name for condensate in self.parameters.reaction_system.condensates
+            condensate.name for condensate in self.parameters.reaction_system.condensate_phases
         ]
         condensate_slice: slice = self.parameters.reaction_system.condensates_slice
 

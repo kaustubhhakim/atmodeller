@@ -32,6 +32,7 @@ from atmodeller.constants import (
     TAU_NUM,
 )
 from atmodeller.engine import get_min_log_elemental_abundance_per_species, objective_function
+from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
@@ -338,7 +339,7 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
         jnp.full_like(log_number_moles, INITIAL_LOG_STABILITY),
     )
 
-    return jnp.concatenate((log_number_moles, log_stability))
+    return jnp.concatenate((log_number_moles, log_stability), axis=-1)
 
 
 def solve_single_with_auto_guess(

@@ -43,11 +43,10 @@ import numpy as np
 from jax import lax
 from jax.scipy.special import logsumexp
 from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.type_aliases import NpFloat, NpInt
+from jaxmod.type_aliases import NpFloat
 from jaxmod.utils import safe_exp, to_hashable
 from jaxtyping import Array, Float, Integer
 from molmass import Formula
-from scipy.special import logsumexp as sp_logsumexp
 
 from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
@@ -57,8 +56,7 @@ from atmodeller.containers import (
     TSpecies_co,
     get_formula_matrix,
 )
-from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
-from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
+from atmodeller.interfaces import SpeciesProtocol
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -164,11 +162,9 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         log_activity: Float[Array, "... n_species"] = self.vmap_log_activity(
             jnp.arange(self.species.number_species), temperature, pressure
         )
-
         log_mole_fraction: Float[Array, "... n_species"] = self.get_log_mole_fraction(
             log_number_moles, log_background_moles
         )
-
         log_activity: Float[Array, "... n_species"] = log_activity + log_mole_fraction
 
         return log_activity
@@ -389,9 +385,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
         log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
     ) -> dict[str, Any]:
-        r"""Outputs phase-level and species-level properties in a human-readable format.
-
-        Single conversion boundary: JAX -> NumPy -> dict
+        r"""Outputs phase-level and species-level properties.
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
@@ -410,12 +404,14 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
 
         # Elements
-        formula_matrix_: NpInt = get_formula_matrix(self.species)
-        log_stoich_matrix: NpFloat = np.where(
-            formula_matrix_ > 0, np.log(formula_matrix_), -np.inf
+        formula_matrix_: Float[Array, "n_elements n_species"] = jnp.asarray(
+            get_formula_matrix(self.species)
         )
-        log_terms: NpFloat = np.asarray(log_number_moles[..., None, :] + log_stoich_matrix)
-        log_elements: NpFloat = cast(NpFloat, sp_logsumexp(log_terms, axis=-1))
+        log_stoich_matrix: Float[Array, "n_element n_species"] = jnp.where(
+            formula_matrix_ > 0, jnp.log(formula_matrix_), -jnp.inf
+        )
+        log_terms: Array = log_number_moles[..., None, :] + log_stoich_matrix
+        log_elements: Array = cast(Array, logsumexp(log_terms, axis=-1))
 
         log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
             log_number_moles, log_background_mass
@@ -431,49 +427,49 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         out: dict[str, Any] = {
             "phase": {
-                "number_moles": np.squeeze(
-                    np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
+                "number_moles": jnp.squeeze(
+                    jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
                 ),
-                "mass_kg": np.squeeze(np.exp(log_phase_mass)),
-                "molar_mass_kg_per_mol": np.squeeze(
-                    np.exp(
+                "mass_kg": jnp.squeeze(jnp.exp(log_phase_mass)),
+                "molar_mass_kg_per_mol": jnp.squeeze(
+                    jnp.exp(
                         self.get_log_phase_molar_mass(
                             log_number_moles, log_background_molar_mass, log_background_mass
                         )
                     )
                 ),
-                "background_molar_mass_kg_per_mol": np.exp(log_background_molar_mass),
-                "background_mass_kg": np.exp(log_background_mass),
-                "species_to_phase_mass_ratio": np.squeeze(
-                    np.exp(log_species_mass_sum - log_phase_mass)
+                "background_molar_mass_kg_per_mol": jnp.exp(log_background_molar_mass),
+                "background_mass_kg": jnp.exp(log_background_mass),
+                "species_to_phase_mass_ratio": jnp.squeeze(
+                    jnp.exp(log_species_mass_sum - log_phase_mass)
                 ),
             },
             "elements": {
-                "number_moles": dict(zip(self.species.unique_elements, np.exp(log_elements).T)),
+                "number_moles": dict(zip(self.species.unique_elements, jnp.exp(log_elements).T)),
                 "mass_kg": dict(
                     zip(
                         self.species.unique_elements,
-                        np.exp(log_elements + np.log(self.species.element_molar_masses)).T,
+                        jnp.exp(log_elements + jnp.log(self.species.element_molar_masses)).T,
                     )
                 ),
             },
             "species": {
-                "number_moles": dict(zip(self.species_names, np.exp(log_number_moles).T)),
+                "number_moles": dict(zip(self.species_names, jnp.exp(log_number_moles).T)),
                 "mole_fraction": dict(
                     zip(
                         self.species_names,
-                        np.exp(
+                        jnp.exp(
                             self.get_log_mole_fraction(log_number_moles, log_background_moles)
                         ).T,
                     )
                 ),
                 "mass_kg": dict(
-                    zip(self.species_names, np.exp(self.get_log_mass(log_number_moles)).T)
+                    zip(self.species_names, jnp.exp(self.get_log_mass(log_number_moles)).T)
                 ),
                 "mass_fraction": dict(
                     zip(
                         self.species_names,
-                        np.exp(
+                        jnp.exp(
                             self.get_log_mass_fraction(log_number_moles, log_background_mass)
                         ).T,
                     )
@@ -481,7 +477,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
                 "activity": dict(
                     zip(
                         self.species_names,
-                        np.exp(
+                        jnp.exp(
                             self.get_log_activity_with_stability(
                                 log_number_moles,
                                 log_stability,
@@ -613,33 +609,34 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
         log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
 
-        out["phase"]["pressure_bar"] = np.squeeze(np.asarray(pressure))
+        out["phase"]["pressure_bar"] = jnp.squeeze(jnp.asarray(pressure))
         out["species"]["partial_pressure_bar"] = dict(
             zip(
                 self.species_names,
-                np.asarray(pressure)
-                * np.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
+                jnp.asarray(pressure)
+                * jnp.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
             )
         )
         number_moles: NpFloat = np.squeeze(
-            np.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
+            jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
         )
         out["phase"]["volume_m3"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
 
-        # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
-        if not jnp.isnan(self.O2_index):
-            log10_fugacity = np.log10(out["species"]["activity"]["O2_g"])
-            buffer: RedoxBufferProtocol = IronWustiteBuffer()
-            # Shift at 1 bar
-            buffer_at_one_bar = np.asarray(buffer.log10_fugacity(temperature, 1.0))
-            log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
-            # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
-            out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
-            # Shift at actual pressure
-            buffer_at_P = np.asarray(buffer.log10_fugacity(temperature, pressure))
-            log10_shift_at_P = log10_fugacity - buffer_at_P
-            # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
-            out["phase"]["log10dIW_P"] = log10_shift_at_P
+        # TODO: Need JAX compatible switch
+        # # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
+        # if not jnp.isnan(self.O2_index):
+        #     log10_fugacity = jnp.log10(out["species"]["activity"]["O2_g"])
+        #     buffer: RedoxBufferProtocol = IronWustiteBuffer()
+        #     # Shift at 1 bar
+        #     buffer_at_one_bar = jnp.asarray(buffer.log10_fugacity(temperature, 1.0))
+        #     log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
+        #     # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+        #     out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
+        #     # Shift at actual pressure
+        #     buffer_at_P = jnp.asarray(buffer.log10_fugacity(temperature, pressure))
+        #     log10_shift_at_P = log10_fugacity - buffer_at_P
+        #     # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+        #     out["phase"]["log10dIW_P"] = log10_shift_at_P
 
         return out
 

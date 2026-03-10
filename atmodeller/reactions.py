@@ -373,22 +373,22 @@ class ReactionSystem(BaseReactionBlock):
     constants and residuals in a JAX-compatible way.
 
     Args:
-        gas: Gas phase
-        melt: Melt phase. Defaults to an empty melt phase if not provided.
-        solid: Solid phase. Defaults to an empty solid phase if not provided.
-        condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
+        gas_phase: Gas phase
+        melt_phase: Melt phase. Defaults to an empty melt phase if not provided.
+        solid_phase: Solid phase. Defaults to an empty solid phase if not provided.
+        condensate_phases: Pure condensate phases. Defaults to an empty tuple if not provided.
     """
 
     species: SpeciesCollection[SpeciesProtocol]
     """All species"""
-    gas: GasPhase
-    """Gas"""
-    melt: MeltPhase
-    """Melt"""
-    solid: SolidPhase
-    """Solid"""
-    condensates: tuple[PurePhase, ...]
-    """Pure condensates"""
+    gas_phase: GasPhase
+    """Gas phase"""
+    melt_phase: MeltPhase
+    """Melt phase"""
+    solid_phase: SolidPhase
+    """Solid phase"""
+    condensate_phases: tuple[PurePhase, ...]
+    """Pure condensate phases"""
     formula_matrix: NpInt
     """Formula matrix of the full species collection"""
     reaction: ReactionNetwork
@@ -406,35 +406,38 @@ class ReactionSystem(BaseReactionBlock):
 
     def __init__(
         self,
-        gas: GasPhase,
+        gas_phase: GasPhase,
         *,
-        melt: Optional[MeltPhase] = None,
-        solid: Optional[SolidPhase] = None,
-        condensates: Optional[Iterable[PurePhase]] = None,
+        melt_phase: Optional[MeltPhase] = None,
+        solid_phase: Optional[SolidPhase] = None,
+        condensate_phases: Optional[Iterable[PurePhase]] = None,
     ):
         # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
         # preserved because reaction matrices, phase slices, and activity concatenation rely on
         # this ordering.
         phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
 
-        if melt is None:
-            melt = MeltPhase.empty()
-        if solid is None:
-            solid = SolidPhase.empty()
-        if condensates is None:
-            condensates = ()
+        if melt_phase is None:
+            melt_phase = MeltPhase.empty()
+        if solid_phase is None:
+            solid_phase = SolidPhase.empty()
+        if condensate_phases is None:
+            condensate_phases = ()
 
-        self.gas = gas
-        self.melt = melt
-        self.solid = solid
-        self.condensates = tuple(condensates)
+        self.gas_phase = gas_phase
+        self.melt_phase = melt_phase
+        self.solid_phase = solid_phase
+        self.condensate_phases = tuple(condensate_phases)
 
         # Flatten all species. Index 0 because pure phases can only have one species.
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
-            condensate.species[0] for condensate in self.condensates
+            condensate.species[0] for condensate in self.condensate_phases
         )
         all_species: tuple[SpeciesProtocol, ...] = (
-            gas.species.species + melt.species.species + solid.species.species + condensate_species
+            self.gas_phase.species.species
+            + self.melt_phase.species.species
+            + self.solid_phase.species.species
+            + condensate_species
         )
         self.species = SpeciesCollection(all_species)
 
@@ -443,7 +446,7 @@ class ReactionSystem(BaseReactionBlock):
         self._phase_indices = {}
 
         for phase_name, phase_collection in zip(
-            phase_order, [gas, melt, solid, condensate_species]
+            phase_order, [self.gas_phase, self.melt_phase, self.solid_phase, condensate_species]
         ):
             n: int = len(phase_collection)
             self._phase_indices[phase_name] = PhaseIndex(start, start + n)
@@ -459,8 +462,8 @@ class ReactionSystem(BaseReactionBlock):
         self.stability_matrix = np.vstack([block.get_stability_matrix() for block in self.blocks])
 
         # Could be an integer (but represented as a float) or np.nan
-        self._O2_index = np.nan_to_num(gas.O2_index, nan=0).astype(int)
-        self._has_O2 = ~np.isnan(gas.O2_index)
+        self._O2_index = np.nan_to_num(self.gas_phase.O2_index, nan=0).astype(int)
+        self._has_O2 = ~np.isnan(self.gas_phase.O2_index)
 
         self.output_to_logger()
 
@@ -530,13 +533,13 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Log activity of each species
         """
-        log_activity_gas: Float[Array, "... n_gas_species"] = self.gas.get_log_activity(
+        log_activity_gas: Float[Array, "... n_gas_species"] = self.gas_phase.get_log_activity(
             log_number_moles[..., self.gas_slice], temperature, pressure
         )
         # jax.debug.print("log_activity_gas = {out}", out=log_activity_gas)
 
         log_background_melt_moles = log_background_melt_mass - log_background_molar_mass
-        log_activity_melt: Float[Array, "... n_melt_species"] = self.melt.get_log_activity(
+        log_activity_melt: Float[Array, "... n_melt_species"] = self.melt_phase.get_log_activity(
             log_number_moles[..., self.melt_slice],
             temperature,
             pressure,
@@ -544,13 +547,15 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
 
-        log_activity_solid: Float[Array, "... n_solid_species"] = self.solid.get_log_mass_fraction(
-            log_number_moles[..., self.solid_slice], log_background_solid_mass
+        log_activity_solid: Float[Array, "... n_solid_species"] = (
+            self.solid_phase.get_log_mass_fraction(
+                log_number_moles[..., self.solid_slice], log_background_solid_mass
+            )
         )
         # jax.debug.print("activity_solid = {out}", out=jnp.exp(log_activity_solid))
 
         log_activity_condensates: Float[Array, "... n_condensates"] = jnp.zeros(
-            (log_activity_solid.shape[:-1] + (len(self.condensates),))
+            (log_activity_solid.shape[:-1] + (len(self.condensate_phases),))
         )
         # jax.debug.print("activity_condensates = {out}", out=jnp.exp(log_activity_condensates))
 
@@ -612,7 +617,7 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("fO2 = {out}", out=fO2)
 
-        log_solvent_molar_mass: Float[Array, "..."] = self.melt.get_log_phase_molar_mass(
+        log_solvent_molar_mass: Float[Array, "..."] = self.melt_phase.get_log_phase_molar_mass(
             log_number_moles[..., self.melt_slice],
             log_background_molar_mass,
             log_background_melt_mass,
