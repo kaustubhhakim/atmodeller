@@ -1022,8 +1022,8 @@ class SolverParameters(RootFindParameters):
 
     max_starts: int = 10
     """Maximum number of starts"""
-    retry_perturbation: float = 30.0
-    """Perturbation for retry"""
+    retry_perturbation: float = 20.0
+    """Perturbation for retry, in this case for the log number of moles of a species"""
     tau: Array = eqx.field(converter=as_j64, default=TAU)
     """Tau factor for species stability"""
 
