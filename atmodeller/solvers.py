@@ -38,6 +38,52 @@ LOG_NUMBER_MOLES_VMAP_AXES: int = 0
 """Axis index for the solution array in the vmapped batch solver"""
 
 
+def _limiting_reagent(
+    formula_matrix: Float[Array, "n_elements n_species"],
+    element_abundance: Float[Array, " n_elements"],
+    mask: Bool[Array, " n_species"],
+    *,
+    require_positive_budget: bool = False,
+) -> Float[Array, " n_species"]:
+    """Limiting-reagent mole estimate for species in ``mask``.
+
+    For each species in ``mask``, the mole count is estimated by asking: given the available
+    element budget, how many moles of this species could be formed if that element were shared
+    equally among all masked species that contain it? The tightest such constraint across all
+    elements that appear in the species formula determines the estimate. Returns ``inf`` for
+    species not in ``mask`` or not constrained by any available element.
+
+    Args:
+        formula_matrix: Formula matrix
+        element_abundance: Element abundance. ``NaN`` for unconstrained elements.
+        mask: Boolean mask selecting the species to allocate budget to.
+        require_positive_budget: When ``True``, elements with ``element_abundance[e] = 0`` are
+            excluded from constraining species. Use ``True`` when ``element_abundance`` is a
+            *remaining* budget after prior allocation (zeros mean exhausted, not genuinely zero
+            mass); use ``False`` (default) when ``element_abundance`` is the original element
+            budget (zero is a real constraint).
+
+    Returns:
+        Per-species mole estimates; ``inf`` where unconstrained.
+    """
+    stoich_total: Float[Array, " n_elements"] = jnp.sum(formula_matrix * mask, axis=1)
+    safe_stoich: Float[Array, " n_elements"] = jnp.where(stoich_total > 0, stoich_total, 1.0)
+    share: Float[Array, " n_elements"] = element_abundance / safe_stoich
+    budget_ok: Bool[Array, " n_elements"] = ~jnp.isnan(element_abundance)
+
+    if require_positive_budget:
+        budget_ok = budget_ok & (element_abundance > 0)
+
+    is_constrained: Bool[Array, "n_elements n_species"] = (
+        (formula_matrix > 0) & mask & budget_ok[:, None]
+    )
+    implied: Float[Array, "n_elements n_species"] = jnp.where(
+        is_constrained, share[:, None], jnp.inf
+    )
+
+    return jnp.min(implied, axis=0)
+
+
 def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     """Generates an initial solution vector from element mass constraints and fugacity constraints.
 
@@ -46,7 +92,7 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     :func:`jax.lax.while_loop` until the set stops changing. Each iteration:
 
     1. Allocates element budget to currently-predicted-stable condensates (limiting-reagent).
-    2. Distributes the *remaining* budget to non-condensate species (gas/melt/solid).
+    2. Distributes the *remaining* budget to non-condensate species.
     3. Computes ideal-gas activities from those non-condensate mole estimates.
     4. Evaluates ``stability_matrix[r,c] * (log_Kp[r] - log_Q[r]) > 0`` for each reaction and
        condensate species ``c``; a positive signal means the reaction is driven toward condensate
@@ -54,26 +100,25 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     5. Takes the monotone union of the new predictions with the current set (condensates already
        predicted stable are never retracted).
 
-    This catches cascading condensation (e.g. H₂O_l consuming O budget then revealing C_s
-    stability) that a single-pass screen misses. Because the returned mask is the monotone union
-    of the input and new predictions (condensates are never retracted), the set can grow by at
-    least one entry per iteration and convergence to a fixed point is guaranteed in at most
-    ``n_condensates`` iterations.
+    This catches cascading condensation that a single-pass screen misses. Because the returned mask
+    is the monotone union of the input and new predictions (condensates are never retracted), the
+    set can grow by at least one entry per iteration and convergence to a fixed point is guaranteed
+    in at most ``n_condensates`` iterations.
 
     **Step 1 — predicted-stable condensates (first priority):** Only condensates identified as
     supersaturated in the pre-screen are allocated element budget. This keeps more element budget
     available for the gas-phase species.
 
-    **Step 2 — gas/melt/solid species:** Each element's *remaining* budget (after condensate
-    consumption) is distributed across non-condensate species by the same limiting-reagent logic.
-    Species whose element budget is fully consumed by condensates fall back to
+    **Step 2 — gas species:** Each element's *remaining* budget (after condensate consumption) is
+    distributed across non-condensate species by the same limiting-reagent logic. Species whose
+    element budget is fully consumed by condensates fall back to
     :const:`~atmodeller.constants.INITIAL_LOG_NUMBER_MOLES`.
 
     **Step 3 — fugacity-constrained gas species:** The total moles of mass-constrained gas species
     (from step 2) are used to estimate the gas volume via the ideal gas law. The pressure is
     estimated from the gas mass of those species via
     :meth:`~atmodeller.interfaces.ThermodynamicStateProtocol.get_pressure`. Fugacity-constrained
-    gas species (e.g. O₂ set by a redox buffer) are then assigned mole counts via
+    gas species (e.g. O2 set by a redox buffer) are then assigned mole counts via
     :math:`n_i = f_i \\cdot n_\\mathrm{gas,known} / P`.
 
     Log stability is initialised to a strongly negative value (``-60``) for predicted-stable
@@ -87,18 +132,18 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     Returns:
         Concatenated ``[log_number_moles, log_stability]`` of length ``2 * n_species``
     """
-    # formula_matrix: (n_elements, n_species)  — integer stoichiometric counts
-    A: Float[Array, "n_elements n_species"] = jnp.asarray(
+    formula_matrix: Float[Array, "n_elements n_species"] = jnp.asarray(
         parameters.reaction_system.formula_matrix, dtype=float
     )
-    jax.debug.print("formula_matrix = {out}", out=A)
+    # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
 
-    # element moles: (n_elements,) — NaN where element is not mass-constrained.
+    # element abundance in moles: (n_elements,) — NaN where element is not mass-constrained.
     # log_abundance() squeezes the leading batch dimension when unbatched, giving a 1-D array.
-    b: Float[Array, " n_elements"] = jnp.exp(parameters.mass_constraints.log_abundance())
-    jax.debug.print("element_moles = {out}", out=b)
+    element_abundance: Float[Array, " n_elements"] = jnp.exp(
+        parameters.mass_constraints.log_abundance()
+    )
+    # jax.debug.print("element_abundance = {out}", out=element_abundance)
 
-    # Species that are condensates
     condensate_mask: Bool[Array, " n_species"] = jnp.asarray(
         parameters.reaction_system.condensates_species_mask
     )
@@ -111,36 +156,24 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
 
     # Pre-compute reaction matrices and log Kp (composition-independent).
     # The order of the species is gas, melt, solid, condensates (pure phases)
-    # So for the test_graphite_water_stable test, the species are ordered as:
-    # H2O(g), H2(g), O2(g), CO(g), CO2(g), CH4(g), H2O(l), C(s) - these are the columns
-    reaction_matrix: Float[Array, "n_rxn n_species"] = jnp.asarray(
+    reaction_matrix: Float[Array, "n_reactions n_species"] = jnp.asarray(
         parameters.reaction_system.reaction.reaction_matrix_full
     )
-    jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
-    # If we are solving for the species stability, which is common for condensates (either pure
-    # phase or in the melt or solid phase), this mask indicates where the stability criteria (also
-    # part of the solution array) enters the calculation
-    stability_matrix_rxn: Float[Array, "n_rxn n_species"] = jnp.asarray(
+    # jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
+
+    stability_matrix: Float[Array, "n_reactions n_species"] = jnp.asarray(
         parameters.reaction_system.reaction.reaction_stability_matrix_full
     )
-    jax.debug.print("stability_matrix_rxn = {out}", out=stability_matrix_rxn)
+    # jax.debug.print("stability_matrix = {out}", out=stability_matrix)
 
-    # log Kp of the reactions. The number of entries is the same as the number of reactions (i.e.,
-    # number of rows of the reaction matrix)
-    log_Kp: Float[Array, " n_rxn"] = parameters.reaction_system.reaction.get_log_Kp(temperature)
-    jax.debug.print("log_Kp = {out}", out=log_Kp)
+    log_Kp: Float[Array, " n_reactions"] = parameters.reaction_system.reaction.get_log_Kp(
+        temperature
+    )
+    # jax.debug.print("log_Kp = {out}", out=log_Kp)
 
     # Species that are not condensates
     other_mask: Bool[Array, " n_species"] = ~condensate_mask
-    jax.debug.print("other_mask = {out}", out=other_mask)
-    # Total element stoichiometry of non-condensate species
-    other_stoich_total: Float[Array, " n_elements"] = jnp.sum(A * other_mask, axis=1)
-    jax.debug.print("other_stoich_total = {out}", out=other_stoich_total)
-    # Guard to avoid divide by zero
-    safe_other_stoich: Float[Array, " n_elements"] = jnp.where(
-        other_stoich_total > 0, other_stoich_total, 1.0
-    )
-    jax.debug.print("safe_other_stoich = {out}", out=safe_other_stoich)
+    # jax.debug.print("other_mask = {out}", out=other_mask)
 
     def _one_stability_pass(
         condensate_stable_known: Bool[Array, " n_species"],
@@ -148,7 +181,7 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
         """One stability-prediction pass.
 
         Given a set of already-known-stable condensates, allocates element budget to them first,
-        distributes the remainder to gas/melt/solid, computes ideal-gas activities, evaluates
+        distributes the remainder to gas species, computes ideal-gas activities, evaluates
         the reaction K vs Q signal, and returns the monotone union of the new predictions with
         the input mask.
 
@@ -156,76 +189,36 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
             condensate_stable_known: Boolean mask of condensates predicted stable so far.
 
         Returns:
-            Updated mask — superset of ``condensate_stable_known``.
+            Updated mask - superset of ``condensate_stable_known``.
         """
         # Allocate element budget to known-stable condensates (limiting-reagent).
-        known_stoich_total: Float[Array, " n_elements"] = jnp.sum(
-            A * condensate_stable_known, axis=1
+        n_known: Float[Array, " n_species"] = _limiting_reagent(
+            formula_matrix, element_abundance, condensate_stable_known
         )
-        jax.debug.print("known_stoich_total = {out}", out=known_stoich_total)
-        # Guard to avoid divide by zero
-        safe_known_stoich: Float[Array, " n_elements"] = jnp.where(
-            known_stoich_total > 0, known_stoich_total, 1.0
-        )
-        jax.debug.print("safe_known_stoich = {out}", out=safe_known_stoich)
-
-        # For each element e, how many moles of each known-stable condensate species s would
-        # be implied if element e were the sole limiting reagent: n_s = b[e] / A[e,s].
-        known_share: Float[Array, " n_elements"] = b / safe_known_stoich
-        jax.debug.print("known_share = {out}", out=known_share)
-        # Only consider (e, s) pairs where species s actually contains element e, s is a
-        # known-stable condensate, and element e is mass-constrained (not NaN).
-        is_known_constrained: Bool[Array, "n_elements n_species"] = (
-            (A > 0) & condensate_stable_known & ~jnp.isnan(b[:, None])
-        )
-        jax.debug.print("is_known_constrained = {out}", out=is_known_constrained)
-        # Fill unconstrained (e, s) pairs with inf so they don't win the min below.
-        known_implied: Float[Array, "n_elements n_species"] = jnp.where(
-            is_known_constrained, known_share[:, None], jnp.inf
-        )
-        jax.debug.print("known_implied = {out}", out=known_implied)
-
-        n_known: Float[Array, " n_species"] = jnp.min(known_implied, axis=0)
-        jax.debug.print("n_known = {out}", out=n_known)
+        # Zero out unconstrained condensates so they don't consume element budget.
         n_known_applied: Float[Array, " n_species"] = jnp.where(jnp.isinf(n_known), 0.0, n_known)
-        jax.debug.print("n_known_applied = {out}", out=n_known_applied)
+        # jax.debug.print("n_known_applied = {out}", out=n_known_applied)
 
         # element_used[e] = sum_s( A[e,s] * n_known_applied[s] ) for known-stable condensates only:
         # the total moles of element e consumed by the allocated condensate budget.
         element_used: Float[Array, " n_elements"] = jnp.einsum(
-            "es,s->e", A * condensate_stable_known, n_known_applied
+            "es,s->e", formula_matrix * condensate_stable_known, n_known_applied
         )
-        jax.debug.print("element_used = {out}", out=element_used)
-        # This is the amount of remaining element budget after known-stable condensate allocation;
-        # it will be distributed to all non-condensate species in the next step.
-        remaining_b: Float[Array, " n_elements"] = jnp.maximum(b - element_used, 0.0)
-        jax.debug.print("remaining_b = {out}", out=remaining_b)
+        # jax.debug.print("element_used = {out}", out=element_used)
+        # Remaining element budget after known-stable condensate allocation.
+        remaining_b: Float[Array, " n_elements"] = jnp.maximum(
+            element_abundance - element_used, 0.0
+        )
+        # jax.debug.print("remaining_b = {out}", out=remaining_b)
 
-        # Distribute remaining budget to non-condensate species.
-        has_remaining: Bool[Array, " n_elements"] = (remaining_b > 0) & ~jnp.isnan(remaining_b)
-        jax.debug.print("has_remaining = {out}", out=has_remaining)
-
-        # Same limiting-reagent logic as above, but applied to non-condensate species using
-        # the remaining element budget. other_share[e] = remaining_b[e] / safe_other_stoich[e].
-        other_share: Float[Array, " n_elements"] = remaining_b / safe_other_stoich
-        jax.debug.print("other_share = {out}", out=other_share)
-        # Only consider (e, s) pairs where species s is a non-condensate, contains element e,
-        # and element e still has remaining budget after condensate allocation.
-        is_other_constrained: Bool[Array, "n_elements n_species"] = (
-            (A > 0) & other_mask & has_remaining[:, None]
+        # Distribute remaining budget to non-condensate species (limiting-reagent).
+        # Exhausted elements (remaining_b = 0) are excluded; species unconstrained by any
+        # available element fall back to INITIAL_LOG_NUMBER_MOLES.
+        n_other: Float[Array, " n_species"] = _limiting_reagent(
+            formula_matrix, remaining_b, other_mask, require_positive_budget=True
         )
-        jax.debug.print("is_other_constrained = {out}", out=is_other_constrained)
-        # Fill unconstrained pairs with inf so they don't win the min below.
-        other_implied: Float[Array, "n_elements n_species"] = jnp.where(
-            is_other_constrained, other_share[:, None], jnp.inf
-        )
-        jax.debug.print("other_implied = {out}", out=other_implied)
-        # Limiting-reagent: the tightest element constraint sets the mole count for each species.
-        n_other: Float[Array, " n_species"] = jnp.min(other_implied, axis=0)
-        jax.debug.print("n_other = {out}", out=n_other)
-        # Species unconstrained by any element (all-inf column) fall back to INITIAL_LOG_NUMBER_MOLES.
         n_gas_est: Float[Array, " n_species"] = jnp.where(jnp.isinf(n_other), fallback, n_other)
-        jax.debug.print("n_gas_est = {out}", out=n_gas_est)
+        # jax.debug.print("n_gas_est = {out}", out=n_gas_est)
 
         # Ideal-gas log activity for gas species: log(x_i * P) = log(n_i/n_total) + log(P).
         # Non-gas species (melt, solid, pure-phase condensates) are assigned log_activity = 0,
@@ -242,29 +235,20 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
             jnp.log(jnp.where(gas_mask, n_gas_est, 1.0))
             - jnp.log(safe_n_gas_total)
             + jnp.log(jnp.where(pressure > 0, pressure, 1.0)),
-            0.0,  # NOTE: Approximation. Species in phases will have non-ideal activities that we
-            # are ignoring here, but this is just a heuristic pre-screen.
+            0.0,
         )
 
         # Condensate c is supersaturated when sm[r,c] * (log_Kp[r] - log_Q[r]) > 0.
         # NaN entries in log_activity propagate to log_Q --> stability_signal NaN --> not > 0
         # (safe).
         log_Q: Float[Array, " n_rxn"] = jnp.einsum("rs,s->r", reaction_matrix, log_activity)
-        stability_signal: Float[Array, "n_rxn n_species"] = stability_matrix_rxn * (
+        stability_signal: Float[Array, "n_rxn n_species"] = stability_matrix * (
             log_Kp[:, None] - log_Q[:, None]
-        )
-        jax.debug.print(
-            "  known={k} log_act={la} log_Kp={kp} log_Q={lq} stab_col={sc}",
-            k=condensate_stable_known,
-            la=log_activity,
-            kp=log_Kp,
-            lq=log_Q,
-            sc=stability_signal[:, -1],
         )
         new_predictions: Bool[Array, " n_species"] = (
             jnp.any(stability_signal > 0, axis=0) & condensate_mask
         )
-        jax.debug.print("new_predictions = {out}", out=new_predictions)
+        # jax.debug.print("new_predictions = {out}", out=new_predictions)
 
         # Monotone union: condensates are never retracted once predicted stable. This ensures the
         # set grows by at least one entry per iteration, guaranteeing fixed-point convergence
@@ -278,9 +262,9 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
     _MAX_STABILITY_ITERS: int = 10
 
     init_stable: Bool[Array, " n_species"] = jnp.zeros_like(condensate_mask)
-    jax.debug.print("init_stable = {out}", out=init_stable)
+    # jax.debug.print("init_stable = {out}", out=init_stable)
     first_stable: Bool[Array, " n_species"] = _one_stability_pass(init_stable)
-    jax.debug.print("first_stable = {out}", out=first_stable)
+    # jax.debug.print("first_stable = {out}", out=first_stable)
 
     def _cond_fn(carry: tuple) -> Bool[Array, ""]:
         prev, curr, i = carry
@@ -294,41 +278,24 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
         _cond_fn, _body_fn, (init_stable, first_stable, jnp.array(0))
     )
 
-    # --- Step 1: allocate element budget to predicted-stable condensates ---
-    condensate_stoich_total: Float[Array, " n_elements"] = jnp.sum(
-        A * condensate_stable_predicted, axis=1
+    # Step 1: allocate element budget to predicted-stable condensates
+    n_condensate: Float[Array, " n_species"] = _limiting_reagent(
+        formula_matrix, element_abundance, condensate_stable_predicted
     )
-    safe_condensate_stoich: Float[Array, " n_elements"] = jnp.where(
-        condensate_stoich_total > 0, condensate_stoich_total, 1.0
-    )
-    condensate_share: Float[Array, " n_elements"] = b / safe_condensate_stoich
-    is_condensate_constrained: Bool[Array, "n_elements n_species"] = (
-        (A > 0) & condensate_stable_predicted & ~jnp.isnan(b[:, None])
-    )
-    condensate_implied: Float[Array, "n_elements n_species"] = jnp.where(
-        is_condensate_constrained, condensate_share[:, None], jnp.inf
-    )
-    n_condensate: Float[Array, " n_species"] = jnp.min(condensate_implied, axis=0)
 
-    # Remaining element budget after stable-condensate allocation.
+    # Remaining element budget after stable-condensate allocation
     n_condensate_applied: Float[Array, " n_species"] = jnp.where(
         jnp.isinf(n_condensate), 0.0, n_condensate
     )
     element_used: Float[Array, " n_elements"] = jnp.einsum(
-        "es,s->e", A * condensate_stable_predicted, n_condensate_applied
+        "es,s->e", formula_matrix * condensate_stable_predicted, n_condensate_applied
     )
-    remaining_b: Float[Array, " n_elements"] = jnp.maximum(b - element_used, 0.0)
+    remaining_b: Float[Array, " n_elements"] = jnp.maximum(element_abundance - element_used, 0.0)
 
-    # --- Step 2: allocate remaining budget to non-condensate species ---
-    other_share: Float[Array, " n_elements"] = remaining_b / safe_other_stoich
-    has_remaining: Bool[Array, " n_elements"] = (remaining_b > 0) & ~jnp.isnan(remaining_b)
-    is_other_constrained: Bool[Array, "n_elements n_species"] = (
-        (A > 0) & other_mask & has_remaining[:, None]
+    # Step 2: allocate remaining budget to non-condensate species
+    n_other: Float[Array, " n_species"] = _limiting_reagent(
+        formula_matrix, remaining_b, other_mask, require_positive_budget=True
     )
-    other_implied: Float[Array, "n_elements n_species"] = jnp.where(
-        is_other_constrained, other_share[:, None], jnp.inf
-    )
-    n_other: Float[Array, " n_species"] = jnp.min(other_implied, axis=0)
 
     # Combine: predicted-stable condensates use their budget estimate; all others use the
     # non-condensate remainder. Fallback for species not covered by any constrained element.
@@ -339,7 +306,7 @@ def _auto_initial_guess(parameters: Parameters) -> Float[Array, " n_solution"]:
 
     log_number_moles: Float[Array, " n_species"] = jnp.log(n_estimate)
 
-    # --- Step 3: fugacity-constrained gas species ---
+    # Step 3: fugacity-constrained gas species
     log_n_gas_known_total: Float[Array, ""] = logsumexp(
         jnp.where(gas_no_fug, log_number_moles, -jnp.inf)
     )
