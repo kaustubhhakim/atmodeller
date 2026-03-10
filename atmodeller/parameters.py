@@ -98,28 +98,9 @@ class Parameters(eqx.Module):
             solid=solid_phase,
             condensates=condensate_phases,
         )
-        state_: ThermodynamicStateProtocol = Planet() if state is None else state
-        fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
-            reaction_system.species, fugacity_constraints
-        )
-        mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            reaction_system.species, mass_constraints
-        )
 
-        # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
-        # that should remain scalar)
-        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
-        solver_parameters_: SolverParameters = (
-            SolverParameters() if solver_parameters is None else solver_parameters
-        )
-
-        return cls(
-            reaction_system,
-            state_,
-            fugacity_constraints_,
-            mass_constraints_,
-            solver_parameters_,
-            batch_size,
+        return cls.from_reaction_system(
+            reaction_system, state, fugacity_constraints, mass_constraints, solver_parameters
         )
 
     @classmethod
@@ -157,6 +138,7 @@ class Parameters(eqx.Module):
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
         # that should remain scalar)
         batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
+
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
