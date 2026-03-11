@@ -44,7 +44,7 @@ gas: GasPhase = GasPhase((H2_g, H2O_g, O2_g, SiO_g, H4Si_g))
 # for a more realistic activity, but this is fine for testing the real gas EOS.
 condensates: PurePhase = PurePhase((O2Si_l,))
 
-subneptune_model: EquilibriumModel = EquilibriumModel(gas, condensates=(condensates,))
+subneptune_model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(condensates,))
 
 
 def test_fO2_holley() -> None:

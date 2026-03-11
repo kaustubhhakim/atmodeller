@@ -32,7 +32,7 @@ TOLERANCE: float = 5.0e-2
 gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
 graphite: PurePhase = PurePhase.create("C", state="s")
 
-CHO_model: EquilibriumModel = EquilibriumModel(gas, condensates=(graphite,))
+CHO_model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(graphite,))
 
 
 def test_graphite_stable() -> None:
@@ -115,7 +115,7 @@ def test_water_stable() -> None:
     gas: GasPhase = GasPhase.create(("H2", "H2O", "O2"))
     water: PurePhase = PurePhase.create("H2O", state="l")
     planet: Planet = Planet(temperature=411.75)
-    model: EquilibriumModel = EquilibriumModel(gas, condensates=(water,))
+    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(water,))
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -141,7 +141,7 @@ def test_graphite_water_stable() -> None:
     water: PurePhase = PurePhase.create("H2O", state="l")
     graphite: PurePhase = PurePhase.create("C", state="s")
     planet: Planet = Planet(temperature=430)
-    model: EquilibriumModel = EquilibriumModel(gas, condensates=(water, graphite))
+    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(water, graphite))
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
@@ -183,7 +183,7 @@ def test_impose_stable() -> None:
     gas: GasPhase = GasPhase.create(("H2", "N2", "CH4", "CHN", "H"))
     graphite: PurePhase = PurePhase((C_cr,))
 
-    model: EquilibriumModel = EquilibriumModel(gas, condensates=(graphite,))
+    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(graphite,))
 
     # Set the temperature and pressure
     state: ThermodynamicState = ThermodynamicState(
