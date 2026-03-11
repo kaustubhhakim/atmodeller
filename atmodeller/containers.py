@@ -15,7 +15,7 @@ import numpy as np
 from jax import lax
 from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
-from jaxmod.type_aliases import NpArray, NpBool, NpFloat, NpInt
+from jaxmod.type_aliases import NpBool, NpFloat, NpInt
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64, get_batch_size, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
@@ -475,7 +475,7 @@ class ThermodynamicState(eqx.Module):
 
         return self.pressure
 
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, NpArray]:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
@@ -486,14 +486,11 @@ class ThermodynamicState(eqx.Module):
         """
         del gas_mass
 
-        base_dict: dict[str, ArrayLike] = asdict(self)
+        base_dict: dict[str, Array] = asdict(self)
         base_dict["melt_mass"] = self.melt_mass
         base_dict["solid_mass"] = self.solid_mass
 
-        # Convert all values to NumPy arrays
-        base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
-
-        return base_dict_np
+        return base_dict
 
 
 class ThinAtmospherePlanet(eqx.Module):
@@ -660,7 +657,7 @@ class ThinAtmospherePlanet(eqx.Module):
 
         return pressure
 
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, NpArray]:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
@@ -669,7 +666,7 @@ class ThinAtmospherePlanet(eqx.Module):
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, ArrayLike] = asdict(self)
+        base_dict: dict[str, Array] = asdict(self)
         base_dict["pressure"] = self.get_pressure(gas_mass)
         base_dict["mantle_mass"] = self.mantle_mass
         base_dict["mantle_melt_mass"] = self.mantle_melt_mass
@@ -677,10 +674,7 @@ class ThinAtmospherePlanet(eqx.Module):
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        # Convert all values to NumPy arrays
-        base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
-
-        return base_dict_np
+        return base_dict
 
 
 # The only planet supported so far is one with a thin atmosphere
@@ -804,7 +798,7 @@ class FugacityConstraintSet(eqx.Module):
                     zip(
                         self.species.species_names,
                         [
-                            np.exp(constraint.log_fugacity(temperature, pressure))
+                            jnp.exp(constraint.log_fugacity(temperature, pressure))
                             for constraint in self.constraints
                         ],
                     )
@@ -986,8 +980,8 @@ class MassConstraintSet(eqx.Module):
         elements: tuple[str, ...] = self.species.unique_elements
         out: dict[str, Any] = {
             "elements": {
-                "number_moles": dict(zip(elements, np.asarray(self.abundance_mol()).T)),
-                "mass_kg": dict(zip(elements, np.asarray(self.abundance_mass()).T)),
+                "number_moles": dict(zip(elements, jnp.asarray(self.abundance_mol()).T)),
+                "mass_kg": dict(zip(elements, jnp.asarray(self.abundance_mass()).T)),
             }
         }
 
