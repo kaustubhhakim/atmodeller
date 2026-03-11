@@ -17,13 +17,12 @@ import numpy as np
 import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
 from jaxmod.type_aliases import NpArray, NpBool
-from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, Float
 from openpyxl.styles import PatternFill
 
-from atmodeller.engine import get_total_pressure, objective_function
+from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
+from atmodeller.phases import PurePhase
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -301,35 +300,13 @@ class Output(eqx.Module):
     def condensates(self) -> tuple[PurePhase, ...]:
         return self.parameters.reaction_system.condensate_phases
 
-    @property
-    def gas(self) -> GasPhase:
-        """Gas phase output"""
-        return self.parameters.reaction_system.gas_phase
-
-    @property
-    def melt(self) -> MeltPhase:
-        """Melt phase output"""
-        return self.parameters.reaction_system.melt_phase
-
-    @property
-    def solid(self) -> SolidPhase:
-        """Solid phase output"""
-        return self.parameters.reaction_system.solid_phase
-
-    @property
-    def solution(self) -> Float[Array, "... twice_species"]:
-        """Solution array for all species i.e. log number of moles and log stability"""
-        return self.multi_attempt_solution.value
-
-    def asdict(self) -> dict[str, Any]:
-        """Solution as a nested dictionary.
+    def gas_asdict(self) -> dict[str, Any]:
+        """Gas phase output
 
         Returns:
-            Dictionary of the solution
+            A nested dictionary of gas phase output
         """
         gas_slice: slice = self.parameters.reaction_system.gas_slice
-        melt_slice: slice = self.parameters.reaction_system.melt_slice
-        solid_slice: slice = self.parameters.reaction_system.solid_slice
 
         temperature = self.parameters.state.temperature
         total_pressure = get_total_pressure(self.parameters, self.solution)
@@ -338,18 +315,33 @@ class Output(eqx.Module):
 
         # No background component for gas, so no need to pass log_background_molar_mass or
         # log_background_melt_mass
-        out["gas"] = self.gas.output(
+        out["gas"] = self.parameters.reaction_system.gas_phase.output(
             self.log_number_moles[..., gas_slice],
             self.log_stability[..., gas_slice],
             temperature,
             total_pressure,
         )
 
+        return out
+
+    def melt_asdict(self) -> dict[str, Any]:
+        """Melt phase output
+
+        Returns:
+            A nested dictionary of melt phase output
+        """
+        melt_slice: slice = self.parameters.reaction_system.melt_slice
+
+        temperature = self.parameters.state.temperature
+        total_pressure = get_total_pressure(self.parameters, self.solution)
+
+        out: dict[str, Any] = {}
+
         # Background component for melt
         log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
         log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
 
-        out["melt"] = self.melt.output(
+        out["melt"] = self.parameters.reaction_system.melt_phase.output(
             self.log_number_moles[..., melt_slice],
             self.log_stability[..., melt_slice],
             temperature,
@@ -358,11 +350,26 @@ class Output(eqx.Module):
             log_background_melt_mass,
         )
 
+        return out
+
+    def solid_asdict(self) -> dict[str, Any]:
+        """Solid phase output
+
+        Returns:
+            A nested dictionary of solid phase output
+        """
+        solid_slice: slice = self.parameters.reaction_system.solid_slice
+
+        temperature = self.parameters.state.temperature
+        total_pressure = get_total_pressure(self.parameters, self.solution)
+
+        out: dict[str, Any] = {}
+
         # Background component for solid
         log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
         log_background_solid_mass = jnp.log(self.parameters.state.solid_mass)
 
-        out["solid"] = self.solid.output(
+        out["solid"] = self.parameters.reaction_system.solid_phase.output(
             self.log_number_moles[..., solid_slice],
             self.log_stability[..., solid_slice],
             temperature,
@@ -371,35 +378,77 @@ class Output(eqx.Module):
             log_background_solid_mass,
         )
 
-        # Condensates
+        return out
+
+    def condensates_asdict(self) -> dict[str, Any]:
+        """Condensates output
+
+        Returns:
+            A nested dictionary of condensates output
+        """
         condensate_names: list[str] = [
             condensate.name for condensate in self.parameters.reaction_system.condensate_phases
         ]
         condensate_slice: slice = self.parameters.reaction_system.condensates_slice
 
-        out_condensates: list[dict[str, Any]] = []
+        temperature = self.parameters.state.temperature
+        total_pressure = get_total_pressure(self.parameters, self.solution)
+
+        out: dict[str, Any] = {}
 
         for nn, condensate in enumerate(self.condensates):
-            out_condensates.append(
-                condensate.output(
-                    jnp.atleast_1d(self.log_number_moles[..., condensate_slice][..., nn]),
-                    jnp.atleast_1d(self.log_stability[..., condensate_slice][..., nn]),
-                    temperature,
-                    total_pressure,
-                )
+            out[condensate_names[nn]] = condensate.output(
+                jnp.atleast_1d(self.log_number_moles[..., condensate_slice][..., nn]),
+                jnp.atleast_1d(self.log_stability[..., condensate_slice][..., nn]),
+                temperature,
+                total_pressure,
             )
 
-        out["condensates"] = dict(zip(condensate_names, out_condensates))
+        return {"condensates": out}
 
-        total: dict[str, Any] = _sum_phase_outputs(
-            [out["gas"], out["melt"], out["solid"], *out["condensates"].values()]
-        )
-        out["total"] = total
+    def totals_asdict(self) -> dict[str, Any]:
+        """Totals output
 
-        # Convert array to JAX for typing consistency; the arrays will be converted to NumPy when
-        # the output is returned from this method
-        out["state"] = self.parameters.state.asdict(jnp.asarray(out["gas"]["phase"]["mass_kg"]))
+        Returns:
+            A nested dictionary of totals output
+        """
+        gas: dict[str, Any] = self.gas_asdict()
+        melt: dict[str, Any] = self.melt_asdict()
+        solid: dict[str, Any] = self.solid_asdict()
+        condensates: dict[str, Any] = self.condensates_asdict()
 
+        out = gas["phase"]
+
+        # out: dict[str, Any] = {
+        #     "phase": {
+        #         "mass_kg": (
+        #             gas["phase"]["mass_kg"] + melt["phase"]["mass_kg"] + solid["phase"]["mass_kg"]
+        #         )
+        #     }
+        # }
+
+        return out
+
+    @property
+    def solution(self) -> Float[Array, "... twice_species"]:
+        """Solution array for all species i.e. log number of moles and log stability"""
+        return self.multi_attempt_solution.value
+
+    def asdict_jax(self) -> dict[str, Any]:
+        """Complete output as a nested dictionary with JAX arrays.
+
+        Returns:
+            Dictionary of the solution with JAX arrays
+        """
+        out: dict[str, Any] = {}
+
+        out.update(self.gas_asdict())
+        out.update(self.melt_asdict())
+        out.update(self.solid_asdict())
+        out.update(self.condensates_asdict())
+
+        temperature = self.parameters.state.temperature
+        total_pressure = get_total_pressure(self.parameters, self.solution)
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict())
         out["constraints"].update(
@@ -409,13 +458,16 @@ class Output(eqx.Module):
         # Must vmap the residual evaluation to match what the solver did: parameters contains a
         # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
         # solution gives incorrect results. vmap_axes_spec maps None/0 per leaf appropriately.
-        objective_function_vmapped = eqx.filter_vmap(
-            objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
-        )
-        out["residual"] = np.asarray(objective_function_vmapped(self.solution, self.parameters))
-
-        out["solution"] = np.asarray(self.solution)
+        # FIXME: This is breaking because all arrays including numpy are seen as batchable under
+        # jit
+        # objective_function_vmapped = eqx.filter_vmap(
+        #    objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
+        # )
+        # out["residual"] = objective_function_vmapped(self.solution, self.parameters)
+        out["solution"] = self.solution
         out["solver"] = self.multi_attempt_solution.asdict()
+        out["state"] = self.parameters.state.asdict(out["gas"]["phase"]["mass_kg"])
+        out["totals"] = self.totals_asdict()
 
         return out
 
