@@ -34,12 +34,13 @@ from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.containers import SolverParameters
-from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
+from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import make_solve_with_jit
+from atmodeller.state import ThermodynamicStateProtocol
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -169,7 +170,11 @@ class EquilibriumModel:
         )
         jax.debug.print("Trigger for auto initial guess = {out}", out=trigger_autogen)
 
-        multi_sol: MultiAttemptSolution = self._solver(trigger_autogen, parameters, subkey)
+        out: Output = self._solver(trigger_autogen, parameters, subkey)
+        multi_sol: MultiAttemptSolution = out.multi_attempt_solution
+
+        # output: Output = self._solver(trigger_autogen, parameters, subkey)
+        # multi_sol: MultiAttemptSolution = output.multi_attempt_solution
         # jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
 
         num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()

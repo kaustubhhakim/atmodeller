@@ -929,7 +929,7 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         base_solution_array: Float[Array, "... solution"],
         parameters: Parameters,
         key: PRNGKeyArray,
-    ) -> MultiAttemptSolution:
+    ) -> Output:
         """JIT-compiled entry point that dispatches to the appropriate solver branch.
 
         Checks whether any species have active stability and routes accordingly via
@@ -969,7 +969,8 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         multi_sol = lax.cond(
             condition, solve_with_stability_multistart, solve_with_generic_multistart, operand=key
         )
+        output: Output = Output(parameters, multi_sol)
 
-        return multi_sol
+        return output
 
     return solve_with_jit

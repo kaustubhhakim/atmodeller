@@ -6,27 +6,29 @@
 
 import logging
 import pickle
-from collections.abc import Iterable
 from pathlib import Path
 from pprint import pformat
 from typing import Any, Literal
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
 from jaxmod.type_aliases import NpArray, NpBool
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float
 from openpyxl.styles import PatternFill
 
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
-from atmodeller.phases import PurePhase
+from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, SolidPhase
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+# These functions all feel awkward and clunky, and are ultimately not compatible within a jitted
+# workflow
 def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
     """Iteratively flattens a nested dict to {path_tuple: leaf} mapping.
 
@@ -66,94 +68,94 @@ def _set_nested(d: dict, path: tuple, value: Any) -> None:
     d[path[-1]] = value
 
 
-_SUMMABLE_KEYS: frozenset[str] = frozenset({"mass_kg", "number_moles"})
-"""Leaf-level keys whose values are summed across phases by :func:`_sum_phase_outputs`."""
+# _SUMMABLE_KEYS: frozenset[str] = frozenset({"mass_kg", "number_moles"})
+# """Leaf-level keys whose values are summed across phases by :func:`_sum_phase_outputs`."""
 
 
-def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any]:
-    """Sums summable quantities across an iterable of phase output dicts.
+# def _sum_phase_outputs(phase_outputs: Iterable[dict[str, Any]]) -> dict[str, Any]:
+#     """Sums summable quantities across an iterable of phase output dicts.
 
-    Only leaves under a ``"mass_kg"`` or ``"number_moles"`` sub-category are included, preserving
-    the ``elements``, ``species``, and ``phase`` sub-structure. Values at the same path are summed;
-    ``np.nan`` values are treated as zero so that a phase with unconstrained moles does not
-    contaminate the total.
+#     Only leaves under a ``"mass_kg"`` or ``"number_moles"`` sub-category are included, preserving
+#     the ``elements``, ``species``, and ``phase`` sub-structure. Values at the same path are summed;
+#     ``np.nan`` values are treated as zero so that a phase with unconstrained moles does not
+#     contaminate the total.
 
-    Args:
-        phase_outputs: Iterable of phase output dicts as returned by
-            :meth:`~atmodeller.phases.BasePhase.output`.
+#     Args:
+#         phase_outputs: Iterable of phase output dicts as returned by
+#             :meth:`~atmodeller.phases.BasePhase.output`.
 
-    Returns:
-        A nested dict with the same sub-structure as the inputs but restricted to the summable
-        keys, holding the element-wise sum across all phases.
-    """
-    total: dict[tuple, Any] = {}
+#     Returns:
+#         A nested dict with the same sub-structure as the inputs but restricted to the summable
+#         keys, holding the element-wise sum across all phases.
+#     """
+#     total: dict[tuple, Any] = {}
 
-    for phase_out in phase_outputs:
-        for path, value in _flatten_dict(phase_out).items():
-            if not any(k in _SUMMABLE_KEYS for k in path):
-                continue
-            scalar = np.asarray(value)
-            addend = np.where(np.isnan(scalar), 0.0, scalar)
-            # For species, strip the trailing phase suffix (e.g. _g, _d, _s) so that
-            # H2O_g and H2O_d both accumulate under the base formula H2O.
-            if "species" in path:
-                species_name = str(path[-1])
-                base = species_name.rsplit("_", 1)[0] if "_" in species_name else species_name
-                path = path[:-1] + (base,)
-            total[path] = total.get(path, 0.0) + addend
+#     for phase_out in phase_outputs:
+#         for path, value in _flatten_dict(phase_out).items():
+#             if not any(k in _SUMMABLE_KEYS for k in path):
+#                 continue
+#             scalar = np.asarray(value)
+#             addend = np.where(np.isnan(scalar), 0.0, scalar)
+#             # For species, strip the trailing phase suffix (e.g. _g, _d, _s) so that
+#             # H2O_g and H2O_d both accumulate under the base formula H2O.
+#             if "species" in path:
+#                 species_name = str(path[-1])
+#                 base = species_name.rsplit("_", 1)[0] if "_" in species_name else species_name
+#                 path = path[:-1] + (base,)
+#             total[path] = total.get(path, 0.0) + addend
 
-    out: dict[str, Any] = {}
-    for path, value in total.items():
-        _set_nested(out, path, value)
+#     out: dict[str, Any] = {}
+#     for path, value in total.items():
+#         _set_nested(out, path, value)
 
-    # Logarithmic abundance of all elements relative to hydrogen (A(X) = log10(n_X/n_H) + 12)
-    element_moles: dict[str, Any] = out.get("elements", {}).get("number_moles", {})
-    if "H" in element_moles:
-        h_moles: NpArray = np.asarray(element_moles["H"])
-        out.setdefault("elements", {})["logarithmic_abundance"] = {
-            element: np.log10(np.asarray(moles) / h_moles) + 12
-            for element, moles in element_moles.items()
-        }
+#     # Logarithmic abundance of all elements relative to hydrogen (A(X) = log10(n_X/n_H) + 12)
+#     element_moles: dict[str, Any] = out.get("elements", {}).get("number_moles", {})
+#     if "H" in element_moles:
+#         h_moles: NpArray = np.asarray(element_moles["H"])
+#         out.setdefault("elements", {})["logarithmic_abundance"] = {
+#             element: np.log10(np.asarray(moles) / h_moles) + 12
+#             for element, moles in element_moles.items()
+#         }
 
-    return out
+#     return out
 
 
-def _expand_to_batch(nested_dict: dict[str, Any]) -> dict[str, Any]:
-    """Expands all array leaves in a nested dict to a common batch length.
+# def _expand_to_batch(nested_dict: dict[str, Any]) -> dict[str, Any]:
+#     """Expands all array leaves in a nested dict to a common batch length.
 
-    The batch length is inferred from ``solution``: ``1`` if it is 1-D (single run), or
-    ``solution.shape[0]`` if it is 2-D (batched run of ``N`` conditions).  Scalars and length-1
-    arrays are broadcast to ``(batch_length,)``; arrays already of the correct length are passed
-    through unchanged; multi-dimensional arrays such as ``solution`` and ``residual`` whose first
-    axis is already ``batch_length`` are also left unchanged.
+#     The batch length is inferred from ``solution``: ``1`` if it is 1-D (single run), or
+#     ``solution.shape[0]`` if it is 2-D (batched run of ``N`` conditions).  Scalars and length-1
+#     arrays are broadcast to ``(batch_length,)``; arrays already of the correct length are passed
+#     through unchanged; multi-dimensional arrays such as ``solution`` and ``residual`` whose first
+#     axis is already ``batch_length`` are also left unchanged.
 
-    Args:
-        nested_dict: A nested dict as returned by
-            :meth:`~atmodeller.output.Output.quick_look`. Must contain a ``"solution"`` key.
+#     Args:
+#         nested_dict: A nested dict as returned by
+#             :meth:`~atmodeller.output.Output.quick_look`. Must contain a ``"solution"`` key.
 
-    Returns:
-        A new nested dict with the same structure where every scalar leaf is expanded to a
-        :class:`numpy.ndarray` of length ``batch_length``.
-    """
-    # Infer batch length from `solution`, which is always present:
-    # shape (2*n_species,) for a single run → batch_length = 1
-    # shape (N, 2*n_species) for a batched run → batch_length = N
-    solution_arr = np.asarray(nested_dict["solution"])
-    batch_length: int = 1 if solution_arr.ndim == 1 else solution_arr.shape[0]
+#     Returns:
+#         A new nested dict with the same structure where every scalar leaf is expanded to a
+#         :class:`numpy.ndarray` of length ``batch_length``.
+#     """
+#     # Infer batch length from `solution`, which is always present:
+#     # shape (2*n_species,) for a single run → batch_length = 1
+#     # shape (N, 2*n_species) for a batched run → batch_length = N
+#     solution_arr = np.asarray(nested_dict["solution"])
+#     batch_length: int = 1 if solution_arr.ndim == 1 else solution_arr.shape[0]
 
-    def _expand_leaf(value: Any) -> NpArray:
-        arr = np.atleast_1d(np.asarray(value))
-        if batch_length > 1 and arr.shape[0] == 1:
-            # Scalar-promoted or length-1: broadcast first axis to batch_length.
-            # np.array() materialises the broadcast view into a writable array.
-            return np.array(np.broadcast_to(arr, (batch_length,) + arr.shape[1:]))
+#     def _expand_leaf(value: Any) -> NpArray:
+#         arr = np.atleast_1d(np.asarray(value))
+#         if batch_length > 1 and arr.shape[0] == 1:
+#             # Scalar-promoted or length-1: broadcast first axis to batch_length.
+#             # np.array() materialises the broadcast view into a writable array.
+#             return np.array(np.broadcast_to(arr, (batch_length,) + arr.shape[1:]))
 
-        return arr
+#         return arr
 
-    def _map(d: dict) -> dict:
-        return {k: _map(v) if isinstance(v, dict) else _expand_leaf(v) for k, v in d.items()}
+#     def _map(d: dict) -> dict:
+#         return {k: _map(v) if isinstance(v, dict) else _expand_leaf(v) for k, v in d.items()}
 
-    return _map(nested_dict)
+#     return _map(nested_dict)
 
 
 _PHASE_KEYS: frozenset[str] = frozenset({"gas", "melt", "solid", "condensates", "total"})
@@ -168,99 +170,103 @@ _ALL_OUTPUT_KEYS: tuple[_OutputKey, ...] = ("phases", "species", "elements", "ot
 :meth:`~atmodeller.output.Output.to_dataframes`."""
 
 
-def _group_by_all(
-    nested_dict: dict[str, Any], keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS
-) -> dict[str, dict[str, Any]]:
-    """Groups output by phase, species, and/or element.
+# def _group_by_all(
+#     nested_dict: dict[str, Any], keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS
+# ) -> dict[str, dict[str, Any]]:
+#     """Groups output by phase, species, and/or element.
 
-    Groups the requested views in a single pass.  Phase names, species names, and element symbols
-    all share the same namespace of primary keys.  A gas-phase species ``H2O_g`` and the phase
-    key ``gas`` will both appear as top-level entries when both ``"phases"`` and ``"species"``
-    are selected::
+#     Groups the requested views in a single pass.  Phase names, species names, and element symbols
+#     all share the same namespace of primary keys.  A gas-phase species ``H2O_g`` and the phase
+#     key ``gas`` will both appear as top-level entries when both ``"phases"`` and ``"species"``
+#     are selected::
 
-        {
-            "gas":   {"phase.mass_kg": ..., "species.activity.H2O_g": ...,
-                      "phase.log10dIW_1_bar": ..., ...},
-            "H2O_g": {"gas.activity": ..., "gas.mass_kg": ..., ...},
-            "H":     {"gas.mass_kg": ..., "total.logarithmic_abundance": ..., ...},
-            ...
-        }
+#         {
+#             "gas":   {"phase.mass_kg": ..., "species.activity.H2O_g": ...,
+#                       "phase.log10dIW_1_bar": ..., ...},
+#             "H2O_g": {"gas.activity": ..., "gas.mass_kg": ..., ...},
+#             "H":     {"gas.mass_kg": ..., "total.logarithmic_abundance": ..., ...},
+#             ...
+#         }
 
-    Args:
-        nested_dict: A nested dict as returned by
-            :func:`~atmodeller.output.expand_to_batch`.
-        keys: Categories to include.  Any combination of ``"phases"``, ``"species"``,
-            ``"elements"``, and ``"other"``.  Defaults to all four.
+#     Args:
+#         nested_dict: A nested dict as returned by
+#             :func:`~atmodeller.output.expand_to_batch`.
+#         keys: Categories to include.  Any combination of ``"phases"``, ``"species"``,
+#             ``"elements"``, and ``"other"``.  Defaults to all four.
 
-    Returns:
-        A combined dict with phase names, species names, and element symbols as primary keys.
-    """
-    result: dict[str, dict[str, Any]] = {}
+#     Returns:
+#         A combined dict with phase names, species names, and element symbols as primary keys.
+#     """
+#     result: dict[str, dict[str, Any]] = {}
 
-    include_phases: bool = "phases" in keys
-    include_species: bool = "species" in keys
-    include_elements: bool = "elements" in keys
+#     include_phases: bool = "phases" in keys
+#     include_species: bool = "species" in keys
+#     include_elements: bool = "elements" in keys
 
-    for path, value in _flatten_dict(nested_dict).items():
-        if include_phases and path[0] in _PHASE_KEYS:
-            phase_name: str = str(path[0])
-            phase_key: str = ".".join(str(k) for k in path[1:])
-            result.setdefault(phase_name, {})[phase_key] = value
+#     for path, value in _flatten_dict(nested_dict).items():
+#         if include_phases and path[0] in _PHASE_KEYS:
+#             phase_name: str = str(path[0])
+#             phase_key: str = ".".join(str(k) for k in path[1:])
+#             result.setdefault(phase_name, {})[phase_key] = value
 
-        if include_species and "species" in path and path[0] != "total":
-            name: str = str(path[-1])
-            species_key: str = ".".join(str(k) for k in path[:-1] if k != "species")
-            result.setdefault(name, {})[species_key] = value
+#         if include_species and "species" in path and path[0] != "total":
+#             name: str = str(path[-1])
+#             species_key: str = ".".join(str(k) for k in path[:-1] if k != "species")
+#             result.setdefault(name, {})[species_key] = value
 
-        if include_elements and "elements" in path:
-            name = str(path[-1])
-            element_key: str = ".".join(str(k) for k in path[:-1] if k != "elements")
-            result.setdefault(name, {})[element_key] = value
+#         if include_elements and "elements" in path:
+#             name = str(path[-1])
+#             element_key: str = ".".join(str(k) for k in path[:-1] if k != "elements")
+#             result.setdefault(name, {})[element_key] = value
 
-    return result
+#     return result
 
 
-def _group_other(nested_dict: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Collects non-phase top-level keys (``solution``, ``residual``, ``constraints``,
-    ``solver``, etc.) into a dict of flat column dicts, one per top-level key.
+# def _group_other(nested_dict: dict[str, Any]) -> dict[str, dict[str, Any]]:
+#     """Collects non-phase top-level keys (``solution``, ``residual``, ``constraints``,
+#     ``solver``, etc.) into a dict of flat column dicts, one per top-level key.
 
-    Each non-phase top-level key becomes a primary key whose value is a flat
-    ``{column_name: array}`` dict suitable for :class:`~pandas.DataFrame` construction:
+#     Each non-phase top-level key becomes a primary key whose value is a flat
+#     ``{column_name: array}`` dict suitable for :class:`~pandas.DataFrame` construction:
 
-    * **Dict value** — flattened recursively; the dotted sub-path forms the column name,
-      e.g. ``constraints → {"H": ..., "O": ...}``.
-    * **Array value** — if the last axis has more than one element each column is named
-      ``"0"``, ``"1"``, …; if effectively scalar per row the column takes the key name.
+#     * **Dict value** — flattened recursively; the dotted sub-path forms the column name,
+#       e.g. ``constraints → {"H": ..., "O": ...}``.
+#     * **Array value** — if the last axis has more than one element each column is named
+#       ``"0"``, ``"1"``, …; if effectively scalar per row the column takes the key name.
 
-    Args:
-        nested_dict: A nested dict as returned by
-            :func:`~atmodeller.output._expand_to_batch`.
+#     Args:
+#         nested_dict: A nested dict as returned by
+#             :func:`~atmodeller.output._expand_to_batch`.
 
-    Returns:
-        A dict mapping each non-phase top-level key to a flat column dict.
-    """
-    result: dict[str, dict[str, Any]] = {}
+#     Returns:
+#         A dict mapping each non-phase top-level key to a flat column dict.
+#     """
+#     result: dict[str, dict[str, Any]] = {}
 
-    for top_key, value in nested_dict.items():
-        if top_key in _PHASE_KEYS:
-            continue
-        if isinstance(value, dict):
-            cols: dict[str, Any] = {}
-            for path, leaf in _flatten_dict(value).items():
-                cols[".".join(str(k) for k in path)] = leaf
-            result[str(top_key)] = cols
-        else:
-            arr = np.asarray(value)
-            if arr.ndim <= 1 or arr.shape[-1] == 1:
-                result[str(top_key)] = {str(top_key): arr.ravel()}
-            else:
-                result[str(top_key)] = {str(i): arr[..., i] for i in range(arr.shape[-1])}
+#     for top_key, value in nested_dict.items():
+#         if top_key in _PHASE_KEYS:
+#             continue
+#         if isinstance(value, dict):
+#             cols: dict[str, Any] = {}
+#             for path, leaf in _flatten_dict(value).items():
+#                 cols[".".join(str(k) for k in path)] = leaf
+#             result[str(top_key)] = cols
+#         else:
+#             arr = np.asarray(value)
+#             if arr.ndim <= 1 or arr.shape[-1] == 1:
+#                 result[str(top_key)] = {str(top_key): arr.ravel()}
+#             else:
+#                 result[str(top_key)] = {str(i): arr[..., i] for i in range(arr.shape[-1])}
 
-    return result
+#     return result
 
 
 class Output(eqx.Module):
     """Output
+
+    Properties can be called within a jitted context to access output quantites for downstream
+    processing. Arrays are always broadcastable to avoid necessitating expanding all arrays to the
+    batch size.
 
     Args:
         parameters: Parameters
@@ -275,19 +281,24 @@ class Output(eqx.Module):
         self.multi_attempt_solution = multi_attempt_solution
 
     @property
-    def _split_solution(self) -> list[Float[Array, "... n_species"]]:
+    def _split_solution(self) -> list[Float[Array, "#n_batch n_species"]]:
         """Log number of moles and log stability, split from the solution array in one pass."""
         return jnp.split(self.multi_attempt_solution.value, 2, axis=-1)
 
     @property
-    def log_number_moles(self) -> Float[Array, "... n_species"]:
+    def batch_size(self) -> int:
+        """Batch size of the output"""
+        return self.parameters.batch_size
+
+    @property
+    def log_number_moles(self) -> Float[Array, "#n_batch n_species"]:
         """Log number of moles for each species"""
         log_number_moles, _ = self._split_solution
 
         return log_number_moles
 
     @property
-    def log_stability(self) -> Float[Array, "... n_species"]:
+    def log_stability(self) -> Float[Array, "#n_batch n_species"]:
         """Log stability for each species"""
         _, log_stability = self._split_solution
 
@@ -297,163 +308,154 @@ class Output(eqx.Module):
         return log_stability
 
     @property
-    def condensates(self) -> tuple[PurePhase, ...]:
-        return self.parameters.reaction_system.condensate_phases
+    def condensates(self) -> tuple[PhaseOutput, ...]:
+        """Pure phase condensates"""
 
-    def gas_asdict(self) -> dict[str, Any]:
-        """Gas phase output
-
-        Returns:
-            A nested dictionary of gas phase output
-        """
-        gas_slice: slice = self.parameters.reaction_system.gas_slice
-
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
-
-        out: dict[str, Any] = {}
-
-        # No background component for gas, so no need to pass log_background_molar_mass or
-        # log_background_melt_mass
-        out["gas"] = self.parameters.reaction_system.gas_phase.output(
-            self.log_number_moles[..., gas_slice],
-            self.log_stability[..., gas_slice],
-            temperature,
-            total_pressure,
-        )
-
-        return out
-
-    def melt_asdict(self) -> dict[str, Any]:
-        """Melt phase output
-
-        Returns:
-            A nested dictionary of melt phase output
-        """
-        melt_slice: slice = self.parameters.reaction_system.melt_slice
-
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
-
-        out: dict[str, Any] = {}
-
-        # Background component for melt
-        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
-        log_background_melt_mass = jnp.log(self.parameters.state.melt_mass)
-
-        out["melt"] = self.parameters.reaction_system.melt_phase.output(
-            self.log_number_moles[..., melt_slice],
-            self.log_stability[..., melt_slice],
-            temperature,
-            total_pressure,
-            log_background_molar_mass,
-            log_background_melt_mass,
-        )
-
-        return out
-
-    def solid_asdict(self) -> dict[str, Any]:
-        """Solid phase output
-
-        Returns:
-            A nested dictionary of solid phase output
-        """
-        solid_slice: slice = self.parameters.reaction_system.solid_slice
-
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
-
-        out: dict[str, Any] = {}
-
-        # Background component for solid
-        log_background_molar_mass = jnp.log(self.parameters.state.molar_mass)
-        log_background_solid_mass = jnp.log(self.parameters.state.solid_mass)
-
-        out["solid"] = self.parameters.reaction_system.solid_phase.output(
-            self.log_number_moles[..., solid_slice],
-            self.log_stability[..., solid_slice],
-            temperature,
-            total_pressure,
-            log_background_molar_mass,
-            log_background_solid_mass,
-        )
-
-        return out
-
-    def condensates_asdict(self) -> dict[str, Any]:
-        """Condensates output
-
-        Returns:
-            A nested dictionary of condensates output
-        """
-        condensate_names: list[str] = [
-            condensate.name for condensate in self.parameters.reaction_system.condensate_phases
-        ]
         condensate_slice: slice = self.parameters.reaction_system.condensates_slice
 
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
+        condensates_out = []
 
-        out: dict[str, Any] = {}
-
-        for nn, condensate in enumerate(self.condensates):
-            out[condensate_names[nn]] = condensate.output(
-                jnp.atleast_1d(self.log_number_moles[..., condensate_slice][..., nn]),
-                jnp.atleast_1d(self.log_stability[..., condensate_slice][..., nn]),
-                temperature,
-                total_pressure,
+        for nn, condensate in enumerate(self.parameters.reaction_system.condensate_phases):
+            condensate_out = condensate.output(
+                jnp.atleast_2d(self.log_number_moles[..., condensate_slice][..., nn]),
+                jnp.atleast_2d(self.log_stability[..., condensate_slice][..., nn]),
+                self.temperature,
+                self.pressure,
             )
+            condensates_out.append(condensate_out)
 
-        return {"condensates": out}
+        return tuple(condensates_out)
 
-    def totals_asdict(self) -> dict[str, Any]:
-        """Totals output
+    @property
+    def constraints_element_mass(self) -> Float[Array, "#n_batch n_elements"]:
+        """Element mass constraints in kg"""
+        return self.parameters.mass_constraints.abundance_mass()
 
-        Returns:
-            A nested dictionary of totals output
-        """
-        gas: dict[str, Any] = self.gas_asdict()
-        melt: dict[str, Any] = self.melt_asdict()
-        solid: dict[str, Any] = self.solid_asdict()
-        condensates: dict[str, Any] = self.condensates_asdict()
+    @property
+    def constraints_element_moles(self) -> Float[Array, "#n_batch n_elements"]:
+        """Element abundance constraints in moles"""
+        return self.parameters.mass_constraints.abundance_mol()
 
-        out = gas["phase"]
+    @property
+    def constraints_fugacity(self) -> Float[Array, "#n_batch n_species"]:
+        """Fugacity constraints in bar"""
+        constraints: Float[Array, "#n_batch n_species"] = jnp.stack(
+            [
+                jnp.exp(constraint.log_fugacity(self.temperature, self.pressure))
+                for constraint in self.parameters.fugacity_constraints.constraints
+            ],
+            axis=-1,
+        )
+        return constraints
 
-        # out: dict[str, Any] = {
-        #     "phase": {
-        #         "mass_kg": (
-        #             gas["phase"]["mass_kg"] + melt["phase"]["mass_kg"] + solid["phase"]["mass_kg"]
-        #         )
-        #     }
-        # }
+    @property
+    def gas(self) -> GasPhaseOutput:
+        """Gas phase output"""
 
-        return out
+        gas_slice: slice = self.parameters.reaction_system.gas_slice
+
+        gas_output: GasPhaseOutput = self.parameters.reaction_system.gas_phase.output(
+            self.log_number_moles[..., gas_slice],
+            self.log_stability[..., gas_slice],
+            self.temperature,
+            self.pressure,
+            jnp.atleast_2d(0.0),
+            jnp.atleast_2d(-jnp.inf),
+        )
+
+        return gas_output
+
+    @property
+    def melt(self) -> PhaseOutput[MeltPhase]:
+        """Melt phase output"""
+
+        melt_slice: slice = self.parameters.reaction_system.melt_slice
+
+        melt_output: PhaseOutput[MeltPhase] = self.parameters.reaction_system.melt_phase.output(
+            self.log_number_moles[..., melt_slice],
+            self.log_stability[..., melt_slice],
+            self.temperature,
+            self.pressure,
+            jnp.log(jnp.atleast_2d(self.parameters.state.molar_mass)),
+            jnp.log(jnp.atleast_2d(self.parameters.state.melt_mass)),
+        )
+
+        return melt_output
+
+    @property
+    def solid(self) -> PhaseOutput[SolidPhase]:
+        """Solid phase output"""
+
+        solid_slice: slice = self.parameters.reaction_system.solid_slice
+
+        solid_output: PhaseOutput[SolidPhase] = self.parameters.reaction_system.solid_phase.output(
+            self.log_number_moles[..., solid_slice],
+            self.log_stability[..., solid_slice],
+            self.temperature,
+            self.pressure,
+            jnp.log(jnp.atleast_2d(self.parameters.state.molar_mass)),
+            jnp.log(jnp.atleast_2d(self.parameters.state.solid_mass)),
+        )
+
+        return solid_output
+
+    def state_asdict(self) -> dict[str, Any]:
+        """Thermodynamic state of the system"""
+        return self.parameters.state.asdict(jnp.squeeze(self.gas.phase_mass))
+
+    @property
+    def temperature(self) -> Float[Array, "..."]:
+        """Temperature in K"""
+        return jnp.expand_dims(self.parameters.state.temperature, -1)
+
+    @property
+    def pressure(self) -> Float[Array, "..."]:
+        """Pressure in bar"""
+        return jnp.expand_dims(get_total_pressure(self.parameters, self.solution), -1)
 
     @property
     def solution(self) -> Float[Array, "... twice_species"]:
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
 
-    def asdict_jax(self) -> dict[str, Any]:
+    @property
+    def solver(self) -> dict[str, ArrayLike]:
+        """Solver information such as success flags and number of iterations"""
+        return self.multi_attempt_solution.asdict()
+
+    def asdict(self, to_numpy: bool = False) -> dict[str, Any]:
         """Complete output as a nested dictionary with JAX arrays.
+
+        Args:
+            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
 
         Returns:
             Dictionary of the solution with JAX arrays
         """
         out: dict[str, Any] = {}
 
-        out.update(self.gas_asdict())
-        out.update(self.melt_asdict())
-        out.update(self.solid_asdict())
-        out.update(self.condensates_asdict())
+        out["gas"] = self.gas.asdict()
+        out["melt"] = self.melt.asdict()
+        out["solid"] = self.solid.asdict()
+        out["solver"] = self.multi_attempt_solution.asdict()
+        out["state"] = self.state_asdict()
 
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
-        out["constraints"] = {}
-        out["constraints"].update(self.parameters.mass_constraints.asdict())
-        out["constraints"].update(
-            self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
-        )
+        if to_numpy:
+            out = jax.tree_util.tree_map(
+                lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, out
+            )
+
+        return out
+
+        # out.update(self.condensates_asdict())
+
+        # temperature = self.parameters.state.temperature
+        # total_pressure = get_total_pressure(self.parameters, self.solution)
+        # out["constraints"] = {}
+        # out["constraints"].update(self.parameters.mass_constraints.asdict())
+        # out["constraints"].update(
+        #    self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
+        # )
 
         # Must vmap the residual evaluation to match what the solver did: parameters contains a
         # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
@@ -464,12 +466,9 @@ class Output(eqx.Module):
         #    objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
         # )
         # out["residual"] = objective_function_vmapped(self.solution, self.parameters)
-        out["solution"] = self.solution
-        out["solver"] = self.multi_attempt_solution.asdict()
-        out["state"] = self.parameters.state.asdict(out["gas"]["phase"]["mass_kg"])
-        out["totals"] = self.totals_asdict()
+        # out["solution"] = self.solution
 
-        return out
+        # out["totals"] = self.totals_asdict()
 
     def quick_look(self) -> dict[str, Any]:
         """Quick look at the output.
@@ -477,7 +476,7 @@ class Output(eqx.Module):
         Returns:
             A nested dictionary of the output, suitable for quick inspection and comparison.
         """
-        out: dict[str, Any] = self.asdict()
+        out: dict[str, Any] = self.asdict(to_numpy=True)
         logger.info("Quick look output:\n%s", pformat(out))
 
         return out
