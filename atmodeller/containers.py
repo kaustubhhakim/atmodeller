@@ -6,14 +6,12 @@
 
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from dataclasses import asdict
-from typing import Any, Generic, Literal, Optional, TypeVar
+from typing import Any, Generic, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.solvers import RootFindParameters
 from jaxmod.type_aliases import NpBool, NpFloat, NpInt
 from jaxmod.units import unit_conversion
@@ -38,6 +36,7 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
     SpeciesProtocol,
+    TSpecies_co,
 )
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
@@ -47,8 +46,6 @@ from atmodeller.thermodata.core import (
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
 
 
 class ChemicalSpecies(eqx.Module):
@@ -396,291 +393,6 @@ def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
     return formula_matrix
 
 
-class ThermodynamicState(eqx.Module):
-    """A generic thermodynamic state
-
-    This must adhere to ThermodynamicStateProtocol.
-
-    Note:
-        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
-        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
-        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
-        between a Python float and an array for the same argument will trigger retracing or
-        recompilation, so keeping everything as arrays avoids this overhead.
-
-    Args:
-        temperature: Temperature in K
-        pressure: Pressure in bar
-        mass: Mass in kg. Defaults to ``1`` kg.
-        melt_fraction: Melt fraction by weight in kg/kg. Defaults to ``1`` kg/kg.
-        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
-            value for silicate melts.
-    """
-
-    temperature: Array
-    """Temperature in K"""
-    pressure: Array
-    """Pressure in bar"""
-    mass: Array
-    """Mass in kg"""
-    melt_fraction: Array
-    """Mass fraction of melt in kg/kg"""
-    molar_mass: Array
-    """Molar mass of the silicate in kg/mol"""
-
-    def __init__(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        mass: ArrayLike = 1,
-        melt_fraction: ArrayLike = 1,
-        molar_mass: ArrayLike = 60e-3,
-    ):
-        self.temperature = as_j64(temperature)
-        self.pressure = as_j64(pressure)
-        self.mass = as_j64(mass)
-        self.melt_fraction = as_j64(melt_fraction)
-        self.molar_mass = as_j64(molar_mass)
-
-    @property
-    def melt_mass(self) -> Array:
-        """Mass of the melt in kg"""
-        return self.mass * self.melt_fraction
-
-    @property
-    def melt_moles(self) -> Array:
-        """Moles of the melt"""
-        return self.melt_mass / self.molar_mass
-
-    @property
-    def solid_mass(self) -> Array:
-        """Mass of the solid in kg"""
-        return self.mass * (1.0 - self.melt_fraction)
-
-    @property
-    def solid_moles(self) -> Array:
-        """Moles of the solid"""
-        return self.solid_mass / self.molar_mass
-
-    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
-        """Gets the pressure.
-
-        Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
-
-        Returns:
-            Pressure in bar
-        """
-        del gas_mass
-
-        return self.pressure
-
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Array]:
-        """Gets a dictionary of the values as NumPy arrays.
-
-        Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
-
-        Returns:
-            A dictionary of the values
-        """
-        del gas_mass
-
-        base_dict: dict[str, Array] = asdict(self)
-        base_dict["melt_mass"] = self.melt_mass
-        base_dict["solid_mass"] = self.solid_mass
-
-        return base_dict
-
-
-class ThinAtmospherePlanet(eqx.Module):
-    """A planet with a thin atmosphere.
-
-    This must adhere to ThermodynamicStateProtocol.
-
-    Default values are for a fully molten Earth.
-
-    Note:
-        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
-        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
-        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
-        between a Python float and an array for the same argument will trigger retracing or
-        recompilation, so keeping everything as arrays avoids this overhead.
-
-    Args:
-        planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
-        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to ``0.295334691460966`` kg/kg (Earth).
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to ``1.0`` kg/kg.
-        surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
-        temperature: Temperature in K. Defaults to ``2000`` K.
-        pressure: Pressure in bar. Defaults to ``np.nan`` to solve for the mechanical pressure
-            balance at the surface.
-        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
-            value for silicate melts.
-    """
-
-    planet_mass: Array
-    """Mass of the planet in kg"""
-    core_mass_fraction: Array
-    """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: Array
-    """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: Array
-    """Radius of the surface in m"""
-    temperature: Array
-    """Temperature in K"""
-    pressure: Array
-    """Pressure in bar"""
-    molar_mass: Array
-    """Molar mass of the silicate in kg/mol"""
-
-    def __init__(
-        self,
-        planet_mass: ArrayLike = 5.972e24,
-        core_mass_fraction: ArrayLike = 0.295334691460966,
-        mantle_melt_fraction: ArrayLike = 1.0,
-        surface_radius: ArrayLike = 6371000,
-        temperature: ArrayLike = 2000,
-        pressure: ArrayLike = np.nan,
-        molar_mass: ArrayLike = 60e-3,
-    ):
-        self.planet_mass = as_j64(planet_mass)
-        self.core_mass_fraction = as_j64(core_mass_fraction)
-        self.mantle_melt_fraction = as_j64(mantle_melt_fraction)
-        self.surface_radius = as_j64(surface_radius)
-        self.temperature = as_j64(temperature)
-        self.pressure = as_j64(pressure)
-        self.molar_mass = as_j64(molar_mass)
-
-    @property
-    def mantle_mass(self) -> Array:
-        """Mantle mass in kg"""
-        return self.planet_mass * self.mantle_mass_fraction
-
-    @property
-    def mantle_moles(self) -> Array:
-        """Moles of the mantle"""
-        return self.mantle_mass / self.molar_mass
-
-    @property
-    def mantle_mass_fraction(self) -> Array:
-        """Mantle mass fraction in kg/kg"""
-        return 1 - self.core_mass_fraction
-
-    @property
-    def mantle_melt_mass(self) -> Array:
-        """Mass of the molten mantle"""
-        return self.mantle_mass * self.mantle_melt_fraction
-
-    @property
-    def mantle_melt_moles(self) -> Array:
-        """Moles of the molten mantle"""
-        return self.mantle_melt_mass / self.molar_mass
-
-    @property
-    def mantle_solid_mass(self) -> Array:
-        """Mass of the solid mantle"""
-        return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
-
-    @property
-    def mantle_solid_moles(self) -> Array:
-        """Moles of the solid mantle"""
-        return self.mantle_solid_mass / self.molar_mass
-
-    @property
-    def surface_area(self) -> Array:
-        """Surface area"""
-        return 4.0 * jnp.pi * jnp.square(self.surface_radius)
-
-    @property
-    def surface_gravity(self) -> Array:
-        """Surface gravity"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
-
-    # The following properties ensure compliance with ThermodynamicStateProtocol
-    @property
-    def mass(self) -> Array:
-        """Mantle mass in kg (alias for :attr:`mantle_mass`)"""
-        return self.mantle_mass
-
-    @property
-    def melt_fraction(self) -> Array:
-        """Mantle melt fraction in kg/kg (alias for :attr:`mantle_melt_fraction`)"""
-        return self.mantle_melt_fraction
-
-    @property
-    def melt_mass(self) -> Array:
-        """Mass of the molten mantle in kg (alias for :attr:`mantle_melt_mass`)"""
-        return self.mantle_melt_mass
-
-    @property
-    def melt_moles(self) -> Array:
-        """Moles of the molten mantle (alias for :attr:`mantle_melt_moles`)"""
-        return self.mantle_melt_moles
-
-    @property
-    def solid_mass(self) -> Array:
-        """Mass of the solid mantle in kg (alias for :attr:`mantle_solid_mass`)"""
-        return self.mantle_solid_mass
-
-    @property
-    def solid_moles(self) -> Array:
-        """Moles of the solid mantle (alias for :attr:`mantle_solid_moles`)"""
-        return self.mantle_solid_moles
-
-    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
-        """Gets the pressure.
-
-        A pressure is used if specified, otherwise the default behaviour is to compute the
-        pressure from the mechanical pressure balance at the planetary surface assuming the thin
-        atmosphere approximation. That is, the surface gravity is computed from the mass of the
-        planet alone and is assumed to act on all the mass of the atmosphere.
-
-        Args:
-            gas_mass: Gas mass in kg
-
-        Returns:
-            Pressure in bar
-        """
-        pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
-
-        mechanical_pressure: Float[Array, "..."] = (
-            gas_mass * self.surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
-        )
-        # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
-
-        pressure: Float[Array, "..."] = jnp.where(
-            pressure_specified, self.pressure, mechanical_pressure
-        )
-        # jax.debug.print("pressure = {out}", out=pressure)
-
-        return pressure
-
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Array]:
-        """Gets a dictionary of the values as NumPy arrays.
-
-        Args:
-            gas_mass: Gas mass in kg
-
-        Returns:
-            A dictionary of the values
-        """
-        base_dict: dict[str, Array] = asdict(self)
-        base_dict["pressure"] = self.get_pressure(gas_mass)
-        base_dict["mantle_mass"] = self.mantle_mass
-        base_dict["mantle_melt_mass"] = self.mantle_melt_mass
-        base_dict["mantle_solid_mass"] = self.mantle_solid_mass
-        base_dict["surface_area"] = self.surface_area
-        base_dict["surface_gravity"] = self.surface_gravity
-
-        return base_dict
-
-
-# The only planet supported so far is one with a thin atmosphere
-Planet = ThinAtmospherePlanet
-
-
 class FixedFugacityConstraint(eqx.Module):
     """A fixed fugacity constraint
 
@@ -772,6 +484,7 @@ class FugacityConstraintSet(eqx.Module):
         Returns:
             Mask indicating whether fugacity constraints are active or not
         """
+        # TODO: can remove broadcasting now using vmap?
         mask_list: list[Array] = [constraint.active() for constraint in self.constraints]
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(*[jnp.shape(m) for m in mask_list])
 
@@ -782,31 +495,32 @@ class FugacityConstraintSet(eqx.Module):
 
         return active_constraints
 
-    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
-        """Gets an output dictionary of the evaluated fugacity constraints
+    # TODO: remove this eventually when incorporated into Output
+    # def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
+    #     """Gets an output dictionary of the evaluated fugacity constraints
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
 
-        Returns:
-            An output dictionary
-        """
-        out: dict[str, Any] = {
-            "species": {
-                "activity": dict(
-                    zip(
-                        self.species.species_names,
-                        [
-                            jnp.exp(constraint.log_fugacity(temperature, pressure))
-                            for constraint in self.constraints
-                        ],
-                    )
-                )
-            }
-        }
+    #     Returns:
+    #         An output dictionary
+    #     """
+    #     out: dict[str, Any] = {
+    #         "species": {
+    #             "activity": dict(
+    #                 zip(
+    #                     self.species.species_names,
+    #                     [
+    #                         jnp.exp(constraint.log_fugacity(temperature, pressure))
+    #                         for constraint in self.constraints
+    #                     ],
+    #                 )
+    #             )
+    #         }
+    #     }
 
-        return out
+    #     return out
 
     def log_fugacity(
         self, temperature: ArrayLike, pressure: ArrayLike
@@ -851,7 +565,7 @@ class MassConstraintSet(eqx.Module):
         units: Units of the abundance. Defaults to ``mass``.
     """
 
-    abundance: Float[Array, "... elements"] = eqx.field(converter=as_j64)
+    abundance: Float[Array, "#n_batch n_elements"] = eqx.field(converter=as_j64)
     """Abundance"""
     species: SpeciesCollection
     """Species collection"""
@@ -910,7 +624,7 @@ class MassConstraintSet(eqx.Module):
 
         return cls(abundance, species, units)
 
-    def abundance_mol(self) -> Float[Array, "... elements"]:
+    def abundance_mol(self) -> Float[Array, "#n_batch n_elements"]:
         """Abundance by moles for all elements
 
         Returns:
@@ -923,7 +637,7 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    def abundance_mass(self) -> Float[Array, "... elements"]:
+    def abundance_mass(self) -> Float[Array, "#n_batch n_elements"]:
         """Abundance by mass for all elements
 
         Returns:
@@ -936,7 +650,7 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    def log_abundance(self) -> Float[Array, "... elements"]:
+    def log_abundance(self) -> Float[Array, "... n_elements"]:
         """Element abundances in log-space
 
         The output shape depends on the calling context:
@@ -971,21 +685,22 @@ class MassConstraintSet(eqx.Module):
 
         return jnp.atleast_1d(log_abundance)
 
-    def asdict(self) -> dict[str, Any]:
-        """Gets an output dictionary
+    # TODO: can probably remove once incorporated into Output
+    # def asdict(self) -> dict[str, Any]:
+    #     """Gets an output dictionary
 
-        Returns:
-            An output dictionary with the abundance by moles and mass for all elements
-        """
-        elements: tuple[str, ...] = self.species.unique_elements
-        out: dict[str, Any] = {
-            "elements": {
-                "number_moles": dict(zip(elements, jnp.asarray(self.abundance_mol()).T)),
-                "mass_kg": dict(zip(elements, jnp.asarray(self.abundance_mass()).T)),
-            }
-        }
+    #     Returns:
+    #         An output dictionary with the abundance by moles and mass for all elements
+    #     """
+    #     elements: tuple[str, ...] = self.species.unique_elements
+    #     out: dict[str, Any] = {
+    #         "elements": {
+    #             "number_moles": dict(zip(elements, jnp.asarray(self.abundance_mol()).T)),
+    #             "mass_kg": dict(zip(elements, jnp.asarray(self.abundance_mass()).T)),
+    #         }
+    #     }
 
-        return out
+    #     return out
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
