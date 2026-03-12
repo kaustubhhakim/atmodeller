@@ -12,11 +12,11 @@ per-species formula and composition data. It lives here rather than in ``contain
 ``containers.py`` imports from this module — moving it there would create a circular import.
 """
 
-from typing import Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, TypeVar, runtime_checkable
 
 import equinox as eqx
 from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Bool
 from molmass import Formula
 
 
@@ -102,6 +102,9 @@ class SpeciesProtocol(Protocol):
     def include_in_phase_mass(self) -> bool:
         """Whether the species is included in phase-level mass, mole, and fraction aggregations"""
         ...
+
+
+TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
 
 
 @runtime_checkable
@@ -201,55 +204,4 @@ class SolubilityProtocol(Protocol):
         Returns:
             Concentration in ppmw
         """
-        ...
-
-
-@runtime_checkable
-class ThermodynamicStateProtocol(Protocol):
-    @property
-    def mass(self) -> Array:
-        """Total mass in kg"""
-        ...
-
-    @property
-    def melt_fraction(self) -> Array:
-        """Melt mass fraction"""
-        ...
-
-    @property
-    def melt_mass(self) -> Array:
-        """Melt mass in kg"""
-        ...
-
-    @property
-    def melt_moles(self) -> Array:
-        """Moles of melt"""
-        ...
-
-    @property
-    def molar_mass(self) -> Array:
-        """Molar mass of the solvent in kg/mol"""
-        ...
-
-    @property
-    def solid_mass(self) -> Array:
-        """Solid mass in kg"""
-        ...
-
-    @property
-    def solid_moles(self) -> Array:
-        """Moles of solid"""
-        ...
-
-    @property
-    def temperature(self) -> Array:
-        """Temperature in K"""
-        ...
-
-    def get_pressure(self, gas_mass: Array) -> Array:
-        """Pressure in bar"""
-        ...
-
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict:
-        """Dictionary representation"""
         ...
