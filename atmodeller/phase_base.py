@@ -527,7 +527,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
 
     # Background component outputs
     @property
-    def log_background_moles(self) -> Float[Array, "... 1"]:
+    def log_background_number_moles(self) -> Float[Array, "... 1"]:
         return self.log_background_mass - self.log_background_molar_mass
 
     @property
@@ -539,8 +539,8 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         return jnp.exp(self.log_background_molar_mass)
 
     @property
-    def background_moles(self) -> Float[Array, "..."]:
-        return jnp.exp(self.log_background_moles)
+    def background_number_moles(self) -> Float[Array, "... 1"]:
+        return jnp.exp(self.log_background_number_moles)
 
     # Element outputs
     @property
@@ -562,7 +562,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def phase_number_moles(self) -> Float[Array, "#n_batch 1"]:
         return jnp.exp(
-            self.phase.get_log_phase_moles(self.log_number_moles, self.log_background_moles)
+            self.phase.get_log_phase_moles(self.log_number_moles, self.log_background_number_moles)
         )
 
     @property
@@ -614,7 +614,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
                 # function.
                 jnp.squeeze(self.temperature),
                 jnp.squeeze(self.pressure),
-                jnp.squeeze(self.log_background_moles),
+                jnp.squeeze(self.log_background_number_moles),
             )
         )
         return jnp.exp(log_activity)
@@ -636,10 +636,43 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def species_mole_fraction(self) -> Float[Array, "#n_batch n_species"]:
         log_mole_fraction: Float[Array, "#n_batch n_species"] = self.phase.get_log_mole_fraction(
-            self.log_number_moles, self.log_background_moles
+            self.log_number_moles, self.log_background_number_moles
         )
         return jnp.exp(log_mole_fraction)
 
     @property
     def species_number_moles(self) -> Float[Array, "#n_batch n_species"]:
         return jnp.exp(self.log_number_moles)
+
+    def asdict(self) -> dict[str, Any]:
+        """Dictionary representation of the output for downstream processing or analysis.
+
+        Returns:
+            A dictionary containing phase-level and species-level properties
+        """
+        out: dict[str, Any] = {}
+        out["phase"] = {
+            "background_mass": self.background_mass,
+            "background_number_moles": self.background_number_moles,
+            "background_molar_mass": self.background_molar_mass,
+            "mass": self.phase_mass,
+            "number_moles": self.phase_number_moles,
+            "molar_mass": self.phase_molar_mass,
+            "species_to_phase_mass_ratio": self.species_to_phase_mass_ratio,
+        }
+        out["elements"] = {
+            "names": self.phase.species.unique_elements,
+            "mass": self.element_mass,
+            "number_moles": self.element_number_moles,
+        }
+        out["species"] = {
+            "names": self.phase.species_names,
+            "activity": self.species_activity,
+            "mass": self.species_mass,
+            "mass_fraction": self.species_mass_fraction,
+            "number_moles": self.species_number_moles,
+            "mole_fraction": self.species_mole_fraction,
+            "include_in_phase_mass": self.include_in_mass_phase,
+        }
+
+        return out
