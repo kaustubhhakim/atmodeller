@@ -198,7 +198,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
         log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
+        log_background_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
     ) -> GasPhaseOutput:
         r"""Constructs a jittable output helper object for phase-level and species-level properties.
 

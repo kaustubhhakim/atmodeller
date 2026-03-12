@@ -404,17 +404,17 @@ class Output(eqx.Module):
         return self.parameters.state.asdict(jnp.squeeze(self.gas.phase_mass))
 
     @property
-    def temperature(self) -> Float[Array, "..."]:
+    def temperature(self) -> Float[Array, "#n_batch 1"]:
         """Temperature in K"""
-        return jnp.expand_dims(self.parameters.state.temperature, -1)
+        return jnp.atleast_2d(self.parameters.state.temperature).T
 
     @property
-    def pressure(self) -> Float[Array, "..."]:
+    def pressure(self) -> Float[Array, "#n_batch 1"]:
         """Pressure in bar"""
-        return jnp.expand_dims(get_total_pressure(self.parameters, self.solution), -1)
+        return jnp.atleast_2d(get_total_pressure(self.parameters, self.solution)).T
 
     @property
-    def solution(self) -> Float[Array, "... twice_species"]:
+    def solution(self) -> Float[Array, "#n_batch twice_species"]:
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
 

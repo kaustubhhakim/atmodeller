@@ -224,7 +224,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         background: Float[Array, "... 1"] = jnp.broadcast_to(
             log_background_mass, log_mass.shape[:-1]
         )[..., jnp.newaxis]
-        log_mass_with_background: Float[Array, "... n_species+1"] = jnp.concatenate(
+        log_mass_with_background: Float[Array, "... n_species_plus_one"] = jnp.concatenate(
             [log_mass, background], axis=-1
         )
 
@@ -277,7 +277,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         background: Float[Array, "... 1"] = jnp.broadcast_to(
             log_background_moles, log_number_moles.shape[:-1]
         )[..., jnp.newaxis]
-        log_moles_with_background: Float[Array, "... n_species+1"] = jnp.concatenate(
+        log_moles_with_background: Float[Array, "... n_species_plus_one"] = jnp.concatenate(
             [log_number_moles, background], axis=-1
         )
 
@@ -309,7 +309,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         self,
         log_number_moles: Float[Array, "... n_species"],
         log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
+        log_background_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
     ) -> Float[Array, "... 1"]:
         r"""Gets the log molar mass of the phase.
 
@@ -341,7 +341,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         temperature: Float[Array, "..."],
         pressure: Float[Array, "..."],
         log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
+        log_background_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
     ) -> "PhaseOutput[Self]":
         r"""Constructs a jittable output helper object for phase-level and species-level properties.
 
@@ -414,12 +414,12 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         return jnp.asarray(self.phase.species.phase_mass_mask.astype(bool))
 
     @property
-    def formula_matrix(self) -> Float[Array, "n_elements n_species"]:
+    def formula_matrix(self) -> Integer[Array, "n_elements n_species"]:
         return jnp.asarray(get_formula_matrix(self.phase.species))
 
     @property
     def log_stoich_matrix(self) -> Float[Array, "n_element n_species"]:
-        formula_matrix: Float[Array, "n_elements n_species"] = self.formula_matrix
+        formula_matrix: Integer[Array, "n_elements n_species"] = self.formula_matrix
         return jnp.where(formula_matrix > 0, jnp.log(formula_matrix), -jnp.inf)
 
     # Background component outputs
