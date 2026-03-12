@@ -8,7 +8,7 @@ import logging
 import pickle
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax
@@ -29,44 +29,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # These functions all feel awkward and clunky, and are ultimately not compatible within a jitted
 # workflow
-def _flatten_dict(d: dict, parent_keys: tuple = ()) -> dict[tuple, Any]:
-    """Iteratively flattens a nested dict to {path_tuple: leaf} mapping.
-
-    Args:
-        d: The nested dictionary to flatten.
-        parent_keys: A tuple of keys representing the path prefix to prepend to all
-            entries.  Defaults to an empty tuple (top-level traversal).
-
-    Returns:
-        A flat dictionary mapping each leaf's full key path (as a tuple) to its value.
-    """
-    result: dict[tuple, Any] = {}
-    stack: list[tuple[tuple, dict]] = [(parent_keys, d)]
-    while stack:
-        prefix, current = stack.pop()
-        for k, v in current.items():
-            path = prefix + (k,)
-            if isinstance(v, dict):
-                stack.append((path, v))
-            else:
-                result[path] = v
-    return result
-
-
-def _set_nested(d: dict, path: tuple, value: Any) -> None:
-    """Sets a value in a nested dict given a path tuple, creating intermediate dicts.
-
-    Args:
-        d: The nested dictionary to modify in place.
-        path: A tuple of keys describing the location of the value.  Intermediate
-            dicts are created as needed.
-        value: The value to assign at the leaf position identified by ``path``.
-    """
-    for key in path[:-1]:
-        d = d.setdefault(key, {})
-
-    d[path[-1]] = value
-
 
 # _SUMMABLE_KEYS: frozenset[str] = frozenset({"mass_kg", "number_moles"})
 # """Leaf-level keys whose values are summed across phases by :func:`_sum_phase_outputs`."""
@@ -589,41 +551,56 @@ class Output(eqx.Module):
 
         logger.info("Output written to %s", output_file)
 
-    def compare(self, target: dict[str, Any], rtol: float, atol: float, log: bool = False) -> bool:
-        """Compares matching keys in target to quick_look output.
-
-        Only keys present in both target and quick_look are compared. Keys present in one but not
-        the other are ignored.
+    def compare(
+        self,
+        d1: dict,
+        rtol: float,
+        atol: float,
+        log: bool = False,
+        d2: Optional[dict] = None,
+        path: tuple = (),
+        all_match: bool = True,
+    ) -> bool:
+        """Compares two nested dictionaries of output.
 
         Args:
-            target: Nested dictionary with the same structure as quick_look output
+            d1: Target dictionary
             rtol: Relative tolerance for comparison
             atol: Absolute tolerance for comparison
-            log: Compare closeness in log10-space. Defaults to ``False``.
+            log: Whether to compare the base-10 logarithm of the values
+            d2: Dictionary to compare against. If ``None``, compares against the current output.
+                Defaults to ``None``.
+            path: Internal parameter for tracking the current path in the nested structure during
+                recursion. Should not be set by the user. Defaults to an empty tuple.
+            all_match: Internal parameter for tracking whether all comparisons have matched so far
+                during recursion. Should not be set by the user. Defaults to ``True``.
 
         Returns:
-            True if all matching keys agree within tolerance
+            ``True`` if all values in the dictionaries match within the specified tolerances, else
+            ``False``.
         """
-        current_map: dict[tuple, Any] = _flatten_dict(self.quick_look())
-        target_map: dict[tuple, Any] = _flatten_dict(target)
-
-        result: dict[str, Any] = {}
-        all_match: bool = True
-
-        for path, target_value in target_map.items():
-            if path not in current_map:
-                continue
-            a: NpArray = np.atleast_1d(current_map[path])
-            b: NpArray = np.atleast_1d(target_value)
-            if log:
-                a, b = np.log10(a), np.log10(b)
-
-            match: bool = bool(np.allclose(a, b, rtol=rtol, atol=atol))
-            _set_nested(result, path, match)
-            all_match = all_match and match
-
-        logger.info("\nComparison result:\n%s", pformat(result))
-        logger.info("All matching keys agree within tolerance: %s", all_match)
+        if d2 is None:
+            d2 = self.asdict(to_numpy=True)
+        keys = d1.keys()
+        for key in keys:
+            v1 = d1.get(key)
+            v2 = d2.get(key)
+            current_path = path + (key,)
+            if isinstance(v1, dict) and isinstance(v2, dict):
+                all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
+            else:
+                if isinstance(v1, np.ndarray) and isinstance(v2, np.ndarray):
+                    if log:
+                        v1, v2 = np.log10(v1), np.log10(v2)
+                    is_close: bool = np.allclose(v1, v2, rtol=rtol, atol=atol)
+                    all_match = all_match and is_close
+                    logger.info(
+                        "Comparing %s: %s vs %s --> %s",
+                        current_path,
+                        v1,
+                        v2,
+                        "match" if is_close else "mismatch",
+                    )
 
         return all_match
 
