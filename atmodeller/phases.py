@@ -33,471 +33,74 @@ explicit species in the solver.
 """
 
 import logging
-from abc import abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, Self, cast
+from typing import Self
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jax.scipy.special import logsumexp
 from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.type_aliases import NpFloat
-from jaxmod.utils import safe_exp, to_hashable
+from jaxmod.utils import to_hashable
 from jaxtyping import Array, Float, Integer
-from molmass import Formula
 
 from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
-from atmodeller.containers import (
-    ChemicalSpecies,
-    SpeciesCollection,
-    TSpecies_co,
-    get_formula_matrix,
-)
-from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.containers import ChemicalSpecies, SpeciesCollection
+from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
+from atmodeller.phase_base import BasePhase, PhaseOutput, build_species_collection
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def _build_species_collection(
-    species: str | Iterable[str], factory: Callable[[str], TSpecies_co]
-) -> SpeciesCollection[TSpecies_co]:
-    """Normalizes input and builds a species collection using a factory.
-
-    Args:
-        species: A single species name or an iterable of names
-        factory: A function that takes a Hill formula and returns a species instance
-
-    Returns:
-        A SpeciesCollection containing the constructed species
-    """
-    if isinstance(species, str):
-        species = [species]
-
-    species_list: list[TSpecies_co] = []
-
-    for species_ in species:
-        hill_formula: str = Formula(species_).formula
-        species_list.append(factory(hill_formula))
-
-    return SpeciesCollection(species_list)
-
-
-class BasePhase(eqx.Module, Generic[TSpecies_co]):
-    """Base class for all phases."""
-
-    species: SpeciesCollection[TSpecies_co]
-    """Collection of species in the phase"""
-
-    @abstractmethod
-    def __init__(self, species: Iterable[TSpecies_co]):
-        """Initializes a phase with a collection of species.
-
-        Args:
-            species: An iterable of species belonging to the phase
-        """
-
-    # Abstract, but commented out because vmap_log_activity may be an instance attribute assigned
-    # in __init_, which does not satisfy the ABC mechanism.
-    # @abstractmethod
-    def vmap_log_activity(
-        self,
-        species_indices: Integer[Array, " n_species"],
-        temperature: Float[Array, "..."],
-        pressure: Float[Array, "..."],
-    ) -> Float[Array, "... n_species"]:
-        """Applies the log activity function for each species in the phase.
-
-        Args:
-            species_indices: Integer array of shape (n_species,) containing the indices of the
-                species in the phase. This is passed to the log activity function to identify
-                which species' activity to compute.
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log activity of each species in the phase
-        """
-        del species_indices
-        del temperature
-        del pressure
-
-        raise NotImplementedError("vmap_log_activity must be implemented by subclasses")
-
-    @classmethod
-    def empty(cls) -> Self:
-        """Returns an empty phase instance."""
-        return cls([])
+class GasPhaseOutput(PhaseOutput["GasPhase"]):
+    """Output helper class for GasPhase-specific properties."""
 
     @property
-    def species_names(self) -> tuple[str, ...]:
-        """List of species names in the phase."""
-        return self.species.species_names
+    def log10dIW_1_bar(self) -> Float[Array, "..."]:
+        """Log10 of the oxygen fugacity relative to the IW buffer at 1 bar."""
+        O2_index: NpFloat = self.phase.O2_index
 
-    def get_log_activity(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        temperature: Float[Array, "..."],
-        pressure: Float[Array, "..."],
-        log_background_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-    ) -> Float[Array, "... n_species"]:
-        """Gets the log activity of each species in the phase.
+        def no_oxygen() -> Float[Array, "..."]:
+            return jnp.full(self.log_number_moles.shape[0], jnp.nan)
 
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            log_background_moles: Log moles of the background component. Defaults to negative
-                infinity (i.e., no background component).
+        def with_oxygen() -> Float[Array, "..."]:
+            log10_fugacity = jnp.log10(self.species_activity[..., O2_index.astype(int)])
+            buffer: RedoxBufferProtocol = IronWustiteBuffer()
+            buffer_at_one_bar = buffer.log10_fugacity(self.temperature, 1.0)
+            log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
+            return log10_shift_at_one_bar
 
-        Returns:
-            Log activity of each species in the phase
-        """
-        if self.species.number_species == 0:
-            return jnp.zeros_like(log_number_moles)
+        return lax.cond(jnp.isnan(O2_index), no_oxygen, with_oxygen)
 
-        # Log activity coefficient of pure species
-        log_activity: Float[Array, "... n_species"] = self.vmap_log_activity(
-            jnp.arange(self.species.number_species), temperature, pressure
-        )
-        log_mole_fraction: Float[Array, "... n_species"] = self.get_log_mole_fraction(
-            log_number_moles, log_background_moles
-        )
-        log_activity: Float[Array, "... n_species"] = log_activity + log_mole_fraction
+    @property
+    def log10dIW_P(self) -> Float[Array, "..."]:
+        """Log10 of the oxygen fugacity relative to the IW buffer at the pressure of interest."""
+        O2_index: NpFloat = self.phase.O2_index
 
-        return log_activity
+        def no_oxygen() -> Float[Array, "..."]:
+            return jnp.full(self.log_number_moles.shape[0], jnp.nan)
 
-    def get_log_activity_with_stability(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_stability: Float[Array, "... n_species"],
-        temperature: Float[Array, "..."],
-        pressure: Float[Array, "..."],
-        log_background_moles: Float[Array, ""] = jnp.array(-jnp.inf),
-    ) -> Float[Array, "... n_species"]:
-        """Gets the log activity of each species in the phase, accounting for stability.
+        def with_oxygen() -> Float[Array, "..."]:
+            log10_fugacity = jnp.log10(self.species_activity[..., O2_index.astype(int)])
+            buffer: RedoxBufferProtocol = IronWustiteBuffer()
+            buffer_at_P = buffer.log10_fugacity(self.temperature, self.pressure)
+            log10_shift_at_P = log10_fugacity - buffer_at_P
+            return log10_shift_at_P
 
-        Unstable species are assigned a log activity of negative infinity.
+        return lax.cond(jnp.isnan(O2_index), no_oxygen, with_oxygen)
 
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_stability: Log stability of each species in the phase
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            log_background_moles: Log moles of the background component. Defaults to negative
-                infinity (i.e., no background component).
+    @property
+    def species_partial_pressure(self) -> Float[Array, "... n_species"]:
+        """Partial pressure of each species in bar"""
+        return self.pressure * self.species_mole_fraction
 
-        Returns:
-            Log activity of each species in the phase, with unstable species set to negative
-                infinity
-        """
-        log_activity: Float[Array, "... n_species"] = self.get_log_activity(
-            log_number_moles, temperature, pressure, log_background_moles
-        )
-        log_stability_masked: Float[Array, "... n_species"] = jnp.where(
-            self.species.active_stability, log_stability, -jnp.inf
-        )
-        log_activity_with_stability: Float[Array, "... n_species"] = log_activity - safe_exp(
-            log_stability_masked
-        )
-
-        return log_activity_with_stability
-
-    def apply_phase_mass_mask(
-        self, log_array: Float[Array, "... n_species"]
-    ) -> Float[Array, "... n_species"]:
-        """Zeros out (in log-space) species that do not contribute to phase-level aggregations.
-
-        Species with ``include_in_phase_mass=False`` are replaced with ``-inf``; all others are
-        passed through unchanged.
-
-        Args:
-            log_array: Log-space values whose entries for non-contributing species are to be masked
-
-        Returns:
-            The input array with non-contributing species set to ``-inf``.
-        """
-        log_mask: Float[Array, " n_species"] = jnp.where(
-            self.species.phase_mass_mask, 0.0, -jnp.inf
-        )
-
-        return log_array + log_mask
-
-    def get_log_mass(
-        self, log_number_moles: Float[Array, "... n_species"]
-    ) -> Float[Array, "... n_species"]:
-        """Gets the log mass of each species in the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-
-        Returns:
-            Log mass of each species in the phase in kg
-        """
-        log_mass: Float[Array, "... n_species"] = log_number_moles + jnp.log(
-            self.species.molar_masses
-        )
-
-        return log_mass
-
-    def get_log_phase_mass(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_background_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
-    ) -> Float[Array, "... 1"]:
-        """Gets the log mass of the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_background_mass: Log mass of the background component in kg. Defaults to negative
-                infinity (i.e., no background mass).
-
-        Returns:
-            Log mass of the phase in kg
-        """
-        log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
-        log_mass = self.apply_phase_mass_mask(log_mass)
-
-        # jnp.append without axis flattens its inputs, collapsing any batch dimensions.
-        # Instead, broadcast the background scalar to the batch shape and concatenate
-        # along the species axis so the result remains (... n_species+1).
-        background: Float[Array, "... 1"] = jnp.broadcast_to(
-            log_background_mass, log_mass.shape[:-1]
-        )[..., jnp.newaxis]
-        log_mass_with_background: Float[Array, "... n_species_plus_1"] = jnp.concatenate(
-            [log_mass, background], axis=-1
-        )
-
-        return logsumexp(log_mass_with_background, axis=-1, keepdims=True)
-
-    def get_log_mass_fraction(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_background_mass: Float[Array, "..."] = jnp.asarray(-jnp.inf),
-    ) -> Float[Array, "... n_species"]:
-        """Gets the log mass fraction of the species in the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_background_mass: Log mass of the background component in kg. Defaults to negative
-                infinity (i.e., no background component).
-
-        Returns:
-            Log mass fraction of each species in the phase
-        """
-        log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
-        log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
-            log_number_moles, log_background_mass
-        )
-        log_mass_fraction: Float[Array, "... n_species"] = log_mass - log_phase_mass
-        # jax.debug.print("log_mass_fraction = {out}", out=log_mass_fraction)
-
-        return log_mass_fraction
-
-    def get_log_phase_moles(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_background_moles: Float[Array, "..."] = jnp.asarray(-jnp.inf),
-    ) -> Float[Array, "... 1"]:
-        """Gets the log moles of the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_background_moles: Log moles of the background component. Defaults to negative
-                infinity (i.e., no background moles).
-
-        Returns:
-            Log moles of the phase in mol
-        """
-        log_number_moles = self.apply_phase_mass_mask(log_number_moles)
-
-        # jnp.append without axis flattens its inputs, collapsing any batch dimensions.
-        # Instead, broadcast the background scalar to the batch shape and concatenate
-        # along the species axis so the result remains (... n_species+1).
-        background: Float[Array, "... 1"] = jnp.broadcast_to(
-            log_background_moles, log_number_moles.shape[:-1]
-        )[..., jnp.newaxis]
-        log_moles_with_background: Float[Array, "... n_species_plus_1"] = jnp.concatenate(
-            [log_number_moles, background], axis=-1
-        )
-
-        return logsumexp(log_moles_with_background, axis=-1, keepdims=True)
-
-    def get_log_mole_fraction(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_background_moles: Float[Array, "..."] = jnp.array(-jnp.inf),
-    ) -> Float[Array, "... n_species"]:
-        """Gets the log mole fraction of the species in the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_background_moles: Log moles of the background component in mol. Defaults to
-                negative infinity (i.e., no background component).
-
-        Returns:
-            Log mole fraction of each species in the phase
-        """
-        log_phase_moles: Float[Array, "... 1"] = self.get_log_phase_moles(
-            log_number_moles, log_background_moles
-        )
-        log_mole_fraction: Float[Array, "... n_species"] = log_number_moles - log_phase_moles
-
-        return log_mole_fraction
-
-    def get_log_phase_molar_mass(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    ) -> Float[Array, "... 1"]:
-        r"""Gets the log molar mass of the phase.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_background_molar_mass: Log molar mass of the background component in
-                kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of
-                1 kg mol\ :sup:`-1`); only meaningful when ``log_background_mass`` is finite.
-            log_background_mass: Log mass of the background component in kg. Defaults to negative
-                infinity (i.e., no background component).
-
-        Returns:
-            Log molar mass of the phase in kg mol\ :sup:`-1`
-        """
-        log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
-            log_number_moles, log_background_mass
-        )
-        log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
-        log_number_total: Float[Array, "... 1"] = self.get_log_phase_moles(
-            log_number_moles, log_background_moles
-        )
-
-        return log_phase_mass - log_number_total
-
-    def output(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_stability: Float[Array, "... n_species"],
-        temperature: Float[Array, "..."],
-        pressure: Float[Array, "..."],
-        log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    ) -> dict[str, Any]:
-        r"""Outputs phase-level and species-level properties.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_stability: Log stability of each species in the phase.
-            temperature: Temperature in K.
-            pressure: Pressure in bar.
-            log_background_molar_mass: Log molar mass of the background component in
-                kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of 1 kg mol\ :sup:`-1`)
-                ; only meaningful when ``log_background_mass`` is finite.
-            log_background_mass: Log mass of the background component in kg. Defaults to negative
-                infinity (i.e., no background component).
-
-        Returns:
-            A dictionary containing phase-level and species-level properties
-        """
-        log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
-
-        # Elements
-        formula_matrix_: Float[Array, "n_elements n_species"] = jnp.asarray(
-            get_formula_matrix(self.species)
-        )
-        log_stoich_matrix: Float[Array, "n_element n_species"] = jnp.where(
-            formula_matrix_ > 0, jnp.log(formula_matrix_), -jnp.inf
-        )
-        log_terms: Array = log_number_moles[..., None, :] + log_stoich_matrix
-        log_elements: Array = cast(Array, logsumexp(log_terms, axis=-1))
-
-        log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(
-            log_number_moles, log_background_mass
-        )
-
-        # Sum of all species mass (no background, no mask), for comparison with the phase total.
-        # For a true dilute system, this provides a check that the dissolved content is in the
-        # dilute approximation. Otherwise, depending on the assumptions and objectives of the user,
-        # it provides a metric of how much the tracked species contribute to the total phase mass.
-        log_species_mass_sum: Float[Array, "... 1"] = logsumexp(
-            self.get_log_mass(log_number_moles), axis=-1, keepdims=True
-        )
-
-        out: dict[str, Any] = {
-            "phase": {
-                "number_moles": jnp.squeeze(
-                    jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
-                ),
-                "mass_kg": jnp.squeeze(jnp.exp(log_phase_mass)),
-                "molar_mass_kg_per_mol": jnp.squeeze(
-                    jnp.exp(
-                        self.get_log_phase_molar_mass(
-                            log_number_moles, log_background_molar_mass, log_background_mass
-                        )
-                    )
-                ),
-                "background_molar_mass_kg_per_mol": jnp.exp(log_background_molar_mass),
-                "background_mass_kg": jnp.exp(log_background_mass),
-                "species_to_phase_mass_ratio": jnp.squeeze(
-                    jnp.exp(log_species_mass_sum - log_phase_mass)
-                ),
-            },
-            "elements": {
-                "number_moles": dict(zip(self.species.unique_elements, jnp.exp(log_elements).T)),
-                "mass_kg": dict(
-                    zip(
-                        self.species.unique_elements,
-                        jnp.exp(log_elements + jnp.log(self.species.element_molar_masses)).T,
-                    )
-                ),
-            },
-            "species": {
-                "number_moles": dict(zip(self.species_names, jnp.exp(log_number_moles).T)),
-                "mole_fraction": dict(
-                    zip(
-                        self.species_names,
-                        jnp.exp(
-                            self.get_log_mole_fraction(log_number_moles, log_background_moles)
-                        ).T,
-                    )
-                ),
-                "mass_kg": dict(
-                    zip(self.species_names, jnp.exp(self.get_log_mass(log_number_moles)).T)
-                ),
-                "mass_fraction": dict(
-                    zip(
-                        self.species_names,
-                        jnp.exp(
-                            self.get_log_mass_fraction(log_number_moles, log_background_mass)
-                        ).T,
-                    )
-                ),
-                "activity": dict(
-                    zip(
-                        self.species_names,
-                        jnp.exp(
-                            self.get_log_activity_with_stability(
-                                log_number_moles,
-                                log_stability,
-                                temperature,
-                                pressure,
-                                log_background_moles,
-                            )
-                        ).T,
-                    )
-                ),
-                "include_in_phase_mass": dict(
-                    zip(self.species_names, self.species.phase_mass_mask.astype(bool))
-                ),
-            },
-        }
-
-        return out
-
-    def __len__(self) -> int:
-        return len(self.species)
+    @property
+    def volume(self) -> Float[Array, "..."]:
+        r"""Volume of the gas phase in m\ :sup:`3`"""
+        return self.phase_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
@@ -548,7 +151,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         Returns:
             An instance
         """
-        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
+        species_collection: SpeciesCollection[ChemicalSpecies] = build_species_collection(
             species, lambda hill: ChemicalSpecies.create_gas(hill, state=GAS_STATE)
         )
 
@@ -579,10 +182,8 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         pressure: Float[Array, "..."],
         log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
         log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    ) -> dict[str, Any]:
-        r"""Outputs phase-level and species-level properties in a human-readable format.
-
-        Single conversion boundary: JAX -> NumPy -> dict
+    ) -> GasPhaseOutput:
+        r"""Constructs a jittable output helper object for phase-level and species-level properties.
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
@@ -590,15 +191,17 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             temperature: Temperature in K
             pressure: Pressure in bar
             log_background_molar_mass: Log molar mass of the background component in
-                kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of 1 kg mol\ :sup:`-1`)
-                ; only meaningful when ``log_background_mass`` is finite.
+                kg mol\ :sup:`-1`. Defaults to ``0.0`` (dummy value of 1 kg mol\ :sup:`-1`);
+                only meaningful when ``log_background_mass`` is finite.
             log_background_mass: Log mass of the background component in kg. Defaults to negative
                 infinity (i.e., no background component).
 
         Returns:
-            A dictionary containing phase-level and species-level properties
+            An output helper object for accessing and manipulating output quantities in a
+            structured, jittable form.
         """
-        out: dict[str, Any] = super().output(
+        output: GasPhaseOutput = GasPhaseOutput(
+            self,
             log_number_moles,
             log_stability,
             temperature,
@@ -607,38 +210,77 @@ class GasPhase(BasePhase[ChemicalSpecies]):
             log_background_mass,
         )
 
-        log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
+        return output
 
-        out["phase"]["pressure_bar"] = jnp.squeeze(jnp.asarray(pressure))
-        out["species"]["partial_pressure_bar"] = dict(
-            zip(
-                self.species_names,
-                jnp.asarray(pressure)
-                * jnp.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
-            )
-        )
-        number_moles: NpFloat = np.squeeze(
-            jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
-        )
-        out["phase"]["volume_m3"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
+    # @override
+    # def output(
+    #     self,
+    #     log_number_moles: Float[Array, "... n_species"],
+    #     log_stability: Float[Array, "... n_species"],
+    #     temperature: Float[Array, "..."],
+    #     pressure: Float[Array, "..."],
+    #     log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
+    #     log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
+    # ) -> dict[str, Any]:
+    #     r"""Outputs phase-level and species-level properties in a human-readable format.
 
-        # TODO: Need JAX compatible switch
-        # # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
-        # if not jnp.isnan(self.O2_index):
-        #     log10_fugacity = jnp.log10(out["species"]["activity"]["O2_g"])
-        #     buffer: RedoxBufferProtocol = IronWustiteBuffer()
-        #     # Shift at 1 bar
-        #     buffer_at_one_bar = jnp.asarray(buffer.log10_fugacity(temperature, 1.0))
-        #     log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
-        #     # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
-        #     out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
-        #     # Shift at actual pressure
-        #     buffer_at_P = jnp.asarray(buffer.log10_fugacity(temperature, pressure))
-        #     log10_shift_at_P = log10_fugacity - buffer_at_P
-        #     # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
-        #     out["phase"]["log10dIW_P"] = log10_shift_at_P
+    #     Single conversion boundary: JAX -> NumPy -> dict
 
-        return out
+    #     Args:
+    #         log_number_moles: Log number of moles of each species in the phase
+    #         log_stability: Log stability of each species in the phase
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+    #         log_background_molar_mass: Log molar mass of the background component in
+    #             kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of 1 kg mol\ :sup:`-1`)
+    #             ; only meaningful when ``log_background_mass`` is finite.
+    #         log_background_mass: Log mass of the background component in kg. Defaults to negative
+    #             infinity (i.e., no background component).
+
+    #     Returns:
+    #         A dictionary containing phase-level and species-level properties
+    #     """
+    #     out: dict[str, Any] = super().output(
+    #         log_number_moles,
+    #         log_stability,
+    #         temperature,
+    #         pressure,
+    #         log_background_molar_mass,
+    #         log_background_mass,
+    #     )
+
+    # log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
+
+    # out["phase"]["pressure_bar"] = jnp.squeeze(jnp.asarray(pressure))
+    # out["species"]["partial_pressure_bar"] = dict(
+    #    zip(
+    #        self.species_names,
+    #        jnp.asarray(pressure)
+    #        * jnp.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
+    #    )
+    # )
+    # number_moles: NpFloat = np.squeeze(
+    #    jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
+    # )
+    # out["phase"]["volume_m3"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
+
+    # TODO: Need JAX compatible switch
+    # # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
+    # if not jnp.isnan(self.O2_index):
+    #     log10_fugacity = jnp.log10(out["species"]["activity"]["O2_g"])
+    #     buffer: RedoxBufferProtocol = IronWustiteBuffer()
+    #     # Shift at 1 bar
+    #     buffer_at_one_bar = jnp.asarray(buffer.log10_fugacity(temperature, 1.0))
+    #     log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
+    #     # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+    #     out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
+    #     # Shift at actual pressure
+    #     buffer_at_P = jnp.asarray(buffer.log10_fugacity(temperature, pressure))
+    #     log10_shift_at_P = log10_fugacity - buffer_at_P
+    #     # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+    #     out["phase"]["log10dIW_P"] = log10_shift_at_P
+
+    # return out
 
 
 class MeltPhase(BasePhase[SpeciesProtocol]):
@@ -694,7 +336,7 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
         Returns:
             An instance
         """
-        species_collection: SpeciesCollection[SpeciesProtocol] = _build_species_collection(
+        species_collection: SpeciesCollection[SpeciesProtocol] = build_species_collection(
             species,
             lambda hill: ChemicalSpecies.create_condensed(
                 hill, state=LIQUID_STATE, include_in_phase_mass=include_in_phase_mass
@@ -746,7 +388,7 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
         Returns:
             An instance
         """
-        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
+        species_collection: SpeciesCollection[ChemicalSpecies] = build_species_collection(
             species,
             lambda hill: ChemicalSpecies.create_condensed(
                 hill, state=SOLID_STATE, include_in_phase_mass=include_in_phase_mass
@@ -795,7 +437,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         Returns:
             An instance
         """
-        species_collection: SpeciesCollection[ChemicalSpecies] = _build_species_collection(
+        species_collection: SpeciesCollection[ChemicalSpecies] = build_species_collection(
             species, lambda hill: ChemicalSpecies.create_condensed(hill, state=state)
         )
 
