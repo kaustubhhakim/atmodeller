@@ -119,10 +119,8 @@ from atmodeller.classes import EquilibriumModel  # noqa: E402, F401
 from atmodeller.containers import (  # noqa: E402, F401
     ChemicalSpecies,
     FixedFugacityConstraint,
-    Planet,
     ReservoirSpecies,
     SolverParameters,
-    ThermodynamicState,
 )
 from atmodeller.parameters import Parameters  # noqa: E402, F401
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase  # noqa: E402, F401
@@ -131,6 +129,7 @@ from atmodeller.reactions import (  # noqa: E402, F401
     ReactionNetwork,
     ReactionSystem,
 )
+from atmodeller.state import Planet, ThermodynamicState  # noqa: E402, F401
 from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
