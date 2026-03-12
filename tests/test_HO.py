@@ -14,10 +14,11 @@ from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import FixedFugacityConstraint, Planet, ReservoirSpecies
+from atmodeller.containers import FixedFugacityConstraint, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.phases import GasPhase, MeltPhase
 from atmodeller.solubility import get_solubility_models
+from atmodeller.state import Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

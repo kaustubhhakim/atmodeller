@@ -13,9 +13,10 @@ from molmass import Formula
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ChemicalSpecies, Planet, ThermodynamicState
+from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.phases import GasPhase, PurePhase
+from atmodeller.state import Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

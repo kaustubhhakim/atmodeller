@@ -12,11 +12,12 @@ from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ChemicalSpecies, Planet, ReservoirSpecies
+from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import ActivityProtocol, FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase
 from atmodeller.solubility import get_solubility_models
+from atmodeller.state import Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
