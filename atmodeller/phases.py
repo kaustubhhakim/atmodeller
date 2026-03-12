@@ -43,7 +43,7 @@ from jax import lax
 from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.type_aliases import NpFloat
 from jaxmod.utils import to_hashable
-from jaxtyping import Array, Float, Integer
+from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
@@ -61,7 +61,7 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
     @property
     def log10dIW_1_bar(self) -> Float[Array, "#n_batch 1"]:
         """Log10 of the oxygen fugacity relative to the IW buffer at 1 bar."""
-        O2_index: NpFloat = self.phase.O2_index
+        O2_index: ArrayLike = self.phase.O2_index
 
         def no_oxygen() -> Float[Array, "#n_batch 1"]:
             return jnp.full((self.log_number_moles.shape[0], 1), jnp.nan)
@@ -78,7 +78,7 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
     @property
     def log10dIW_P(self) -> Float[Array, "#n_batch 1"]:
         """Log10 of the oxygen fugacity relative to the IW buffer at the pressure of interest."""
-        O2_index: NpFloat = self.phase.O2_index
+        O2_index: ArrayLike = self.phase.O2_index
 
         def no_oxygen() -> Float[Array, "#n_batch 1"]:
             return jnp.full((self.log_number_moles.shape[0], 1), jnp.nan)

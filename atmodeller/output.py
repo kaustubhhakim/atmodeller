@@ -16,7 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
-from jaxmod.type_aliases import NpArray, NpBool
+from jaxmod.type_aliases import NpArray
 from jaxtyping import Array, ArrayLike, Float
 from openpyxl.styles import PatternFill
 
@@ -264,7 +264,7 @@ class Output(eqx.Module):
         """Log stability for each species"""
         _, log_stability = self._split_solution
 
-        active_stability: NpBool = self.parameters.reaction_system.species.active_stability
+        active_stability: ArrayLike = self.parameters.reaction_system.species.active_stability
         log_stability = jnp.where(active_stability, log_stability, -jnp.inf)
 
         return log_stability
@@ -283,6 +283,8 @@ class Output(eqx.Module):
                 jnp.atleast_2d(self.log_stability[..., condensate_slice][..., nn]),
                 self.temperature,
                 self.pressure,
+                jnp.atleast_2d(0.0),
+                jnp.atleast_2d(-jnp.inf),
             )
             condensates_out.append(condensate_out)
 
@@ -399,8 +401,41 @@ class Output(eqx.Module):
         out["gas"] = self.gas.asdict()
         out["melt"] = self.melt.asdict()
         out["solid"] = self.solid.asdict()
+
+        condensate_dict: dict = {}
+        for condensate in self.condensates:
+            condensate_dict[condensate.phase.species.species_names[0]] = condensate.asdict()
+        out["condensates"] = condensate_dict
+
+        # condensate_out: list = []
+        # for condensate in self.condensates:
+        #     condensate_out.append(condensate.asdict())
+        # out["condensates"] = condensate_out
+
         out["solver"] = self.multi_attempt_solution.asdict()
         out["state"] = self.state_asdict()
+
+        if to_numpy:
+            out = jax.tree_util.tree_map(
+                lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, out
+            )
+
+        return out
+
+    def asdict_split(self, to_numpy: bool = False):
+        """Output as a nested dictionary with JAX arrays, splitting by elements and species
+
+        Args:
+            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
+
+        Returns:
+            Dictionary of the solution with JAX arrays, split by elements and species
+        """
+        out: dict[str, Any] = {}
+
+        out["gas"] = self.gas.asdict_split()
+        out["melt"] = self.melt.asdict_split()
+        out["solid"] = self.solid.asdict_split()
 
         if to_numpy:
             out = jax.tree_util.tree_map(

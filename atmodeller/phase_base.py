@@ -577,3 +577,68 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         }
 
         return out
+
+    def _split_by_elements(self, inarray: Array, output: dict, keyname: str) -> None:
+        """Splits the element-level data by element and adds them to the output.
+
+        Args:
+            inarray: The input array to split, with shape (... n_elements)
+            output: The output dictionary to which the split entries will be added
+            keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
+                to use in the output keys
+        """
+        split_data = jnp.split(inarray, max(self.phase.species.number_elements, 1), axis=-1)
+        for ii, element in enumerate(self.phase.species.unique_elements):
+            element_dict = output.setdefault(element, {})
+            element_dict[keyname] = split_data[ii]
+
+    # Species-level split
+    def _split_by_species(self, inarray: Array, output: dict, keyname: str) -> None:
+        """Splits the species-level data by species' and adds them to the output.
+
+        Args:
+            inarray: The input array to split, with shape (... n_species)
+            output: The output dictionary to which the split entries will be added
+            keyname: The name of the property being split (e.g., "mass", "activity", etc.) to
+                use in the output keys
+        """
+        split_data = jnp.split(inarray, max(self.phase.species.number_species, 1), axis=-1)
+        for ii, species in enumerate(self.phase.species_names):
+            species_dict = output.setdefault(species, {})
+            species_dict[keyname] = split_data[ii]
+
+    def asdict_split(self) -> dict[str, Any]:
+        """Dictionary representation of the output with species-level arrays split into individual
+        entries for downstream processing or analysis.
+
+        Returns:
+            A dictionary containing phase-level properties and individual entries for each species'
+        """
+        out: dict[str, Any] = {}
+
+        # Phase-level properties
+        out["phase"] = {
+            "background_mass": self.background_mass,
+            "background_number_moles": self.background_number_moles,
+            "background_molar_mass": self.background_molar_mass,
+            "mass": self.phase_mass,
+            "number_moles": self.phase_number_moles,
+            "molar_mass": self.phase_molar_mass,
+            "species_to_phase_mass_ratio": self.species_to_phase_mass_ratio,
+        }
+
+        # Element-level properties, split by element
+        elements_out: dict = out.setdefault("elements", {})
+        self._split_by_elements(self.element_mass, elements_out, "mass")
+        self._split_by_elements(self.element_number_moles, elements_out, "number_moles")
+
+        # Species-level properties, split by species
+        species_out: dict = out.setdefault("species", {})
+        self._split_by_species(self.species_activity, species_out, "activity")
+        self._split_by_species(self.species_mass, species_out, "mass")
+        self._split_by_species(self.species_mass_fraction, species_out, "mass_fraction")
+        self._split_by_species(self.species_number_moles, species_out, "number_moles")
+        self._split_by_species(self.species_mole_fraction, species_out, "mole_fraction")
+        self._split_by_species(self.include_in_mass_phase, species_out, "include_in_phase_mass")
+
+        return out
