@@ -23,7 +23,7 @@ from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -69,21 +69,23 @@ def test_H_and_C() -> None:
     target: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "H2O_g": 0.2582458752325180,
-                    "H2_g": 0.2502809714412906,
-                    "O2_g": 8.838513516896038e-08,
-                    "CO_g": 59.65835224848439,
-                    "CO2_g": 13.43793686555727,
-                }
+                "partial_pressure": np.array(
+                    [
+                        0.2582458752325180,
+                        0.2502809714412906,
+                        8.838513516896038e-08,
+                        59.65835224848439,
+                        13.43793686555727,
+                    ]
+                )
             }
         }
     }
 
-    assert model.output.compare(target, log=False, rtol=TOLERANCE, atol=TOLERANCE)
+    assert model.output.compare(target, rtol=TOLERANCE, atol=TOLERANCE, log=False)
 
 
-@pytest.mark.skip(reason="Checks result against previous work but not different functionality")
+# @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
 def test_CHO_reduced() -> None:
     """Tests C-H-O system at IW-2
 
@@ -103,16 +105,7 @@ def test_CHO_reduced() -> None:
 
     factsage_result: dict[str, Any] = {
         "gas": {
-            "species": {
-                "partial_pressure_bar": {
-                    "H2_g": 175.5,
-                    "H2O_g": 13.8,
-                    "CO_g": 6.21,
-                    "CO2_g": 0.228,
-                    "CH4_g": 38.07,
-                    "O2_g": 1.25e-15,
-                }
-            }
+            "species": {"partial_pressure": np.array([175.5, 13.8, 6.21, 0.228, 38.07, 1.25e-15])}
         }
     }
 
@@ -139,14 +132,7 @@ def test_CHO_IW() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "CH4_g": 28.66,
-                    "CO2_g": 30.88,
-                    "CO_g": 46.42,
-                    "H2O_g": 337.16,
-                    "H2_g": 236.98,
-                    "O2_g": 4.11e-13,
-                }
+                "partial_pressure": np.array([236.98, 337.16, 46.42, 30.88, 28.66, 4.11e-13])
             }
         }
     }
@@ -154,14 +140,16 @@ def test_CHO_IW() -> None:
     fastchem_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "CH4_g": 29.61919788,
-                    "CO2_g": 29.82548282,
-                    "CO_g": 45.94958264,
-                    "H2O_g": 332.03616807,
-                    "H2_g": 236.73845646,
-                    "O2_g": 3.96475584e-13,
-                }
+                "partial_pressure": np.array(
+                    [
+                        236.73845646,
+                        332.03616807,
+                        45.94958264,
+                        29.82548282,
+                        29.61919788,
+                        3.96475584e-13,
+                    ]
+                )
             }
         }
     }
@@ -191,14 +179,7 @@ def test_CHO_oxidised() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "CH4_g": 0.00129,
-                    "CO2_g": 3.25,
-                    "CO_g": 0.873,
-                    "H2O_g": 218.48,
-                    "H2_g": 27.40,
-                    "O2_g": 1.29e-11,
-                }
+                "partial_pressure": np.array([27.40, 218.48, 0.873, 3.25, 0.00129, 1.29e-11])
             }
         }
     }
@@ -229,14 +210,7 @@ def test_CHO_highly_oxidised() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "CH4_g": 7.13e-05,
-                    "CO2_g": 357.23,
-                    "CO_g": 10.21,
-                    "H2O_g": 432.08,
-                    "H2_g": 5.78,
-                    "O2_g": 1.14e-09,
-                }
+                "partial_pressure": np.array([5.78, 432.08, 10.21, 357.23, 7.13e-05, 1.14e-09])
             }
         }
     }
@@ -261,14 +235,7 @@ def test_CHO_middle_temperature() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "H2_g": 59.066,
-                    "H2O_g": 18.320,
-                    "CO_g": 8.91e-4,
-                    "CO2_g": 7.48e-4,
-                    "CH4_g": 19.548,
-                    "O2_g": 1.27e-25,
-                }
+                "partial_pressure": np.array([59.066, 18.320, 8.91e-4, 7.48e-4, 19.548, 1.27e-25])
             }
         }
     }
@@ -298,14 +265,7 @@ def test_CHO_low_temperature() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
-                    "H2_g": 55.475,
-                    "H2O_g": 8.0,
-                    "CO2_g": 1.24e-14,
-                    "O2_g": 7.85e-54,
-                    "CH4_g": 16.037,
-                    "CO_g": 2.12e-16,
-                }
+                "partial_pressure": np.array([55.475, 8.0, 2.12e-16, 1.24e-14, 16.037, 7.85e-54])
             }
         }
     }
