@@ -477,7 +477,7 @@ TPhase_co = TypeVar("TPhase_co", bound=BasePhase, covariant=True)
 
 
 class PhaseOutput(eqx.Module, Generic[TPhase_co]):
-    """Output helper class for phase-level and species-level results.
+    r"""Output helper class for phase-level and species-level results.
 
     Provides convenient accessors and computed properties for phase output quantities (e.g., mass,
     mole fractions, activities, element totals) in a structured, jittable form. Designed to operate
@@ -491,8 +491,11 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         log_stability: Log stability for each species
         temperature: Temperature in K
         pressure: Pressure in bar
-        log_background_molar_mass: Log molar mass of background component
-        log_background_mass: Log mass of background component
+        log_background_molar_mass: Log molar mass of the background component in
+            kg mol\ :sup:`-1`. Defaults to ``0.0`` (dummy value of 1 kg mol\ :sup:`-1`);
+            only meaningful when ``log_background_mass`` is finite.
+        log_background_mass: Log mass of the background component in kg. Defaults to negative
+            infinity (i.e., no background component).
     """
 
     phase: TPhase_co
@@ -607,9 +610,11 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             self.phase.get_log_activity_with_stability(
                 self.log_number_moles,
                 self.log_stability,
-                self.temperature,
-                self.pressure,
-                self.log_background_moles,
+                # The following arrays must be 1-D to be broadcast correctly in the log activity
+                # function.
+                jnp.squeeze(self.temperature),
+                jnp.squeeze(self.pressure),
+                jnp.squeeze(self.log_background_moles),
             )
         )
         return jnp.exp(log_activity)
