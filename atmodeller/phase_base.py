@@ -587,10 +587,12 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
                 to use in the output keys
         """
-        split_data = jnp.split(inarray, max(self.phase.species.number_elements, 1), axis=-1)
+        split_data: list[Array] = jnp.split(
+            inarray, max(self.phase.species.number_elements, 1), axis=-1
+        )
+        element_dict: dict = output.setdefault(keyname, {})
         for ii, element in enumerate(self.phase.species.unique_elements):
-            element_dict = output.setdefault(element, {})
-            element_dict[keyname] = split_data[ii]
+            element_dict[element] = split_data[ii]
 
     # Species-level split
     def _split_by_species(self, inarray: Array, output: dict, keyname: str) -> None:
@@ -602,17 +604,19 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             keyname: The name of the property being split (e.g., "mass", "activity", etc.) to
                 use in the output keys
         """
-        split_data = jnp.split(inarray, max(self.phase.species.number_species, 1), axis=-1)
+        split_data: list[Array] = jnp.split(
+            inarray, max(self.phase.species.number_species, 1), axis=-1
+        )
+        species_dict: dict = output.setdefault(keyname, {})
         for ii, species in enumerate(self.phase.species_names):
-            species_dict = output.setdefault(species, {})
-            species_dict[keyname] = split_data[ii]
+            species_dict[species] = split_data[ii]
 
     def asdict_split(self) -> dict[str, Any]:
         """Dictionary representation of the output with species-level arrays split into individual
         entries for downstream processing or analysis.
 
         Returns:
-            A dictionary containing phase-level properties and individual entries for each species'
+            A dictionary containing phase-level and species-level properties
         """
         out: dict[str, Any] = {}
 

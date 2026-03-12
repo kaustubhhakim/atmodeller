@@ -615,7 +615,7 @@ class Output(eqx.Module):
             ``False``.
         """
         if d2 is None:
-            d2 = self.asdict(to_numpy=True)
+            d2 = self.asdict_split(to_numpy=True)
         keys = d1.keys()
         for key in keys:
             v1 = d1.get(key)
@@ -624,7 +624,9 @@ class Output(eqx.Module):
             if isinstance(v1, dict) and isinstance(v2, dict):
                 all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
             else:
-                if isinstance(v1, np.ndarray) and isinstance(v2, np.ndarray):
+                if isinstance(v1, (np.ndarray, float, int)) and isinstance(
+                    v2, (np.ndarray, float, int)
+                ):
                     if log:
                         v1, v2 = np.log10(v1), np.log10(v2)
                     is_close: bool = np.allclose(v1, v2, rtol=rtol, atol=atol)

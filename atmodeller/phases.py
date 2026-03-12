@@ -112,10 +112,29 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
             A dictionary containing phase-level and species-level properties
         """
         out = super().asdict()
+
         out["phase"]["volume"] = self.volume
         out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
         out["phase"]["log10dIW_P"] = self.log10dIW_P
         out["species"]["partial_pressure"] = self.species_partial_pressure
+
+        return out
+
+    @override
+    def asdict_split(self) -> dict[str, Any]:
+        """Dictionary representation of the output with species-level arrays split into individual
+        entries for each species.
+
+        Returns:
+            A dictionary containing phase-level and species-level properties
+        """
+        out = super().asdict_split()
+
+        out["phase"]["volume"] = self.volume
+        out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
+        out["phase"]["log10dIW_P"] = self.log10dIW_P
+
+        self._split_by_species(self.species_partial_pressure, out["species"], "partial_pressure")
 
         return out
 
