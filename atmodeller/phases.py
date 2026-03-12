@@ -34,7 +34,7 @@ explicit species in the solver.
 
 import logging
 from collections.abc import Callable, Iterable
-from typing import Self
+from typing import Any, Self
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -59,48 +59,65 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
     """Output helper class for GasPhase-specific properties."""
 
     @property
-    def log10dIW_1_bar(self) -> Float[Array, "..."]:
+    def log10dIW_1_bar(self) -> Float[Array, "#n_batch 1"]:
         """Log10 of the oxygen fugacity relative to the IW buffer at 1 bar."""
         O2_index: NpFloat = self.phase.O2_index
 
-        def no_oxygen() -> Float[Array, "..."]:
-            return jnp.full(self.log_number_moles.shape[0], jnp.nan)
+        def no_oxygen() -> Float[Array, "#n_batch 1"]:
+            return jnp.full((self.log_number_moles.shape[0], 1), jnp.nan)
 
-        def with_oxygen() -> Float[Array, "..."]:
+        def with_oxygen() -> Float[Array, "#n_batch 1"]:
             log10_fugacity = jnp.log10(self.species_activity[..., O2_index.astype(int)])
             buffer: RedoxBufferProtocol = IronWustiteBuffer()
-            buffer_at_one_bar = buffer.log10_fugacity(self.temperature, 1.0)
+            buffer_at_one_bar = buffer.log10_fugacity(jnp.squeeze(self.temperature), 1.0)
             log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
-            return log10_shift_at_one_bar
+            return jnp.expand_dims(log10_shift_at_one_bar, axis=-1)
 
         return lax.cond(jnp.isnan(O2_index), no_oxygen, with_oxygen)
 
     @property
-    def log10dIW_P(self) -> Float[Array, "..."]:
+    def log10dIW_P(self) -> Float[Array, "#n_batch 1"]:
         """Log10 of the oxygen fugacity relative to the IW buffer at the pressure of interest."""
         O2_index: NpFloat = self.phase.O2_index
 
-        def no_oxygen() -> Float[Array, "..."]:
-            return jnp.full(self.log_number_moles.shape[0], jnp.nan)
+        def no_oxygen() -> Float[Array, "#n_batch 1"]:
+            return jnp.full((self.log_number_moles.shape[0], 1), jnp.nan)
 
-        def with_oxygen() -> Float[Array, "..."]:
+        def with_oxygen() -> Float[Array, "#n_batch 1"]:
             log10_fugacity = jnp.log10(self.species_activity[..., O2_index.astype(int)])
             buffer: RedoxBufferProtocol = IronWustiteBuffer()
-            buffer_at_P = buffer.log10_fugacity(self.temperature, self.pressure)
+            buffer_at_P = buffer.log10_fugacity(
+                jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+            )
             log10_shift_at_P = log10_fugacity - buffer_at_P
-            return log10_shift_at_P
+            return jnp.expand_dims(log10_shift_at_P, axis=-1)
 
         return lax.cond(jnp.isnan(O2_index), no_oxygen, with_oxygen)
 
     @property
-    def species_partial_pressure(self) -> Float[Array, "... n_species"]:
+    def species_partial_pressure(self) -> Float[Array, "#n_batch n_species"]:
         """Partial pressure of each species in bar"""
         return self.pressure * self.species_mole_fraction
 
     @property
-    def volume(self) -> Float[Array, "..."]:
+    def volume(self) -> Float[Array, "#n_batch 1"]:
         r"""Volume of the gas phase in m\ :sup:`3`"""
         return self.phase_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
+
+    @override
+    def asdict(self) -> dict[str, Any]:
+        """Dictionary representation of the output for downstream processing or analysis.
+
+        Returns:
+            A dictionary containing phase-level and species-level properties
+        """
+        out = super().asdict()
+        out["phase"]["volume"] = self.volume
+        out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
+        out["phase"]["log10dIW_P"] = self.log10dIW_P
+        out["species"]["partial_pressure"] = self.species_partial_pressure
+
+        return out
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):

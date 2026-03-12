@@ -372,103 +372,6 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         return output
 
-    def output_asdict(
-        self,
-        log_number_moles: Float[Array, "... n_species"],
-        log_stability: Float[Array, "... n_species"],
-        temperature: Float[Array, "..."],
-        pressure: Float[Array, "..."],
-        log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-        log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    ) -> dict[str, Any]:
-        r"""Outputs phase-level and species-level properties.
-
-        Args:
-            log_number_moles: Log number of moles of each species in the phase
-            log_stability: Log stability of each species in the phase.
-            temperature: Temperature in K.
-            pressure: Pressure in bar.
-            log_background_molar_mass: Log molar mass of the background component in
-                kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of 1 kg mol\ :sup:`-1`)
-                ; only meaningful when ``log_background_mass`` is finite.
-            log_background_mass: Log mass of the background component in kg. Defaults to negative
-                infinity (i.e., no background component).
-
-        Returns:
-            A dictionary containing phase-level and species-level properties
-        """
-        out: dict[str, Any] = {}
-        #    "phase": {
-        #        "number_moles": jnp.squeeze(
-        #            jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
-        #        ),
-        #        "mass_kg": jnp.squeeze(jnp.exp(log_phase_mass)),
-        #        "molar_mass_kg_per_mol": jnp.squeeze(
-        #            jnp.exp(
-        #                self.get_log_phase_molar_mass(
-        #                    log_number_moles, log_background_molar_mass, log_background_mass
-        #                )
-        #            )
-        #        ),
-        #        "background_molar_mass_kg_per_mol": jnp.exp(log_background_molar_mass),
-        #        "background_mass_kg": jnp.exp(log_background_mass),
-        #        "species_to_phase_mass_ratio": jnp.squeeze(
-        #            jnp.exp(log_species_mass_sum - log_phase_mass)
-        #        ),
-        #    },
-        # "elements": {
-        #    "number_moles": dict(zip(self.species.unique_elements, jnp.exp(log_elements).T)),
-        #    "mass_kg": dict(
-        #        zip(
-        #            self.species.unique_elements,
-        #            jnp.exp(log_elements + jnp.log(self.species.element_molar_masses)).T,
-        #        )
-        #    ),
-        # },
-        # "species": {
-        # "number_moles": dict(zip(self.species_names, jnp.exp(log_number_moles).T)),
-        # "mole_fraction": dict(
-        #    zip(
-        #        self.species_names,
-        #        jnp.exp(
-        #            self.get_log_mole_fraction(log_number_moles, log_background_moles)
-        #        ).T,
-        #    )
-        # ),
-        # "mass_kg": dict(
-        #    zip(self.species_names, jnp.exp(self.get_log_mass(log_number_moles)).T)
-        # ),
-        # "mass_fraction": dict(
-        #    zip(
-        #        self.species_names,
-        #        jnp.exp(
-        #            self.get_log_mass_fraction(log_number_moles, log_background_mass)
-        #        ).T,
-        #    )
-        # ),
-        # "activity": dict(
-        #    zip(
-        #        self.species_names,
-        #        jnp.exp(
-        #            self.get_log_activity_with_stability(
-        #                log_number_moles,
-        #                log_stability,
-        #                temperature,
-        #                pressure,
-        #                log_background_moles,
-        #            )
-        #        ).T,
-        #    )
-        # ),
-        # "include_in_phase_mass": dict(
-        #    zip(self.species_names, self.species.phase_mass_mask.astype(bool))
-        # ),
-        # },
-
-        # }
-
-        return out
-
     def __len__(self) -> int:
         return len(self.species)
 
@@ -482,8 +385,8 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     Provides convenient accessors and computed properties for phase output quantities (e.g., mass,
     mole fractions, activities, element totals) in a structured, jittable form. Designed to operate
     within JAX-jitted workflows, enabling efficient manipulation, transformation, and extraction of
-    output data for downstream analysis or further computation. In this regard, arrays maintain
-    batch dimensions to allow flexible use in both single-calculation and batched contexts.
+    output data for downstream analysis or further computation. Arrays maintain batch dimensions to
+    allow flexible use in both single-calculation and batched contexts.
 
     Args:
         phase: The phase instance associated with this output
@@ -492,10 +395,8 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         temperature: Temperature in K
         pressure: Pressure in bar
         log_background_molar_mass: Log molar mass of the background component in
-            kg mol\ :sup:`-1`. Defaults to ``0.0`` (dummy value of 1 kg mol\ :sup:`-1`);
-            only meaningful when ``log_background_mass`` is finite.
-        log_background_mass: Log mass of the background component in kg. Defaults to negative
-            infinity (i.e., no background component).
+            kg mol\ :sup:`-1`
+        log_background_mass: Log mass of the background component in kg
     """
 
     phase: TPhase_co
@@ -503,12 +404,8 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     log_stability: Float[Array, "#n_batch n_species"]
     temperature: Float[Array, "#n_batch 1"]
     pressure: Float[Array, "#n_batch 1"]
-    log_background_molar_mass: Float[Array, "#n_batch 1"] = eqx.field(
-        default_factory=jnp.asarray([[0.0]])
-    )
-    log_background_mass: Float[Array, "#n_batch 1"] = eqx.field(
-        default_factory=jnp.asarray([[-jnp.inf]])
-    )
+    log_background_molar_mass: Float[Array, "#n_batch 1"]
+    log_background_mass: Float[Array, "#n_batch 1"]
 
     @property
     def include_in_mass_phase(self) -> Bool[Array, " n_species"]:
@@ -546,7 +443,9 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def log_element_number_moles(self) -> Float[Array, "#n_batch n_elements"]:
         log_terms: Array = self.log_number_moles[..., None, :] + self.log_stoich_matrix
-        return cast(Float[Array, "#batch n_elements"], logsumexp(log_terms, axis=-1))
+        return cast(
+            Float[Array, "#batch n_elements"], logsumexp(log_terms, axis=-1, keepdims=False)
+        )
 
     @property
     def element_number_moles(self) -> Float[Array, "#n_batch n_elements"]:
@@ -562,12 +461,16 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def phase_number_moles(self) -> Float[Array, "#n_batch 1"]:
         return jnp.exp(
-            self.phase.get_log_phase_moles(self.log_number_moles, self.log_background_number_moles)
+            self.phase.get_log_phase_moles(
+                self.log_number_moles, jnp.squeeze(self.log_background_number_moles)
+            )
         )
 
     @property
     def log_phase_mass(self) -> Float[Array, "#n_batch 1"]:
-        return self.phase.get_log_phase_mass(self.log_number_moles, self.log_background_mass)
+        return self.phase.get_log_phase_mass(
+            self.log_number_moles, jnp.squeeze(self.log_background_mass)
+        )
 
     @property
     def phase_mass(self) -> Float[Array, "#n_batch 1"]:
@@ -578,8 +481,8 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         return jnp.exp(
             self.phase.get_log_phase_molar_mass(
                 self.log_number_moles,
-                self.log_background_molar_mass,
-                self.log_background_mass,
+                jnp.squeeze(self.log_background_molar_mass),
+                jnp.squeeze(self.log_background_mass),
             )
         )
 
@@ -596,7 +499,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             self.phase.get_log_mass(self.log_number_moles), axis=-1, keepdims=True
         )
         log_phase_mass: Float[Array, "#n_batch 1"] = self.phase.get_log_phase_mass(
-            self.log_number_moles, self.log_background_mass
+            self.log_number_moles, jnp.squeeze(self.log_background_mass)
         )
         log_species_to_phase_mass_ratio: Float[Array, "#batch 1"] = (
             log_species_mass_sum - log_phase_mass
@@ -610,8 +513,6 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             self.phase.get_log_activity_with_stability(
                 self.log_number_moles,
                 self.log_stability,
-                # The following arrays must be 1-D to be broadcast correctly in the log activity
-                # function.
                 jnp.squeeze(self.temperature),
                 jnp.squeeze(self.pressure),
                 jnp.squeeze(self.log_background_number_moles),
@@ -622,7 +523,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def species_mass_fraction(self) -> Float[Array, "#n_batch n_species"]:
         log_mass_fraction: Float[Array, "#n_batch n_species"] = self.phase.get_log_mass_fraction(
-            self.log_number_moles, self.log_background_mass
+            self.log_number_moles, jnp.squeeze(self.log_background_mass)
         )
         return jnp.exp(log_mass_fraction)
 
@@ -636,7 +537,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def species_mole_fraction(self) -> Float[Array, "#n_batch n_species"]:
         log_mole_fraction: Float[Array, "#n_batch n_species"] = self.phase.get_log_mole_fraction(
-            self.log_number_moles, self.log_background_number_moles
+            self.log_number_moles, jnp.squeeze(self.log_background_number_moles)
         )
         return jnp.exp(log_mole_fraction)
 
