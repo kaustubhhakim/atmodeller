@@ -568,7 +568,7 @@ class Output(eqx.Module):
             ``True`` if all values match within the specified tolerances, else ``False``
         """
         if d2 is None:
-            d2 = self.asdict_split(to_numpy=True, ravel=True)
+            d2 = self.asdict_split(to_numpy=True, ravel=True, expand_to_batch=True)
 
         keys = d1.keys()
 
