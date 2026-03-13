@@ -408,10 +408,10 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     log_background_mass: Float[Array, "#n_batch 1"]
 
     @property
-    def include_in_mass_phase(self) -> Bool[Array, " n_species"]:
+    def include_in_mass_phase(self) -> Bool[Array, "1 n_species"]:
         """Boolean mask indicating which species to include in phase-level mass and derived
         aggregations."""
-        return jnp.asarray(self.phase.species.phase_mass_mask.astype(bool))
+        return jnp.atleast_2d(self.phase.species.phase_mass_mask.astype(bool))
 
     @property
     def formula_matrix(self) -> Integer[Array, "n_elements n_species"]:

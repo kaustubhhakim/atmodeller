@@ -8,7 +8,7 @@ import logging
 import pickle
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 import equinox as eqx
 import jax
@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from jaxmod.solvers import MultiAttemptSolution
 from jaxmod.type_aliases import NpArray
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
 from atmodeller.engine import get_total_pressure
@@ -25,7 +25,7 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, SolidPhase
 
 logger: logging.Logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 
 # These functions all feel awkward and clunky, and are ultimately not compatible within a jitted
 # workflow
@@ -81,146 +81,55 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 #     return out
 
+# _OutputKey = Literal["phases", "species", "elements", "other"]
+# """Valid category selectors for :func:`_group_by_all` and :meth:`Output.to_dataframes`."""
 
-# def _expand_to_batch(nested_dict: dict[str, Any]) -> dict[str, Any]:
-#     """Expands all array leaves in a nested dict to a common batch length.
-
-#     The batch length is inferred from ``solution``: ``1`` if it is 1-D (single run), or
-#     ``solution.shape[0]`` if it is 2-D (batched run of ``N`` conditions).  Scalars and length-1
-#     arrays are broadcast to ``(batch_length,)``; arrays already of the correct length are passed
-#     through unchanged; multi-dimensional arrays such as ``solution`` and ``residual`` whose first
-#     axis is already ``batch_length`` are also left unchanged.
-
-#     Args:
-#         nested_dict: A nested dict as returned by
-#             :meth:`~atmodeller.output.Output.quick_look`. Must contain a ``"solution"`` key.
-
-#     Returns:
-#         A new nested dict with the same structure where every scalar leaf is expanded to a
-#         :class:`numpy.ndarray` of length ``batch_length``.
-#     """
-#     # Infer batch length from `solution`, which is always present:
-#     # shape (2*n_species,) for a single run → batch_length = 1
-#     # shape (N, 2*n_species) for a batched run → batch_length = N
-#     solution_arr = np.asarray(nested_dict["solution"])
-#     batch_length: int = 1 if solution_arr.ndim == 1 else solution_arr.shape[0]
-
-#     def _expand_leaf(value: Any) -> NpArray:
-#         arr = np.atleast_1d(np.asarray(value))
-#         if batch_length > 1 and arr.shape[0] == 1:
-#             # Scalar-promoted or length-1: broadcast first axis to batch_length.
-#             # np.array() materialises the broadcast view into a writable array.
-#             return np.array(np.broadcast_to(arr, (batch_length,) + arr.shape[1:]))
-
-#         return arr
-
-#     def _map(d: dict) -> dict:
-#         return {k: _map(v) if isinstance(v, dict) else _expand_leaf(v) for k, v in d.items()}
-
-#     return _map(nested_dict)
+# _ALL_OUTPUT_KEYS: tuple[_OutputKey, ...] = ("phases", "species", "elements", "other")
+# """Default set of all output category selectors passed to
+# :meth:`~atmodeller.output.Output.to_dataframes`."""
 
 
-_PHASE_KEYS: frozenset[str] = frozenset({"gas", "melt", "solid", "condensates", "total"})
-"""Top-level keys in the :meth:`~atmodeller.output.Output.quick_look` output that represent
-physically meaningful phases or phase aggregations."""
+def expand_jax_arrays_to_batch(pytree: PyTree, batch_size: int, *, ravel: bool = False) -> PyTree:
+    """Expands all arrays in a PyTree to the batch size.
 
-_OutputKey = Literal["phases", "species", "elements", "other"]
-"""Valid category selectors for :func:`_group_by_all` and :meth:`Output.to_dataframes`."""
+    Args:
+        pytree: PyTree (nested dict, list, tuple, etc.) of arrays to expand
+        batch_size: Batch size to expand to
+        ravel: Whether to ravel arrays to 1-D after expanding. Can be used when the expanded
+            arrays are intended for conversion to DataFrames (which also requires an
+            additional step of converting the arrays to NumPy). Defaults to ``False``.
 
-_ALL_OUTPUT_KEYS: tuple[_OutputKey, ...] = ("phases", "species", "elements", "other")
-"""Default set of all output category selectors passed to 
-:meth:`~atmodeller.output.Output.to_dataframes`."""
+    Returns:
+        PyTree with arrays expanded to batch size
+    """
 
+    def expand(x: Any) -> Any:
+        if isinstance(x, jnp.ndarray):
+            x = jnp.atleast_1d(x)
+            if x.shape[0] == batch_size:
+                return x
+            x_broadcasted: Array = jnp.broadcast_to(x, (batch_size,) + x.shape[1:])
+            if ravel:
+                return jnp.ravel(x_broadcasted)
+            else:
+                return x_broadcasted
+        return x
 
-# def _group_by_all(
-#     nested_dict: dict[str, Any], keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS
-# ) -> dict[str, dict[str, Any]]:
-#     """Groups output by phase, species, and/or element.
-
-#     Groups the requested views in a single pass.  Phase names, species names, and element symbols
-#     all share the same namespace of primary keys.  A gas-phase species ``H2O_g`` and the phase
-#     key ``gas`` will both appear as top-level entries when both ``"phases"`` and ``"species"``
-#     are selected::
-
-#         {
-#             "gas":   {"phase.mass_kg": ..., "species.activity.H2O_g": ...,
-#                       "phase.log10dIW_1_bar": ..., ...},
-#             "H2O_g": {"gas.activity": ..., "gas.mass_kg": ..., ...},
-#             "H":     {"gas.mass_kg": ..., "total.logarithmic_abundance": ..., ...},
-#             ...
-#         }
-
-#     Args:
-#         nested_dict: A nested dict as returned by
-#             :func:`~atmodeller.output.expand_to_batch`.
-#         keys: Categories to include.  Any combination of ``"phases"``, ``"species"``,
-#             ``"elements"``, and ``"other"``.  Defaults to all four.
-
-#     Returns:
-#         A combined dict with phase names, species names, and element symbols as primary keys.
-#     """
-#     result: dict[str, dict[str, Any]] = {}
-
-#     include_phases: bool = "phases" in keys
-#     include_species: bool = "species" in keys
-#     include_elements: bool = "elements" in keys
-
-#     for path, value in _flatten_dict(nested_dict).items():
-#         if include_phases and path[0] in _PHASE_KEYS:
-#             phase_name: str = str(path[0])
-#             phase_key: str = ".".join(str(k) for k in path[1:])
-#             result.setdefault(phase_name, {})[phase_key] = value
-
-#         if include_species and "species" in path and path[0] != "total":
-#             name: str = str(path[-1])
-#             species_key: str = ".".join(str(k) for k in path[:-1] if k != "species")
-#             result.setdefault(name, {})[species_key] = value
-
-#         if include_elements and "elements" in path:
-#             name = str(path[-1])
-#             element_key: str = ".".join(str(k) for k in path[:-1] if k != "elements")
-#             result.setdefault(name, {})[element_key] = value
-
-#     return result
+    return jax.tree_util.tree_map(expand, pytree)
 
 
-# def _group_other(nested_dict: dict[str, Any]) -> dict[str, dict[str, Any]]:
-#     """Collects non-phase top-level keys (``solution``, ``residual``, ``constraints``,
-#     ``solver``, etc.) into a dict of flat column dicts, one per top-level key.
+def convert_jax_arrays_to_numpy(pytree: PyTree) -> PyTree:
+    """Converts all JAX arrays in a PyTree to NumPy arrays.
 
-#     Each non-phase top-level key becomes a primary key whose value is a flat
-#     ``{column_name: array}`` dict suitable for :class:`~pandas.DataFrame` construction:
+    Args:
+        pytree: PyTree (nested dict, list, tuple, etc.) of arrays to convert
 
-#     * **Dict value** — flattened recursively; the dotted sub-path forms the column name,
-#       e.g. ``constraints → {"H": ..., "O": ...}``.
-#     * **Array value** — if the last axis has more than one element each column is named
-#       ``"0"``, ``"1"``, …; if effectively scalar per row the column takes the key name.
-
-#     Args:
-#         nested_dict: A nested dict as returned by
-#             :func:`~atmodeller.output._expand_to_batch`.
-
-#     Returns:
-#         A dict mapping each non-phase top-level key to a flat column dict.
-#     """
-#     result: dict[str, dict[str, Any]] = {}
-
-#     for top_key, value in nested_dict.items():
-#         if top_key in _PHASE_KEYS:
-#             continue
-#         if isinstance(value, dict):
-#             cols: dict[str, Any] = {}
-#             for path, leaf in _flatten_dict(value).items():
-#                 cols[".".join(str(k) for k in path)] = leaf
-#             result[str(top_key)] = cols
-#         else:
-#             arr = np.asarray(value)
-#             if arr.ndim <= 1 or arr.shape[-1] == 1:
-#                 result[str(top_key)] = {str(top_key): arr.ravel()}
-#             else:
-#                 result[str(top_key)] = {str(i): arr[..., i] for i in range(arr.shape[-1])}
-
-#     return result
+    Returns:
+        PyTree with JAX arrays converted to NumPy arrays
+    """
+    return jax.tree_util.tree_map(
+        lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, pytree
+    )
 
 
 class Output(eqx.Module):
@@ -387,14 +296,16 @@ class Output(eqx.Module):
         """Solver information such as success flags and number of iterations"""
         return self.multi_attempt_solution.asdict()
 
-    def asdict(self, to_numpy: bool = False) -> dict[str, Any]:
-        """Complete output as a nested dictionary with JAX arrays.
+    def asdict(self, *, to_numpy: bool = False) -> dict[str, Any]:
+        """Complete output as a nested dictionary with JAX or NumPy arrays.
 
         Args:
             to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
+                Must be ``False`` if used within a jitted context, as NumPy arrays are not
+                compatible with JAX transformations (jit, vmap, etc.).
 
         Returns:
-            Dictionary of the solution with JAX arrays
+            Dictionary of the solution with JAX or NumPy arrays
         """
         out: dict[str, Any] = {}
 
@@ -416,31 +327,40 @@ class Output(eqx.Module):
         out["state"] = self.state_asdict()
 
         if to_numpy:
-            out = jax.tree_util.tree_map(
-                lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, out
-            )
+            out = convert_jax_arrays_to_numpy(out)
 
         return out
 
-    def asdict_split(self, to_numpy: bool = False):
-        """Output as a nested dictionary with JAX arrays, splitting by elements and species
+    def asdict_split(
+        self, *, expand_to_batch: bool = False, to_numpy: bool = False, ravel: bool = False
+    ) -> dict[str, Any]:
+        """Output as a nested dictionary with JAX or NumPy arrays, split by elements and species
 
         Args:
-            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
+            expand_to_batch: Whether to expand arrays to the batch size. Defaults to ``False``.
+            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``. Must be
+                ``False`` if used within a jitted context, as NumPy arrays are not compatible with
+                JAX transformations (jit, vmap, etc.).
+            ravel: Whether to ravel arrays to 1-D after expanding. Can be used when the expanded
+                arrays are intended for conversion to DataFrames (which also requires
+                ``to_numpy=False``). Defaults to ``False``.
 
         Returns:
-            Dictionary of the solution with JAX arrays, split by elements and species
+            Dictionary of the solution with JAX or NumPy arrays, split by elements and species
         """
         out: dict[str, Any] = {}
 
         out["gas"] = self.gas.asdict_split()
         out["melt"] = self.melt.asdict_split()
-        out["solid"] = self.solid.asdict_split()
+
+        # FIXME: might break dataframe creation because empty
+        # out["solid"] = self.solid.asdict_split()
+
+        if expand_to_batch:
+            out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)
 
         if to_numpy:
-            out = jax.tree_util.tree_map(
-                lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, out
-            )
+            out = convert_jax_arrays_to_numpy(out)
 
         return out
 
@@ -478,31 +398,50 @@ class Output(eqx.Module):
 
         return out
 
-    def to_dataframes(
-        self,
-        keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS,
-        drop_unsuccessful_solves: bool = False,
-    ) -> dict[str, pd.DataFrame]:
+    def to_dataframes(self, drop_unsuccessful_solves: bool = False) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
 
+        Each top-level key becomes a DataFrame, with columns formed by joining nested keys with "."
+
         Args:
-            keys: Categories to include in the output.  Any combination of ``"phases"``,
-                ``"species"``, ``"elements"``, and ``"other"``.  ``"other"`` produces one
-                DataFrame per non-phase top-level key (``solution``, ``residual``,
-                ``constraints``, ``solver``, etc.).  Defaults to all four.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
 
         Returns:
-            Output in a dictionary of dataframes
+            Dictionary mapping top-level keys to pandas DataFrames
         """
-        expanded: dict[str, Any] = _expand_to_batch(self.asdict())
-        result: dict[str, pd.DataFrame] = {
-            name: pd.DataFrame(props) for name, props in _group_by_all(expanded, keys=keys).items()
-        }
-        if "other" in keys:
-            for name, cols in _group_other(expanded).items():
-                result[name] = pd.DataFrame(cols)
+
+        def flatten(d: dict, parent_key: str = ""):
+            """Recursively flattens a nested dictionary, joining keys with "." to form column names.
+
+            Args:
+                d: Dictionary to flatten
+                parent_key: Prefix for keys (used during recursion)
+
+            Returns:
+                Flat dictionary with dot-joined keys
+            """
+            items: dict = {}
+            for k, v in d.items():
+                new_key: str = f"{parent_key}.{k}" if parent_key else str(k)
+                if isinstance(v, dict):
+                    items.update(flatten(v, new_key))
+                else:
+                    items[new_key] = v
+            return items
+
+        split_nested_dict: dict[str, Any] = self.asdict_split(
+            expand_to_batch=True, to_numpy=True, ravel=True
+        )
+
+        result: dict = {}
+
+        for top_key, value in split_nested_dict.items():
+            if isinstance(value, dict):
+                flat: dict = flatten(value)
+                result[top_key] = pd.DataFrame(flat)
+            else:
+                result[top_key] = pd.DataFrame({top_key: value})
 
         if drop_unsuccessful_solves:
             logger.info("Dropping unsuccessful solves from output")
@@ -511,23 +450,19 @@ class Output(eqx.Module):
         return result
 
     def to_excel(
-        self,
-        file_prefix: str = "atmodeller_out",
-        keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS,
-        drop_unsuccessful_solves: bool = False,
+        self, file_prefix: str = "atmodeller_out", drop_unsuccessful_solves: bool = False
     ) -> None:
         """Writes the output to an Excel file.
 
         Args:
             file_prefix: Prefix of the output file. Defaults to atmodeller_out.
-            keys: Categories to include in the output.  Any combination of ``"phases"``,
-                ``"species"``, ``"elements"``, and ``"other"``.  Defaults to all four.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
         """
         logger.info("Writing output to excel")
+
         out: dict[str, pd.DataFrame] = self.to_dataframes(
-            keys=keys, drop_unsuccessful_solves=drop_unsuccessful_solves
+            drop_unsuccessful_solves=drop_unsuccessful_solves
         )
         output_file: str = f"{file_prefix}.xlsx"
 
@@ -563,21 +498,18 @@ class Output(eqx.Module):
     def to_pickle(
         self,
         file_prefix: Path | str = "atmodeller_out",
-        keys: tuple[_OutputKey, ...] = _ALL_OUTPUT_KEYS,
         drop_unsuccessful_solves: bool = False,
     ) -> None:
         """Writes the output to a pickle file.
 
         Args:
             file_prefix: Prefix of the output file. Defaults to atmodeller_out.
-            keys: Categories to include in the output.  Any combination of ``"phases"``,
-                ``"species"``, ``"elements"``, and ``"other"``.  Defaults to all four.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
         """
         logger.info("Writing output to pickle")
         out: dict[str, pd.DataFrame] = self.to_dataframes(
-            keys=keys, drop_unsuccessful_solves=drop_unsuccessful_solves
+            drop_unsuccessful_solves=drop_unsuccessful_solves
         )
         output_file: Path = Path(f"{file_prefix}.pkl")
 
@@ -611,16 +543,18 @@ class Output(eqx.Module):
                 during recursion. Should not be set by the user. Defaults to ``True``.
 
         Returns:
-            ``True`` if all values in the dictionaries match within the specified tolerances, else
-            ``False``.
+            ``True`` if all values match within the specified tolerances, else ``False``
         """
         if d2 is None:
-            d2 = self.asdict_split(to_numpy=True)
+            d2 = self.asdict_split(to_numpy=True, ravel=True)
+
         keys = d1.keys()
+
         for key in keys:
             v1 = d1.get(key)
             v2 = d2.get(key)
             current_path = path + (key,)
+
             if isinstance(v1, dict) and isinstance(v2, dict):
                 all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
             else:
@@ -658,7 +592,8 @@ class Output(eqx.Module):
         }
 
 
-# TODO: Reinstate disequilibrium calculations and add to output
+# TODO: To reinstate at some point, but needs to be adapted to new output structure and parameters
+# handling
 
 # class OutputDisequilibrium:
 #     """Output disequilibrium calculations

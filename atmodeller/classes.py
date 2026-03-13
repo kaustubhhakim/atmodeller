@@ -26,6 +26,7 @@ Typical usage:
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
+from pprint import pformat
 from typing import Optional, cast
 
 import jax
@@ -88,30 +89,33 @@ class EquilibriumModel:
 
         return self._output
 
-    def calculate_disequilibrium(
-        self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike
-    ) -> None:
-        """Computes the Gibbs free energy disequilibrium.
+    # TODO: To reinstate at some point, but needs to be adapted to new output structure and
+    # parameters handling
 
-        This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
-        relative to equilibrium, based on the current state of the system. A value of zero
-        indicates a reaction at equilibrium, while positive or negative values indicate departures
-        from equilibrium in terms of energetic favourability.
+    # def calculate_disequilibrium(
+    #     self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike
+    # ) -> None:
+    #     """Computes the Gibbs free energy disequilibrium.
 
-        Args:
-            state: Thermodynamic state
-            log_number_moles: Log number of moles
-        """
-        parameters: Parameters = Parameters.from_reaction_system(self.reaction_system, state)
-        solution_array: Array = broadcast_initial_solution(
-            log_number_moles,
-            None,
-            self.reaction_system.species.number_species,
-            parameters.batch_size,
-        )
-        # jax.debug.print("solution_array = {out}", out=solution_array)
+    #     This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
+    #     relative to equilibrium, based on the current state of the system. A value of zero
+    #     indicates a reaction at equilibrium, while positive or negative values indicate departures
+    #     from equilibrium in terms of energetic favourability.
 
-        self._output = OutputDisequilibrium(parameters, solution_array)
+    #     Args:
+    #         state: Thermodynamic state
+    #         log_number_moles: Log number of moles
+    #     """
+    #     parameters: Parameters = Parameters.from_reaction_system(self.reaction_system, state)
+    #     solution_array: Array = broadcast_initial_solution(
+    #         log_number_moles,
+    #         None,
+    #         self.reaction_system.species.number_species,
+    #         parameters.batch_size,
+    #     )
+    #     # jax.debug.print("solution_array = {out}", out=solution_array)
+
+    #     self._output = OutputDisequilibrium(parameters, solution_array)
 
     def solve(
         self,
@@ -172,6 +176,8 @@ class EquilibriumModel:
 
         out: Output = self._solver(trigger_autogen, parameters, subkey)
         multi_sol: MultiAttemptSolution = out.multi_attempt_solution
+
+        logger.info("asdict_split = \n%s", pformat(out.asdict_split()))
 
         # output: Output = self._solver(trigger_autogen, parameters, subkey)
         # multi_sol: MultiAttemptSolution = output.multi_attempt_solution
