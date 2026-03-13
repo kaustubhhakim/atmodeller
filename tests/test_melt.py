@@ -62,8 +62,10 @@ def test_H2O_no_dilute_limit() -> None:
 
     target: dict[str, Any] = {
         "gas": {
-            "partial_pressure_bar": {"H2O_g": 1.0299426742644398},
-            "number_moles": {"H2O_g": 2.969522562007359e20},
+            "species": {
+                "partial_pressure": {"H2O_g": 1.0299426742644398},
+                "number_moles": {"H2O_g": 2.969522562007359e20},
+            }
         }
     }
 
