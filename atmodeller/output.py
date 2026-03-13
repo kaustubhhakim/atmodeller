@@ -328,15 +328,13 @@ class Output(eqx.Module):
         out["solver"] = self.multi_attempt_solution.asdict()
         out["state"] = self.state_asdict()
 
-        temperature = self.parameters.state.temperature
-        total_pressure = get_total_pressure(self.parameters, self.solution)
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict())
-
-        # TODO
-        # out["constraints"].update(
-        #    self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
-        # )
+        out["constraints"].update(
+            self.parameters.fugacity_constraints.asdict(
+                jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+            )
+        )
 
         if to_numpy:
             out = convert_jax_arrays_to_numpy(out)

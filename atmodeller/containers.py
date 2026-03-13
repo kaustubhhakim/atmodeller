@@ -496,32 +496,29 @@ class FugacityConstraintSet(eqx.Module):
 
         return active_constraints
 
-    # TODO: remove this eventually when incorporated into Output
-    # def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
-    #     """Gets an output dictionary of the evaluated fugacity constraints
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
+        """Gets an output dictionary of the evaluated fugacity constraints
 
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
-    #     Returns:
-    #         An output dictionary
-    #     """
-    #     out: dict[str, Any] = {
-    #         "species": {
-    #             "activity": dict(
-    #                 zip(
-    #                     self.species.species_names,
-    #                     [
-    #                         jnp.exp(constraint.log_fugacity(temperature, pressure))
-    #                         for constraint in self.constraints
-    #                     ],
-    #                 )
-    #             )
-    #         }
-    #     }
+        Returns:
+            An output dictionary
+        """
+        out: dict[str, Any] = {
+            "species": {
+                "activity": jnp.stack(
+                    [
+                        jnp.exp(constraint.log_fugacity(temperature, pressure))
+                        for constraint in self.constraints
+                    ],
+                    axis=-1,
+                ),
+            }
+        }
 
-    #     return out
+        return out
 
     def log_fugacity(
         self, temperature: ArrayLike, pressure: ArrayLike
