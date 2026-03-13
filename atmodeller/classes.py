@@ -172,17 +172,12 @@ class EquilibriumModel:
         trigger_autogen: Float[Array, "batch_size twice_species"] = jnp.broadcast_to(
             jnp.nan, (parameters.batch_size, self.reaction_system.species.number_species * 2)
         )
-        jax.debug.print("Trigger for auto initial guess = {out}", out=trigger_autogen)
+        logger.debug("Trigger for auto initial guess = %s", trigger_autogen)
 
         out: Output = self._solver(trigger_autogen, parameters, subkey)
+        logger.debug("asdict_split = \n%s", pformat(out.asdict_split()))
+
         multi_sol: MultiAttemptSolution = out.multi_attempt_solution
-
-        logger.info("asdict_split = \n%s", pformat(out.asdict_split()))
-
-        # output: Output = self._solver(trigger_autogen, parameters, subkey)
-        # multi_sol: MultiAttemptSolution = output.multi_attempt_solution
-        # jax.debug.print("multi_sol.value = {out}", out=multi_sol.value)
-
         num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()
         num_failed_models: int = jnp.count_nonzero(~multi_sol.solver_success).item()
 
