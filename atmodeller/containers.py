@@ -655,7 +655,7 @@ class MassConstraintSet(eqx.Module):
 
         return cls(abundance, species, units)
 
-    def abundance_mol(self) -> Float[Array, "#n_batch n_elements"]:
+    def abundance_mol(self) -> Float[Array, "... n_elements"]:
         """Abundance by moles for all elements
 
         Returns:
@@ -668,7 +668,7 @@ class MassConstraintSet(eqx.Module):
         else:
             raise ValueError("Units must be 'mass' or 'moles'")
 
-    def abundance_mass(self) -> Float[Array, "#n_batch n_elements"]:
+    def abundance_mass(self) -> Float[Array, "... n_elements"]:
         """Abundance by mass for all elements
 
         Returns:
