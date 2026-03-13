@@ -56,7 +56,7 @@ def test_graphite_stable() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
+                "partial_pressure": {
                     "O2_g": 1.27e-25,
                     "H2_g": 14.564,
                     "CO_g": 0.07276,
@@ -67,9 +67,11 @@ def test_graphite_stable() -> None:
             },
         },
         "condensates": {
-            "C_s": {"species": {"activity": {"C_s": 1.0}}, "mass_kg": {"C_s": 3.54162e20}},
+            "C_s": {"species": {"activity": {"C_s": 1.0}, "mass": {"C_s": 3.54162e20}}},
         },
     }
+
+    # CHO_model.output.to_excel("test_graphite_stable")
 
     assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
@@ -94,7 +96,7 @@ def test_graphite_unstable() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
+                "partial_pressure": {
                     "O2_g": 4.11e-13,
                     "H2_g": 236.98,
                     "CO_g": 46.42,
@@ -106,6 +108,8 @@ def test_graphite_unstable() -> None:
         },
         "condensates": {"C_s": {"species": {"activity": {"C_s": 0.12202}}}},
     }
+
+    # CHO_model.output.to_excel("test_graphite_unstable")
 
     assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
@@ -126,11 +130,13 @@ def test_water_stable() -> None:
     model.solve(state=planet, mass_constraints=mass_constraints)
 
     factsage_result: dict[str, Any] = {
-        "gas": {"partial_pressure_bar": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
+        "gas": {"partial_pressure": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
         "condensates": {
-            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}}, "mass_kg": {"H2O_l": 1.247201e21}}
+            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}, "mass": {"H2O_l": 1.247201e21}}}
         },
     }
+
+    # CHO_model.output.to_excel("test_water_stable")
 
     assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
@@ -154,7 +160,7 @@ def test_graphite_water_stable() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
+                "partial_pressure": {
                     "CH4_g": 0.3241,
                     "CO2_g": 4.3064,
                     "CO_g": 2.77e-6,
@@ -165,10 +171,12 @@ def test_graphite_water_stable() -> None:
             }
         },
         "condensates": {
-            "C_s": {"species": {"activity": {"C_s": 1.0}, "mass_kg": {"C_s": 8.75101e19}}},
-            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}, "mass_kg": {"H2O_l": 2.74821e21}}},
+            "C_s": {"species": {"activity": {"C_s": 1.0}, "mass": {"C_s": 8.75101e19}}},
+            "H2O_l": {"species": {"activity": {"H2O_l": 1.0}, "mass": {"H2O_l": 2.74821e21}}},
         },
     }
+
+    # CHO_model.output.to_excel("test_graphite_water_stable")
 
     assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
@@ -204,7 +212,7 @@ def test_impose_stable() -> None:
     factsage_result: dict[str, Any] = {
         "gas": {
             "species": {
-                "partial_pressure_bar": {
+                "partial_pressure": {
                     "CH4_g": 0.000194708,
                     "H_g": 0.000201266,
                     "H2_g": 0.49807992,
@@ -216,5 +224,7 @@ def test_impose_stable() -> None:
             "C_s": {"species": {"activity": {"C_s": 1.0}}},
         },
     }
+
+    # CHO_model.output.to_excel("test_impose_stable")
 
     assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

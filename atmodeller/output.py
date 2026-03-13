@@ -22,7 +22,7 @@ from openpyxl.styles import PatternFill
 
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, SolidPhase
+from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, PurePhase, SolidPhase
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -179,7 +179,7 @@ class Output(eqx.Module):
         return log_stability
 
     @property
-    def condensates(self) -> tuple[PhaseOutput, ...]:
+    def condensates(self) -> tuple[PhaseOutput[PurePhase], ...]:
         """Pure phase condensates"""
 
         condensate_slice: slice = self.parameters.reaction_system.condensates_slice
@@ -370,7 +370,9 @@ class Output(eqx.Module):
         if len(self.condensates) > 0:
             condensate_dict: dict = {}
             for condensate in self.condensates:
-                condensate_dict[condensate.phase.species.species_names[0]] = condensate.asdict()
+                condensate_dict[condensate.phase.species.species_names[0]] = (
+                    condensate.asdict_split()
+                )
             out["condensates"] = condensate_dict
 
         out["solver"] = self.multi_attempt_solution.asdict()
