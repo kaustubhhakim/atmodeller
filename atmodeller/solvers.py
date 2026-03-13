@@ -943,7 +943,7 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
             key: JAX PRNG key
 
         Returns:
-            :class:`~jaxmod.solvers.MultiAttemptSolution` object
+            :class:`~atmodeller.output.Output` object
         """
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
