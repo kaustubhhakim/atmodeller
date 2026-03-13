@@ -378,6 +378,11 @@ class Output(eqx.Module):
 
         out["constraints"] = {}
         out["constraints"].update(self.parameters.mass_constraints.asdict_split())
+        out["constraints"].update(
+            self.parameters.fugacity_constraints.asdict_split(
+                jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+            )
+        )
 
         if expand_to_batch:
             out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)

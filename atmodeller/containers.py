@@ -508,17 +508,50 @@ class FugacityConstraintSet(eqx.Module):
         """
         out: dict[str, Any] = {
             "species": {
-                "activity": jnp.stack(
-                    [
-                        jnp.exp(constraint.log_fugacity(temperature, pressure))
-                        for constraint in self.constraints
-                    ],
-                    axis=-1,
+                "activity": jnp.exp(
+                    jnp.stack(
+                        [
+                            constraint.log_fugacity(temperature, pressure)
+                            for constraint in self.constraints
+                        ],
+                        axis=-1,
+                    )
                 ),
             }
         }
 
         return out
+
+    def asdict_split(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
+        """Gets an output dictionary of the evaluated fugacity constraints, split by species
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            An output dictionary with the fugacity constraints for each species separately
+        """
+        out: dict[str, Any] = {}
+
+        # Species-level properties, split by species
+        species_out: dict = out.setdefault("species", {})
+        split_by_name_and_add(
+            self.species.species_names,
+            jnp.exp(
+                jnp.stack(
+                    [
+                        constraint.log_fugacity(temperature, pressure)
+                        for constraint in self.constraints
+                    ],
+                    axis=-1,
+                )
+            ),
+            species_out,
+            "activity",
+        )
+
+        return species_out
 
     def log_fugacity(
         self, temperature: ArrayLike, pressure: ArrayLike
