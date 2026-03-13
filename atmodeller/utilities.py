@@ -14,10 +14,11 @@ from collections.abc import Iterable
 from typing import Optional
 
 import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
 from jaxmod.constants import OCEAN_MASS_H2
 from jaxmod.type_aliases import NpFloat, Scalar
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -133,3 +134,22 @@ def get_reaction_dictionary(
             reactions[reaction_index] = reaction
 
     return reactions
+
+
+def split_by_name_and_add(
+    names: tuple[str, ...], inarray: Array, output: dict, keyname: str
+) -> None:
+    """Splits the species/element-level data by species/element and adds them to the output.
+
+    Args:
+        names: The species/elements corresponding to the columns of the input array
+        inarray: The input array to split
+        output: The output dictionary to which the split entries will be added
+        keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
+            to use in the output keys
+    """
+    split_data: list[Array] = jnp.split(inarray, max(len(names), 1), axis=-1)
+    out_dict: dict = output.setdefault(keyname, {})
+
+    for ii, name in enumerate(names):
+        out_dict[name] = split_data[ii]

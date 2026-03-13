@@ -51,6 +51,7 @@ from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
 from atmodeller.phase_base import BasePhase, PhaseOutput, build_species_collection
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
+from atmodeller.utilities import split_by_name_and_add
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -134,7 +135,12 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
         out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
         out["phase"]["log10dIW_P"] = self.log10dIW_P
 
-        self._split_by_species(self.species_partial_pressure, out["species"], "partial_pressure")
+        split_by_name_and_add(
+            self.phase.species.species_names,
+            self.species_partial_pressure,
+            out["species"],
+            "partial_pressure",
+        )
 
         return out
 

@@ -106,13 +106,13 @@ def expand_jax_arrays_to_batch(pytree: PyTree, batch_size: int, *, ravel: bool =
     def expand(x: Any) -> Any:
         if isinstance(x, jnp.ndarray):
             x = jnp.atleast_1d(x)
-            if x.shape[0] == batch_size:
-                return x
-            x_broadcasted: Array = jnp.broadcast_to(x, (batch_size,) + x.shape[1:])
+            # Always broadcast if shape[0] != batch_size
+            if x.shape[0] != batch_size:
+                x = jnp.broadcast_to(x, (batch_size,) + x.shape[1:])
             if ravel:
-                return jnp.ravel(x_broadcasted)
+                return jnp.ravel(x)
             else:
-                return x_broadcasted
+                return x
         return x
 
     return jax.tree_util.tree_map(expand, pytree)
@@ -309,22 +309,34 @@ class Output(eqx.Module):
         """
         out: dict[str, Any] = {}
 
-        out["gas"] = self.gas.asdict()
-        out["melt"] = self.melt.asdict()
-        out["solid"] = self.solid.asdict()
+        if not self.gas.is_empty:
+            out["gas"] = self.gas.asdict()
+        if not self.melt.is_empty:
+            out["melt"] = self.melt.asdict()
+        if not self.solid.is_empty:
+            out["solid"] = self.solid.asdict()
 
-        condensate_dict: dict = {}
-        for condensate in self.condensates:
-            condensate_dict[condensate.phase.species.species_names[0]] = condensate.asdict()
-        out["condensates"] = condensate_dict
-
-        # condensate_out: list = []
-        # for condensate in self.condensates:
-        #     condensate_out.append(condensate.asdict())
-        # out["condensates"] = condensate_out
+        if len(self.condensates) > 0:
+            # This retains symmetry with the output structure of the other phases (gas, melt,
+            # solid), where condensates are ordered in a list and identified by their species name
+            # within the species sub-category.
+            condensate_out: list = []
+            for condensate in self.condensates:
+                condensate_out.append(condensate.asdict())
+            out["condensates"] = condensate_out
 
         out["solver"] = self.multi_attempt_solution.asdict()
         out["state"] = self.state_asdict()
+
+        temperature = self.parameters.state.temperature
+        total_pressure = get_total_pressure(self.parameters, self.solution)
+        out["constraints"] = {}
+        out["constraints"].update(self.parameters.mass_constraints.asdict())
+
+        # TODO
+        # out["constraints"].update(
+        #    self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
+        # )
 
         if to_numpy:
             out = convert_jax_arrays_to_numpy(out)
@@ -350,11 +362,24 @@ class Output(eqx.Module):
         """
         out: dict[str, Any] = {}
 
-        out["gas"] = self.gas.asdict_split()
-        out["melt"] = self.melt.asdict_split()
+        if not self.gas.is_empty:
+            out["gas"] = self.gas.asdict_split()
+        if not self.melt.is_empty:
+            out["melt"] = self.melt.asdict_split()
+        if not self.solid.is_empty:
+            out["solid"] = self.solid.asdict_split()
 
-        # FIXME: might break dataframe creation because empty
-        # out["solid"] = self.solid.asdict_split()
+        if len(self.condensates) > 0:
+            condensate_dict: dict = {}
+            for condensate in self.condensates:
+                condensate_dict[condensate.phase.species.species_names[0]] = condensate.asdict()
+            out["condensates"] = condensate_dict
+
+        out["solver"] = self.multi_attempt_solution.asdict()
+        out["state"] = self.state_asdict()
+
+        out["constraints"] = {}
+        out["constraints"].update(self.parameters.mass_constraints.asdict_split())
 
         if expand_to_batch:
             out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)
@@ -365,14 +390,6 @@ class Output(eqx.Module):
         return out
 
         # out.update(self.condensates_asdict())
-
-        # temperature = self.parameters.state.temperature
-        # total_pressure = get_total_pressure(self.parameters, self.solution)
-        # out["constraints"] = {}
-        # out["constraints"].update(self.parameters.mass_constraints.asdict())
-        # out["constraints"].update(
-        #    self.parameters.fugacity_constraints.asdict(temperature, total_pressure)
-        # )
 
         # Must vmap the residual evaluation to match what the solver did: parameters contains a
         # mix of scalar and batched leaves, so calling objective_function directly on the 2-D

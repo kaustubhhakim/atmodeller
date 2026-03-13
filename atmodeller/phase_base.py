@@ -17,6 +17,7 @@ from molmass import Formula
 
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import TSpecies_co
+from atmodeller.utilities import split_by_name_and_add
 
 
 def build_species_collection(
@@ -408,6 +409,11 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     log_background_mass: Float[Array, "#n_batch 1"]
 
     @property
+    def is_empty(self) -> bool:
+        """Indicates whether the phase contains no species."""
+        return self.phase.species.number_species == 0
+
+    @property
     def include_in_mass_phase(self) -> Bool[Array, "1 n_species"]:
         """Boolean mask indicating which species to include in phase-level mass and derived
         aggregations."""
@@ -578,7 +584,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
 
         return out
 
-    def _split_by_elements(self, inarray: Array, output: dict, keyname: str) -> None:
+    def _split_by_elements_and_add(self, inarray: Array, output: dict, keyname: str) -> None:
         """Splits the element-level data by element and adds them to the output.
 
         Args:
@@ -587,15 +593,9 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
                 to use in the output keys
         """
-        split_data: list[Array] = jnp.split(
-            inarray, max(self.phase.species.number_elements, 1), axis=-1
-        )
-        element_dict: dict = output.setdefault(keyname, {})
-        for ii, element in enumerate(self.phase.species.unique_elements):
-            element_dict[element] = split_data[ii]
+        split_by_name_and_add(self.phase.species.unique_elements, inarray, output, keyname)
 
-    # Species-level split
-    def _split_by_species(self, inarray: Array, output: dict, keyname: str) -> None:
+    def _split_by_species_and_add(self, inarray: Array, output: dict, keyname: str) -> None:
         """Splits the species-level data by species' and adds them to the output.
 
         Args:
@@ -604,12 +604,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             keyname: The name of the property being split (e.g., "mass", "activity", etc.) to
                 use in the output keys
         """
-        split_data: list[Array] = jnp.split(
-            inarray, max(self.phase.species.number_species, 1), axis=-1
-        )
-        species_dict: dict = output.setdefault(keyname, {})
-        for ii, species in enumerate(self.phase.species_names):
-            species_dict[species] = split_data[ii]
+        split_by_name_and_add(self.phase.species_names, inarray, output, keyname)
 
     def asdict_split(self) -> dict[str, Any]:
         """Dictionary representation of the output with species-level arrays split into individual
@@ -633,16 +628,18 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
 
         # Element-level properties, split by element
         elements_out: dict = out.setdefault("elements", {})
-        self._split_by_elements(self.element_mass, elements_out, "mass")
-        self._split_by_elements(self.element_number_moles, elements_out, "number_moles")
+        self._split_by_elements_and_add(self.element_mass, elements_out, "mass")
+        self._split_by_elements_and_add(self.element_number_moles, elements_out, "number_moles")
 
         # Species-level properties, split by species
         species_out: dict = out.setdefault("species", {})
-        self._split_by_species(self.species_activity, species_out, "activity")
-        self._split_by_species(self.species_mass, species_out, "mass")
-        self._split_by_species(self.species_mass_fraction, species_out, "mass_fraction")
-        self._split_by_species(self.species_number_moles, species_out, "number_moles")
-        self._split_by_species(self.species_mole_fraction, species_out, "mole_fraction")
-        self._split_by_species(self.include_in_mass_phase, species_out, "include_in_phase_mass")
+        self._split_by_species_and_add(self.species_activity, species_out, "activity")
+        self._split_by_species_and_add(self.species_mass, species_out, "mass")
+        self._split_by_species_and_add(self.species_mass_fraction, species_out, "mass_fraction")
+        self._split_by_species_and_add(self.species_number_moles, species_out, "number_moles")
+        self._split_by_species_and_add(self.species_mole_fraction, species_out, "mole_fraction")
+        self._split_by_species_and_add(
+            self.include_in_mass_phase, species_out, "include_in_phase_mass"
+        )
 
         return out

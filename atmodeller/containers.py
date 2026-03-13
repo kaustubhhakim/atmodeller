@@ -44,6 +44,7 @@ from atmodeller.thermodata.core import (
     ThermodynamicCoefficients,
     thermodynamic_coefficients_dictionary,
 )
+from atmodeller.utilities import split_by_name_and_add
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -685,22 +686,40 @@ class MassConstraintSet(eqx.Module):
 
         return jnp.atleast_1d(log_abundance)
 
-    # TODO: can probably remove once incorporated into Output
-    # def asdict(self) -> dict[str, Any]:
-    #     """Gets an output dictionary
+    def asdict(self) -> dict[str, Any]:
+        """Gets an output dictionary
 
-    #     Returns:
-    #         An output dictionary with the abundance by moles and mass for all elements
-    #     """
-    #     elements: tuple[str, ...] = self.species.unique_elements
-    #     out: dict[str, Any] = {
-    #         "elements": {
-    #             "number_moles": dict(zip(elements, jnp.asarray(self.abundance_mol()).T)),
-    #             "mass_kg": dict(zip(elements, jnp.asarray(self.abundance_mass()).T)),
-    #         }
-    #     }
+        Returns:
+            An output dictionary with the abundance by moles and mass for all elements
+        """
+        out: dict[str, Any] = {
+            "elements": {
+                "number_moles": self.abundance_mol(),
+                "names": self.species.unique_elements,
+                "mass": self.abundance_mass(),
+            }
+        }
 
-    #     return out
+        return out
+
+    def asdict_split(self) -> dict[str, Any]:
+        """Gets an output dictionary split by elements
+
+        Returns:
+            An output dictionary with the abundance by moles and mass for each element separately
+        """
+        out: dict[str, Any] = {}
+
+        # Element-level properties, split by element
+        elements_out: dict = out.setdefault("elements", {})
+        split_by_name_and_add(
+            self.species.unique_elements, self.abundance_mass(), elements_out, "mass"
+        )
+        split_by_name_and_add(
+            self.species.unique_elements, self.abundance_mol(), elements_out, "number_moles"
+        )
+
+        return elements_out
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
