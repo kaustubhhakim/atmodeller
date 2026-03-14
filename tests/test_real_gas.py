@@ -242,7 +242,7 @@ def test_pH2_fO2_real_gas() -> None:
     O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
 
     H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
+        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
     )
 
     gas: GasPhase = GasPhase((H2O_g, H2_g, O2_g))
@@ -261,8 +261,6 @@ def test_pH2_fO2_real_gas() -> None:
         state=planet,
         mass_constraints=mass_constraints,
         fugacity_constraints=fugacity_constraints,
-        # Guide the solver with an improved initial guess
-        # initial_log_number_moles=np.array([55, 55, 30, 55]),
     )
 
     # output.to_excel("pH2_fO2_real_gas")
