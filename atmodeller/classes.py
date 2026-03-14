@@ -34,6 +34,7 @@ import jax.numpy as jnp
 from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
+from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
@@ -168,13 +169,38 @@ class EquilibriumModel:
             self._solver = make_solve_with_jit(parameters)
             self._solver_shapes = solver_shapes
 
-        # TODO: bit hacky, but trips the auto initial guess
-        trigger_autogen: Float[Array, "batch_size twice_species"] = jnp.broadcast_to(
-            jnp.nan, (parameters.batch_size, self.reaction_system.species.number_species * 2)
-        )
-        logger.debug("Trigger for auto initial guess = %s", trigger_autogen)
+        # Allow the user to provide initial guesses for the solver, but if they are not provided,
+        # apply a default auto guess (nan) that will trigger the solver's internal heuristic to
+        # generate an initial guess. This is often more robust than a fixed initial guess, which
+        # may be far from the solution for some models and lead to solver failure.
+        if initial_log_number_moles is None and initial_log_stability is None:
+            logger.info("Applying auto initial guess")
+            # Any NaN value will trigger the solver's internal heuristic to generate an initial
+            # guess.
+            initial_solution: Float[Array, "n_batch twice_species"] = jnp.broadcast_to(
+                jnp.nan, (parameters.batch_size, self.reaction_system.species.number_species * 2)
+            )
+        else:
+            if initial_log_number_moles is None:
+                initial_log_number_moles = INITIAL_LOG_NUMBER_MOLES
+            initial_log_number_moles = jnp.broadcast_to(
+                initial_log_number_moles,
+                (parameters.batch_size, self.reaction_system.species.number_species),
+            )
+            logger.debug("initial_log_number_moles = %s", initial_log_number_moles)
+            if initial_log_stability is None:
+                initial_log_stability = INITIAL_LOG_STABILITY
+            initial_log_stability = jnp.broadcast_to(
+                initial_log_stability,
+                (parameters.batch_size, self.reaction_system.species.number_species),
+            )
+            logger.debug("initial_log_stability = %s", initial_log_stability)
+            initial_solution = jnp.concatenate(
+                (initial_log_number_moles, initial_log_stability), axis=-1
+            )
+            logger.info("Initial solution = %s", initial_solution)
 
-        out: Output = self._solver(trigger_autogen, parameters, subkey)
+        out: Output = self._solver(initial_solution, parameters, subkey)
         logger.debug("asdict_split = \n%s", pformat(out.asdict_split()))
 
         multi_sol: MultiAttemptSolution = out.multi_attempt_solution
