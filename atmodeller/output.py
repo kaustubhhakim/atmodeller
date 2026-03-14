@@ -409,6 +409,30 @@ class Output(eqx.Module):
 
         # out["totals"] = self.totals_asdict()
 
+    def to_element_species_dict(self) -> dict[str, Any]:
+        def recursive_merge(d1: dict, d2: dict) -> dict:
+            out = dict(d1)
+            for k, v in d2.items():
+                if k in out:
+                    if isinstance(out[k], dict) and isinstance(v, dict):
+                        out[k] = recursive_merge(out[k], v)
+                    else:
+                        out[k] = v
+                else:
+                    out[k] = v
+            return out
+
+        out: dict[str, Any] = {}
+
+        if not self.gas.is_empty:
+            out = recursive_merge(out, self.gas.to_element_species_dict())
+        if not self.melt.is_empty:
+            out = recursive_merge(out, self.melt.to_element_species_dict())
+        if not self.solid.is_empty:
+            out = recursive_merge(out, self.solid.to_element_species_dict())
+
+        return out
+
     def quick_look(self) -> dict[str, Any]:
         """Quick look at the output.
 

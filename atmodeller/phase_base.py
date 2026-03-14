@@ -91,6 +91,11 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         return cls([])
 
     @property
+    @abstractmethod
+    def name(self) -> str:
+        """Name of the phase, for output labeling and downstream processing."""
+
+    @property
     def species_names(self) -> tuple[str, ...]:
         """List of species names in the phase."""
         return self.species.species_names
@@ -551,14 +556,13 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     def species_number_moles(self) -> Float[Array, "#n_batch n_species"]:
         return jnp.exp(self.log_number_moles)
 
-    def asdict(self) -> dict[str, Any]:
-        """Dictionary representation of the output for downstream processing or analysis.
+    def phase_asdict(self) -> dict[str, Any]:
+        """Dictionary representation of phase-level properties for downstream processing
 
         Returns:
-            A dictionary containing phase-level and species-level properties
+            A dictionary containing phase-level properties
         """
-        out: dict[str, Any] = {}
-        out["phase"] = {
+        return {
             "background_mass": self.background_mass,
             "background_number_moles": self.background_number_moles,
             "background_molar_mass": self.background_molar_mass,
@@ -567,6 +571,15 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             "molar_mass": self.phase_molar_mass,
             "species_to_phase_mass_ratio": self.species_to_phase_mass_ratio,
         }
+
+    def asdict(self) -> dict[str, Any]:
+        """Dictionary representation of the output for downstream processing or analysis.
+
+        Returns:
+            A dictionary containing phase-level and species-level properties
+        """
+        out: dict[str, Any] = {}
+        out["phase"] = self.phase_asdict()
         out["elements"] = {
             "names": self.phase.species.unique_elements,
             "mass": self.element_mass,
@@ -616,15 +629,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         out: dict[str, Any] = {}
 
         # Phase-level properties
-        out["phase"] = {
-            "background_mass": self.background_mass,
-            "background_number_moles": self.background_number_moles,
-            "background_molar_mass": self.background_molar_mass,
-            "mass": self.phase_mass,
-            "number_moles": self.phase_number_moles,
-            "molar_mass": self.phase_molar_mass,
-            "species_to_phase_mass_ratio": self.species_to_phase_mass_ratio,
-        }
+        out["phase"] = self.phase_asdict()
 
         # Element-level properties, split by element
         elements_out: dict = out.setdefault("elements", {})
@@ -641,5 +646,46 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         self._split_by_species_and_add(
             self.include_in_mass_phase, species_out, "include_in_phase_mass"
         )
+
+        return out
+
+    def to_element_species_dict(self) -> dict[str, Any]:
+        """Groups the output by element and species names for downstream processing or analysis.
+
+        Returns:
+            A dictionary grouped by element and species names
+        """
+        out: dict[str, Any] = {}
+
+        def splitter(names: tuple[str, ...], inarray: Array) -> list[Array]:
+            return jnp.split(inarray, max(len(names), 1), axis=-1)
+
+        unique_elements: tuple[str, ...] = self.phase.species.unique_elements
+        element_mass: list[Array] = splitter(unique_elements, self.element_mass)
+        element_number_moles: list[Array] = splitter(unique_elements, self.element_number_moles)
+
+        for nn, element in enumerate(unique_elements):
+            element_dict: dict[str, Any] = out.setdefault(element, {})
+            phase_dict: dict[str, Any] = element_dict.setdefault(self.phase.name, {})
+            phase_dict["mass"] = element_mass[nn]
+            phase_dict["number_moles"] = element_number_moles[nn]
+
+        species_names: tuple[str, ...] = self.phase.species_names
+        species_activity: list[Array] = splitter(species_names, self.species_activity)
+        species_mass: list[Array] = splitter(species_names, self.species_mass)
+        species_mass_fraction: list[Array] = splitter(species_names, self.species_mass_fraction)
+        species_number_moles: list[Array] = splitter(species_names, self.species_number_moles)
+        species_mole_fraction: list[Array] = splitter(species_names, self.species_mole_fraction)
+        include_in_mass_phase: list[Array] = splitter(species_names, self.include_in_mass_phase)
+
+        for nn, species in enumerate(species_names):
+            species_dict: dict[str, Any] = out.setdefault(species, {})
+            phase_dict = species_dict.setdefault(self.phase.name, {})
+            phase_dict["activity"] = species_activity[nn]
+            phase_dict["mass"] = species_mass[nn]
+            phase_dict["mass_fraction"] = species_mass_fraction[nn]
+            phase_dict["number_moles"] = species_number_moles[nn]
+            phase_dict["mole_fraction"] = species_mole_fraction[nn]
+            phase_dict["include_in_phase_mass"] = include_in_mass_phase[nn]
 
         return out

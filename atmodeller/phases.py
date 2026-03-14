@@ -156,6 +156,8 @@ class GasPhase(BasePhase[ChemicalSpecies]):
     """Index of O2 or ``np.nan`` if not present"""
     vmap_log_activity: Callable
     """Vectorized log activity function"""
+    name: str = "gas"
+    """Phase name"""
 
     @override
     def __init__(self, species: Iterable[ChemicalSpecies]):
@@ -341,10 +343,13 @@ class MeltPhase(BasePhase[SpeciesProtocol]):
 
     vmap_log_activity: Callable
     """Vectorized log activity function"""
+    name: str = "melt"
+    "Phase name"
 
     @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
         self.species = SpeciesCollection(species)
+
         log_activity_funcs: list[Callable] = [
             to_hashable(species_.activity.log_activity) for species_ in species
         ]
@@ -393,6 +398,8 @@ class SolidPhase(BasePhase[SpeciesProtocol]):
 
     vmap_log_activity: Callable
     """Vectorized log activity function"""
+    name: str = "solid"
+    "Phase name"
 
     @override
     def __init__(self, species: Iterable[SpeciesProtocol]):
