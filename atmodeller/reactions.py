@@ -453,9 +453,10 @@ class ReactionSystem(BaseReactionBlock):
             start += n
 
         self.formula_matrix = get_formula_matrix(self.species)
-        self._log_stoich_matrix = np.where(
-            self.formula_matrix > 0, np.log(self.formula_matrix), -np.inf
-        )
+        with np.errstate(divide="ignore"):
+            self._log_stoich_matrix = np.where(
+                self.formula_matrix > 0, np.log(self.formula_matrix), -np.inf
+            )
         self.reaction = ReactionNetwork(self.species)
         self.dissolution = DissolutionNetwork(self.species)
         self.matrix = np.vstack([block.get_matrix() for block in self.blocks])
