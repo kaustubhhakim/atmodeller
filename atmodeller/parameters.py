@@ -150,5 +150,38 @@ class Parameters(eqx.Module):
 
     @property
     def species(self) -> SpeciesCollection[SpeciesProtocol]:
-        """Species collection"""
+        """Species in the system"""
         return self.reaction_system.species
+
+    @property
+    def species_names(self) -> tuple[str, ...]:
+        """Species names in the system"""
+        return self.species.species_names
+
+    @property
+    def element_names(self) -> tuple[str, ...]:
+        """Unique elements in the system"""
+        return self.reaction_system.species.unique_elements
+
+    def update_constraints(
+        self, new_mass_constraints: Optional[Mapping[str, ArrayLike]] = None
+    ) -> "Parameters":
+        """Updates the constraints of the parameters.
+
+        Args:
+            new_mass_constraints: New mass constraints. Defaults to ``None``.
+
+        Returns:
+            Updated parameters.
+        """
+        parameters_updated: Parameters = self
+
+        if new_mass_constraints is not None:
+            mass_constraints_updated: MassConstraintSet = self.mass_constraints.update_abundance(
+                new_mass_constraints
+            )
+            parameters_updated = eqx.tree_at(
+                lambda p: p.mass_constraints, self, mass_constraints_updated
+            )
+
+        return parameters_updated
