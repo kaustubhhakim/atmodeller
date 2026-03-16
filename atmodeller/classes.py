@@ -200,7 +200,7 @@ class EquilibriumModel:
             )
             logger.info("Initial solution = %s", initial_solution)
 
-        out: Output = self._solver(initial_solution, parameters, subkey)
+        out: Output = self._solver(parameters, subkey, initial_solution)
         logger.debug("asdict_split = \n%s", pformat(out.asdict_split()))
 
         multi_sol: MultiAttemptSolution = out.multi_attempt_solution
