@@ -136,6 +136,19 @@ def get_reaction_dictionary(
     return reactions
 
 
+def split_array_by_names(names: tuple[str, ...], inarray: Array) -> list[Array]:
+    """Splits the input array into a list of arrays corresponding to the input names.
+
+    Args:
+        names: The species/elements corresponding to the columns of the input array
+        inarray: The input array to split
+
+    Returns:
+        A list of arrays corresponding to the input names
+    """
+    return jnp.split(inarray, max(len(names), 1), axis=-1)
+
+
 def split_by_name_and_add(
     names: tuple[str, ...], inarray: Array, output: dict, keyname: str
 ) -> None:
@@ -153,3 +166,25 @@ def split_by_name_and_add(
 
     for ii, name in enumerate(names):
         out_dict[name] = split_data[ii]
+
+
+def split_group_by_name_and_add(
+    names: tuple[str, ...], inarray: Array, output: dict, keyname: str, group_key: str
+) -> None:
+    """Splits the species/element-level data by species/element, groups them, and adds
+    them to the output.
+
+    Args:
+        names: The species/elements corresponding to the columns of the input array
+        inarray: The input array to split
+        output: The output dictionary to which the split entries will be added
+        keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
+            to use in the output keys
+        group_key: The key under which to group the split entries (e.g., "species" or "elements")
+    """
+    split_data: list[Array] = jnp.split(inarray, max(len(names), 1), axis=-1)
+    out_dict: dict = output.setdefault(keyname, {})
+    group_dict: dict = out_dict.setdefault(group_key, {})
+
+    for ii, name in enumerate(names):
+        group_dict[name] = split_data[ii]
