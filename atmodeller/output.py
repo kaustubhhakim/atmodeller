@@ -22,6 +22,7 @@ from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
+from atmodeller.containers import MassConstraintSet
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
 from atmodeller.phase_base import TPhase_co
@@ -354,11 +355,20 @@ class OutputNaturalDict(OutputDict):
             "include_in_phase_mass": phase_output.include_in_mass_phase,
         }
 
+        out["constraints"] = {
+            # Mass constraints are currently only included at the total system level
+            "elements": {
+                "number_moles": self.parameters.mass_constraints.abundance_mol(),
+                "names": self.parameters.mass_constraints.species.unique_elements,
+                "mass": self.parameters.mass_constraints.abundance_mass(),
+            }
+        }
+
         return out
 
     @override
     def to_dict(self, *, to_numpy: bool = False, **kwargs) -> dict[str, Any]:
-        del kwargs  # Unused
+        del kwargs
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
@@ -481,7 +491,7 @@ class OutputElementsSpeciesDict(OutputDict):
 
     @override
     def to_dict(self, to_numpy: bool = False, **kwargs) -> dict[str, Any]:
-        del kwargs  # Unused
+        del kwargs
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
@@ -502,11 +512,23 @@ class OutputElementsSpeciesDict(OutputDict):
         if not self.solid.is_empty:
             out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.solid))
 
-        # FIXME
-        #     # Constraints
-        #     out = recursively_merge_dictionaries(
-        #         out, self.parameters.mass_constraints.to_element_dict()
-        #     )
+        # Mass constraints
+        mass_constraints: MassConstraintSet = self.parameters.mass_constraints
+        unique_elements: tuple[str, ...] = mass_constraints.species.unique_elements
+        element_mass: list[Array] = self._split_array_by_names(
+            unique_elements, mass_constraints.abundance_mass()
+        )
+        element_number_moles: list[Array] = self._split_array_by_names(
+            unique_elements, mass_constraints.abundance_mol()
+        )
+
+        for nn, element in enumerate(unique_elements):
+            element_dict: dict[str, Any] = out.setdefault(element, {})
+            constraints_dict: dict[str, Any] = element_dict.setdefault("constraints", {})
+            constraints_dict["mass"] = element_mass[nn]
+            constraints_dict["number_moles"] = element_number_moles[nn]
+
+        # TODO: Fugacity constraints
 
         if to_numpy:
             out = convert_jax_arrays_to_numpy(out)
@@ -514,7 +536,7 @@ class OutputElementsSpeciesDict(OutputDict):
         return out
 
 
-class Output(OutputDict):
+class OutputSplit(OutputDict):
     """Output dictionary split by element and species names"""
 
     @staticmethod
@@ -607,7 +629,12 @@ class Output(OutputDict):
         return out
 
     def to_dict(
-        self, *, expand_to_batch: bool = False, ravel: bool = False, to_numpy: bool = False
+        self,
+        *,
+        expand_to_batch: bool = False,
+        ravel: bool = False,
+        to_numpy: bool = False,
+        **kwargs,
     ) -> dict[str, Any]:
         """Complete output as a nested dictionary with JAX or NumPy arrays, split by element and
         species names.
@@ -624,6 +651,7 @@ class Output(OutputDict):
         Returns:
             Dictionary of the solution with JAX or NumPy arrays, split by element and species names
         """
+        del kwargs
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
@@ -658,12 +686,37 @@ class Output(OutputDict):
         out["state"] = self.state_to_dict()
 
         out["constraints"] = {}
-        # out["constraints"].update(self.parameters.mass_constraints.asdict_split())
-        # out["constraints"].update(
-        #     self.parameters.fugacity_constraints.asdict_split(
-        #         jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
-        #     )
-        # )
+        elements_out: dict = out["constraints"].setdefault("elements", {})
+        self._split_by_name_and_add(
+            self.parameters.mass_constraints.species.unique_elements,
+            self.parameters.mass_constraints.abundance_mass(),
+            elements_out,
+            "mass",
+        )
+        self._split_by_name_and_add(
+            self.parameters.mass_constraints.species.unique_elements,
+            self.parameters.mass_constraints.abundance_mol(),
+            elements_out,
+            "number_moles",
+        )
+        species_out: dict = out["constraints"].setdefault("species", {})
+        evaluated_fugacity_constraints = jnp.exp(
+            jnp.stack(
+                [
+                    constraint.log_fugacity(
+                        jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+                    )
+                    for constraint in self.parameters.fugacity_constraints.constraints
+                ],
+                axis=-1,
+            )
+        )
+        self._split_by_name_and_add(
+            self.parameters.fugacity_constraints.species.species_names,
+            evaluated_fugacity_constraints,
+            species_out,
+            "activity",
+        )
 
         if expand_to_batch:
             out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)
@@ -729,6 +782,10 @@ class Output(OutputDict):
                     )
 
         return all_match
+
+
+# Hot swap output dictionary
+Output = OutputElementsSpeciesDict
 
 
 class OutputRefactoring(OutputDict):

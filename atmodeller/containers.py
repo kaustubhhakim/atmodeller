@@ -531,37 +531,6 @@ class FugacityConstraintSet(eqx.Module):
 
     #     return out
 
-    # def asdict_split(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Any]:
-    #     """Gets an output dictionary of the evaluated fugacity constraints, split by species
-
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
-
-    #     Returns:
-    #         An output dictionary with the fugacity constraints for each species separately
-    #     """
-    #     out: dict[str, Any] = {}
-
-    #     # Species-level properties, split by species
-    #     species_out: dict = out.setdefault("species", {})
-    #     split_by_name_and_add(
-    #         self.species.species_names,
-    #         jnp.exp(
-    #             jnp.stack(
-    #                 [
-    #                     constraint.log_fugacity(temperature, pressure)
-    #                     for constraint in self.constraints
-    #                 ],
-    #                 axis=-1,
-    #             )
-    #         ),
-    #         species_out,
-    #         "activity",
-    #     )
-
-    #     return species_out
-
     def log_fugacity(
         self, temperature: ArrayLike, pressure: ArrayLike
     ) -> Float[Array, "... species"]:
@@ -752,64 +721,6 @@ class MassConstraintSet(eqx.Module):
         )
 
         return mass_constaint_set_update
-
-    # def to_dict(self) -> dict[str, Any]:
-    #     """Gets an output dictionary
-
-    #     Returns:
-    #         An output dictionary with the abundance by moles and mass for all elements
-    #     """
-    #     out: dict[str, Any] = {
-    #         "elements": {
-    #             "number_moles": self.abundance_mol(),
-    #             "names": self.species.unique_elements,
-    #             "mass": self.abundance_mass(),
-    #         }
-    #     }
-
-    #     return out
-
-    # def asdict_split(self) -> dict[str, Any]:
-    #     """Gets an output dictionary split by elements
-
-    #     Returns:
-    #         An output dictionary with the abundance by moles and mass for each element separately
-    #     """
-    #     out: dict[str, Any] = {}
-
-    #     # Element-level properties, split by element
-    #     elements_out: dict = out.setdefault("elements", {})
-    #     split_by_name_and_add(
-    #         self.species.unique_elements, self.abundance_mass(), elements_out, "mass"
-    #     )
-    #     split_by_name_and_add(
-    #         self.species.unique_elements, self.abundance_mol(), elements_out, "number_moles"
-    #     )
-
-    #     return elements_out
-
-    # def to_element_dict(self) -> dict[str, Any]:
-    #     """Gets a dictionary of the abundance by element
-
-    #     Returns:
-    #         A dictionary with the abundance by mass and moles for each element separately
-    #     """
-    #     out: dict[str, Any] = {}
-
-    #     def splitter(names: tuple[str, ...], inarray: Array) -> list[Array]:
-    #         return jnp.split(inarray, max(len(names), 1), axis=-1)
-
-    #     unique_elements: tuple[str, ...] = self.species.unique_elements
-    #     element_mass: list[Array] = splitter(unique_elements, self.abundance_mass())
-    #     element_number_moles: list[Array] = splitter(unique_elements, self.abundance_mol())
-
-    #     for nn, element in enumerate(unique_elements):
-    #         element_dict: dict[str, Any] = out.setdefault(element, {})
-    #         constraints_dict: dict[str, Any] = element_dict.setdefault("constraints", {})
-    #         constraints_dict["mass"] = element_mass[nn]
-    #         constraints_dict["number_moles"] = element_number_moles[nn]
-
-    #     return out
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
