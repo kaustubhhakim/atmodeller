@@ -23,6 +23,7 @@ from openpyxl.styles import PatternFill
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, PurePhase, SolidPhase
+from atmodeller.utilities import dictionary_recursive_merge
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -410,29 +411,22 @@ class Output(eqx.Module):
         # out["totals"] = self.totals_asdict()
 
     def to_element_species_dict(self) -> dict[str, Any]:
-        def recursive_merge(d1: dict, d2: dict) -> dict:
-            out = dict(d1)
-            for k, v in d2.items():
-                if k in out:
-                    if isinstance(out[k], dict) and isinstance(v, dict):
-                        out[k] = recursive_merge(out[k], v)
-                    else:
-                        out[k] = v
-                else:
-                    out[k] = v
-            return out
+        """Groups the output by element and species names.
 
+        Returns:
+            A nested dictionary of the output, grouped by element and species names.
+        """
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
-            out = recursive_merge(out, self.gas.to_element_species_dict())
+            out = dictionary_recursive_merge(out, self.gas.to_element_species_dict())
         if not self.melt.is_empty:
-            out = recursive_merge(out, self.melt.to_element_species_dict())
+            out = dictionary_recursive_merge(out, self.melt.to_element_species_dict())
         if not self.solid.is_empty:
-            out = recursive_merge(out, self.solid.to_element_species_dict())
+            out = dictionary_recursive_merge(out, self.solid.to_element_species_dict())
 
         # Constraints
-        out = recursive_merge(out, self.parameters.mass_constraints.to_element_dict())
+        out = dictionary_recursive_merge(out, self.parameters.mass_constraints.to_element_dict())
 
         return out
 
