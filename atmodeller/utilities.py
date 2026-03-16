@@ -188,3 +188,28 @@ def split_group_by_name_and_add(
 
     for ii, name in enumerate(names):
         group_dict[name] = split_data[ii]
+
+
+def dictionary_recursive_merge(d1: dict, d2: dict) -> dict:
+    """Recursively merges two dictionaries.
+
+    Args:
+        d1: The first dictionary
+        d2: The second dictionary, which will overwrite values in the first dictionary if there are
+            duplicate keys
+
+    Returns:
+        The merged dictionary
+    """
+    out: dict = dict(d1)
+
+    for k, v in d2.items():
+        if k in out:
+            if isinstance(out[k], dict) and isinstance(v, dict):
+                out[k] = dictionary_recursive_merge(out[k], v)
+            else:
+                out[k] = v
+        else:
+            out[k] = v
+
+    return out
