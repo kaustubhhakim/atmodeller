@@ -34,7 +34,7 @@ explicit species in the solver.
 
 import logging
 from collections.abc import Callable, Iterable
-from typing import Any, Self
+from typing import Self
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -51,7 +51,6 @@ from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
 from atmodeller.phase_base import BasePhase, PhaseOutput, build_species_collection
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
-from atmodeller.utilities import split_array_by_names, split_by_name_and_add
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -104,61 +103,6 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
     def volume(self) -> Float[Array, "#n_batch 1"]:
         r"""Volume of the gas phase in m\ :sup:`3`"""
         return self.phase_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
-
-    @override
-    def asdict(self) -> dict[str, Any]:
-        """Dictionary representation of the output for downstream processing or analysis.
-
-        Returns:
-            A dictionary containing phase-level and species-level properties
-        """
-        out: dict[str, Any] = super().asdict()
-
-        out["phase"]["volume"] = self.volume
-        out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
-        out["phase"]["log10dIW_P"] = self.log10dIW_P
-        out["species"]["partial_pressure"] = self.species_partial_pressure
-
-        return out
-
-    @override
-    def to_element_species_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = super().to_element_species_dict()
-
-        species_names: tuple[str, ...] = self.phase.species_names
-        species_partial_pressure: list[Array] = split_array_by_names(
-            species_names, self.species_partial_pressure
-        )
-
-        for nn, species in enumerate(species_names):
-            species_dict: dict[str, Any] = out.setdefault(species, {})
-            phase_dict: dict[str, Any] = species_dict.setdefault(self.phase.name, {})
-            phase_dict["partial_pressure"] = species_partial_pressure[nn]
-
-        return out
-
-    @override
-    def asdict_split(self) -> dict[str, Any]:
-        """Dictionary representation of the output with species-level arrays split into individual
-        entries for each species.
-
-        Returns:
-            A dictionary containing phase-level and species-level properties
-        """
-        out = super().asdict_split()
-
-        out["phase"]["volume"] = self.volume
-        out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
-        out["phase"]["log10dIW_P"] = self.log10dIW_P
-
-        split_by_name_and_add(
-            self.phase.species.species_names,
-            self.species_partial_pressure,
-            out["species"],
-            "partial_pressure",
-        )
-
-        return out
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
@@ -271,76 +215,6 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         )
 
         return output
-
-    # @override
-    # def output(
-    #     self,
-    #     log_number_moles: Float[Array, "... n_species"],
-    #     log_stability: Float[Array, "... n_species"],
-    #     temperature: Float[Array, "..."],
-    #     pressure: Float[Array, "..."],
-    #     log_background_molar_mass: Float[Array, "..."] = jnp.asarray(0.0),
-    #     log_background_mass: Float[Array, ""] = jnp.asarray(-jnp.inf),
-    # ) -> dict[str, Any]:
-    #     r"""Outputs phase-level and species-level properties in a human-readable format.
-
-    #     Single conversion boundary: JAX -> NumPy -> dict
-
-    #     Args:
-    #         log_number_moles: Log number of moles of each species in the phase
-    #         log_stability: Log stability of each species in the phase
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
-    #         log_background_molar_mass: Log molar mass of the background component in
-    #             kg mol\ :sup:`-1`. Defaults to ``0.0`` (i.e., a dummy value of 1 kg mol\ :sup:`-1`)
-    #             ; only meaningful when ``log_background_mass`` is finite.
-    #         log_background_mass: Log mass of the background component in kg. Defaults to negative
-    #             infinity (i.e., no background component).
-
-    #     Returns:
-    #         A dictionary containing phase-level and species-level properties
-    #     """
-    #     out: dict[str, Any] = super().output(
-    #         log_number_moles,
-    #         log_stability,
-    #         temperature,
-    #         pressure,
-    #         log_background_molar_mass,
-    #         log_background_mass,
-    #     )
-
-    # log_background_moles: Float[Array, "..."] = log_background_mass - log_background_molar_mass
-
-    # out["phase"]["pressure_bar"] = jnp.squeeze(jnp.asarray(pressure))
-    # out["species"]["partial_pressure_bar"] = dict(
-    #    zip(
-    #        self.species_names,
-    #        jnp.asarray(pressure)
-    #        * jnp.exp(self.get_log_mole_fraction(log_number_moles, log_background_moles)).T,
-    #    )
-    # )
-    # number_moles: NpFloat = np.squeeze(
-    #    jnp.exp(self.get_log_phase_moles(log_number_moles, log_background_moles))
-    # )
-    # out["phase"]["volume_m3"] = number_moles * GAS_CONSTANT_BAR * temperature / pressure
-
-    # TODO: Need JAX compatible switch
-    # # fO2 calculation: if O2 is present, compute fO2 relative to the iron-wustite (IW) buffer
-    # if not jnp.isnan(self.O2_index):
-    #     log10_fugacity = jnp.log10(out["species"]["activity"]["O2_g"])
-    #     buffer: RedoxBufferProtocol = IronWustiteBuffer()
-    #     # Shift at 1 bar
-    #     buffer_at_one_bar = jnp.asarray(buffer.log10_fugacity(temperature, 1.0))
-    #     log10_shift_at_one_bar = log10_fugacity - buffer_at_one_bar
-    #     # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
-    #     out["phase"]["log10dIW_1_bar"] = log10_shift_at_one_bar
-    #     # Shift at actual pressure
-    #     buffer_at_P = jnp.asarray(buffer.log10_fugacity(temperature, pressure))
-    #     log10_shift_at_P = log10_fugacity - buffer_at_P
-    #     # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
-    #     out["phase"]["log10dIW_P"] = log10_shift_at_P
-
-    # return out
 
 
 class MeltPhase(BasePhase[SpeciesProtocol]):

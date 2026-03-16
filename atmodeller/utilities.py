@@ -14,11 +14,10 @@ from collections.abc import Iterable
 from typing import Optional
 
 import equinox as eqx
-import jax.numpy as jnp
 import numpy as np
 from jaxmod.constants import OCEAN_MASS_H2
 from jaxmod.type_aliases import NpFloat, Scalar
-from jaxtyping import Array, ArrayLike
+from jaxtyping import ArrayLike
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -136,61 +135,7 @@ def get_reaction_dictionary(
     return reactions
 
 
-def split_array_by_names(names: tuple[str, ...], inarray: Array) -> list[Array]:
-    """Splits the input array into a list of arrays corresponding to the input names.
-
-    Args:
-        names: The species/elements corresponding to the columns of the input array
-        inarray: The input array to split
-
-    Returns:
-        A list of arrays corresponding to the input names
-    """
-    return jnp.split(inarray, max(len(names), 1), axis=-1)
-
-
-def split_by_name_and_add(
-    names: tuple[str, ...], inarray: Array, output: dict, keyname: str
-) -> None:
-    """Splits the species/element-level data by species/element and adds them to the output.
-
-    Args:
-        names: The species/elements corresponding to the columns of the input array
-        inarray: The input array to split
-        output: The output dictionary to which the split entries will be added
-        keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
-            to use in the output keys
-    """
-    split_data: list[Array] = jnp.split(inarray, max(len(names), 1), axis=-1)
-    out_dict: dict = output.setdefault(keyname, {})
-
-    for ii, name in enumerate(names):
-        out_dict[name] = split_data[ii]
-
-
-def split_group_by_name_and_add(
-    names: tuple[str, ...], inarray: Array, output: dict, keyname: str, group_key: str
-) -> None:
-    """Splits the species/element-level data by species/element, groups them, and adds
-    them to the output.
-
-    Args:
-        names: The species/elements corresponding to the columns of the input array
-        inarray: The input array to split
-        output: The output dictionary to which the split entries will be added
-        keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
-            to use in the output keys
-        group_key: The key under which to group the split entries (e.g., "species" or "elements")
-    """
-    split_data: list[Array] = jnp.split(inarray, max(len(names), 1), axis=-1)
-    out_dict: dict = output.setdefault(keyname, {})
-    group_dict: dict = out_dict.setdefault(group_key, {})
-
-    for ii, name in enumerate(names):
-        group_dict[name] = split_data[ii]
-
-
-def dictionary_recursive_merge(d1: dict, d2: dict) -> dict:
+def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
     """Recursively merges two dictionaries.
 
     Args:
@@ -206,7 +151,7 @@ def dictionary_recursive_merge(d1: dict, d2: dict) -> dict:
     for k, v in d2.items():
         if k in out:
             if isinstance(out[k], dict) and isinstance(v, dict):
-                out[k] = dictionary_recursive_merge(out[k], v)
+                out[k] = recursively_merge_dictionaries(out[k], v)
             else:
                 out[k] = v
         else:

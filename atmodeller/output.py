@@ -6,6 +6,7 @@
 
 import logging
 import pickle
+from abc import abstractmethod
 from pathlib import Path
 from pprint import pformat
 from typing import Any, Optional
@@ -20,10 +21,12 @@ from jaxmod.type_aliases import NpArray
 from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
+from atmodeller import override
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
+from atmodeller.phase_base import TPhase_co
 from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, PurePhase, SolidPhase
-from atmodeller.utilities import dictionary_recursive_merge
+from atmodeller.utilities import recursively_merge_dictionaries
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -133,12 +136,8 @@ def convert_jax_arrays_to_numpy(pytree: PyTree) -> PyTree:
     )
 
 
-class Output(eqx.Module):
-    """Output
-
-    Properties can be called within a jitted context to access output quantites for downstream
-    processing. Arrays are always broadcastable to avoid necessitating expanding all arrays to the
-    batch size.
+class OutputDict(eqx.Module):
+    """Represents the output of a model solution as a nested dictionary.
 
     Args:
         parameters: Parameters
@@ -148,9 +147,27 @@ class Output(eqx.Module):
     parameters: Parameters
     multi_attempt_solution: MultiAttemptSolution
 
-    def __init__(self, parameters: Parameters, multi_attempt_solution: MultiAttemptSolution):
-        self.parameters = parameters
-        self.multi_attempt_solution = multi_attempt_solution
+    @abstractmethod
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+        """Dictionary representation of the phase output
+
+        Returns:
+            A dictionary
+        """
+
+    @abstractmethod
+    def to_dict(self, *, to_numpy: bool = False, **kwargs) -> dict[str, Any]:
+        """Output as a nested dictionary with JAX or NumPy arrays.
+
+        Args:
+            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
+                Must be ``False`` if used within a jitted context, as NumPy arrays are not
+                compatible with JAX transformations (jit, vmap, etc.).
+            **kwargs: Arbitrary keyword arguments for the output dictionary
+
+        Returns:
+            Dictionary of the solution with JAX or NumPy arrays
+        """
 
     @property
     def _split_solution(self) -> list[Float[Array, "#n_batch n_species"]]:
@@ -180,6 +197,16 @@ class Output(eqx.Module):
         return log_stability
 
     @property
+    def main_phases(self) -> tuple[PhaseOutput, ...]:
+        """Main phases (gas, melt, solid) output as a list"""
+        return (self.gas, self.melt, self.solid)
+
+    @property
+    def solution(self) -> Float[Array, "#n_batch twice_species"]:
+        """Solution array for all species i.e. log number of moles and log stability"""
+        return self.multi_attempt_solution.value
+
+    @property
     def condensates(self) -> tuple[PhaseOutput[PurePhase], ...]:
         """Pure phase condensates"""
 
@@ -199,28 +226,6 @@ class Output(eqx.Module):
             condensates_out.append(condensate_out)
 
         return tuple(condensates_out)
-
-    @property
-    def constraints_element_mass(self) -> Float[Array, "#n_batch n_elements"]:
-        """Element mass constraints in kg"""
-        return self.parameters.mass_constraints.abundance_mass()
-
-    @property
-    def constraints_element_moles(self) -> Float[Array, "#n_batch n_elements"]:
-        """Element abundance constraints in moles"""
-        return self.parameters.mass_constraints.abundance_mol()
-
-    @property
-    def constraints_fugacity(self) -> Float[Array, "#n_batch n_species"]:
-        """Fugacity constraints in bar"""
-        constraints: Float[Array, "#n_batch n_species"] = jnp.stack(
-            [
-                jnp.exp(constraint.log_fugacity(self.temperature, self.pressure))
-                for constraint in self.parameters.fugacity_constraints.constraints
-            ],
-            axis=-1,
-        )
-        return constraints
 
     @property
     def gas(self) -> GasPhaseOutput:
@@ -273,10 +278,6 @@ class Output(eqx.Module):
 
         return solid_output
 
-    def state_asdict(self) -> dict[str, Any]:
-        """Thermodynamic state of the system"""
-        return self.parameters.state.asdict(jnp.squeeze(self.gas.phase_mass))
-
     @property
     def temperature(self) -> Float[Array, "#n_batch 1"]:
         """Temperature in K"""
@@ -287,65 +288,329 @@ class Output(eqx.Module):
         """Pressure in bar"""
         return jnp.atleast_2d(get_total_pressure(self.parameters, self.solution)).T
 
-    @property
-    def solution(self) -> Float[Array, "#n_batch twice_species"]:
-        """Solution array for all species i.e. log number of moles and log stability"""
-        return self.multi_attempt_solution.value
+    def phase_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+        """Phase-level properties such as total mass, number of moles, molar mass, etc.
 
-    @property
-    def solver(self) -> dict[str, ArrayLike]:
+        Returns:
+            A dictionary of phase-level properties
+        """
+        return {
+            "background_mass": phase_output.background_mass,
+            "background_number_moles": phase_output.background_number_moles,
+            "background_molar_mass": phase_output.background_molar_mass,
+            "mass": phase_output.phase_mass,
+            "number_moles": phase_output.phase_number_moles,
+            "molar_mass": phase_output.phase_molar_mass,
+            "species_to_phase_mass_ratio": phase_output.species_to_phase_mass_ratio,
+        }
+
+    def solver_to_dict(self) -> dict[str, ArrayLike]:
         """Solver information such as success flags and number of iterations"""
         return self.multi_attempt_solution.asdict()
 
-    def asdict(self, *, to_numpy: bool = False) -> dict[str, Any]:
-        """Complete output as a nested dictionary with JAX or NumPy arrays.
+    def state_to_dict(self) -> dict[str, Any]:
+        """Thermodynamic state of the system"""
+        return self.parameters.state.asdict(jnp.squeeze(self.gas.phase_mass))
 
-        Args:
-            to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
-                Must be ``False`` if used within a jitted context, as NumPy arrays are not
-                compatible with JAX transformations (jit, vmap, etc.).
+    def quick_look(self) -> dict[str, Any]:
+        """Quick look at the output.
 
         Returns:
-            Dictionary of the solution with JAX or NumPy arrays
+            A nested dictionary of the output, suitable for quick inspection and comparison.
         """
+        out: dict[str, Any] = self.to_dict(to_numpy=True)
+        logger.info("Quick look output:\n%s", pformat(out))
+
+        return out
+
+
+class OutputNaturalDict(OutputDict):
+    """Represents the natural output of a model based on the arrays used internally.
+
+    Args:
+        parameters: Parameters
+        multi_attempt_solution: Multiple attempt solution object
+    """
+
+    @override
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+
+        # Phase-level properties
+        out["phase"] = self.phase_to_dict(phase_output)
+
+        out["elements"] = {
+            "names": phase_output.phase.species.unique_elements,
+            "mass": phase_output.element_mass,
+            "number_moles": phase_output.element_number_moles,
+        }
+        out["species"] = {
+            "names": phase_output.phase.species_names,
+            "activity": phase_output.species_activity,
+            "mass": phase_output.species_mass,
+            "mass_fraction": phase_output.species_mass_fraction,
+            "number_moles": phase_output.species_number_moles,
+            "mole_fraction": phase_output.species_mole_fraction,
+            "include_in_phase_mass": phase_output.include_in_mass_phase,
+        }
+
+        return out
+
+    @override
+    def to_dict(self, *, to_numpy: bool = False, **kwargs) -> dict[str, Any]:
+        del kwargs  # Unused
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
-            out["gas"] = self.gas.asdict()
+            phase_name: str = self.gas.phase.name
+            out[phase_name] = self._phase_output_to_dict(self.gas)
+            out[phase_name]["species"]["partial_pressure"] = self.gas.species_partial_pressure
+            out[phase_name]["phase"]["volume"] = self.gas.volume
+            out[phase_name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
+            out[phase_name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
+            out[self.gas.phase.name]["phase"]["pressure"] = self.gas.pressure
+
         if not self.melt.is_empty:
-            out["melt"] = self.melt.asdict()
+            phase_name = self.melt.phase.name
+            out[phase_name] = self._phase_output_to_dict(self.melt)
+
         if not self.solid.is_empty:
-            out["solid"] = self.solid.asdict()
+            phase_name = self.solid.phase.name
+            out[phase_name] = self._phase_output_to_dict(self.solid)
 
         if len(self.condensates) > 0:
-            # This retains symmetry with the output structure of the other phases (gas, melt,
+            # This retains symmetry with the output structure of the other phases (gas, melt, and
             # solid), where condensates are ordered in a list and identified by their species name
             # within the species sub-category.
             condensate_out: list = []
             for condensate in self.condensates:
-                condensate_out.append(condensate.asdict())
+                condensate_out.append(self._phase_output_to_dict(condensate))
             out["condensates"] = condensate_out
 
         out["solver"] = self.multi_attempt_solution.asdict()
-        out["state"] = self.state_asdict()
+        out["state"] = self.state_to_dict()
 
         out["constraints"] = {}
-        out["constraints"].update(self.parameters.mass_constraints.asdict())
-        out["constraints"].update(
-            self.parameters.fugacity_constraints.asdict(
-                jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
-            )
-        )
+        # FIXME
+        # out["constraints"].update(self.parameters.mass_constraints.to_dict())
+        # out["constraints"].update(
+        #    self.parameters.fugacity_constraints.to_dict(
+        #        jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+        #    )
+        # )
 
         if to_numpy:
             out = convert_jax_arrays_to_numpy(out)
 
         return out
 
-    def asdict_split(
-        self, *, expand_to_batch: bool = False, to_numpy: bool = False, ravel: bool = False
+
+class OutputElementsSpeciesDict(OutputDict):
+    """Output dictionary grouped by element and species names"""
+
+    @staticmethod
+    def _split_array_by_names(names: tuple[str, ...], inarray: Array) -> list[Array]:
+        """Splits the input array into a list of arrays corresponding to the input names.
+
+        Args:
+            names: The species/elements corresponding to the columns of the input array
+            inarray: The input array to split
+
+        Returns:
+            A list of arrays corresponding to the input names
+        """
+        return jnp.split(inarray, max(len(names), 1), axis=-1)
+
+    @override
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+        """Dictionary representation of the phase output, grouped by element and species names
+
+        This is an alternative output format that groups the output by element and species names,
+        which can be more intuitive for certain types of analysis.
+
+        Returns:
+            A dictionary
+        """
+        out: dict[str, Any] = {}
+
+        unique_elements: tuple[str, ...] = phase_output.phase.species.unique_elements
+        element_mass: list[Array] = self._split_array_by_names(
+            unique_elements, phase_output.element_mass
+        )
+        element_number_moles: list[Array] = self._split_array_by_names(
+            unique_elements, phase_output.element_number_moles
+        )
+
+        for nn, element in enumerate(unique_elements):
+            element_dict: dict[str, Any] = out.setdefault(element, {})
+            phase_dict: dict[str, Any] = element_dict.setdefault(phase_output.phase.name, {})
+            phase_dict["mass"] = element_mass[nn]
+            phase_dict["number_moles"] = element_number_moles[nn]
+
+        species_names: tuple[str, ...] = phase_output.phase.species_names
+        species_activity: list[Array] = self._split_array_by_names(
+            species_names, phase_output.species_activity
+        )
+        species_mass: list[Array] = self._split_array_by_names(
+            species_names, phase_output.species_mass
+        )
+        species_mass_fraction: list[Array] = self._split_array_by_names(
+            species_names, phase_output.species_mass_fraction
+        )
+        species_number_moles: list[Array] = self._split_array_by_names(
+            species_names, phase_output.species_number_moles
+        )
+        species_mole_fraction: list[Array] = self._split_array_by_names(
+            species_names, phase_output.species_mole_fraction
+        )
+        include_in_mass_phase: list[Array] = self._split_array_by_names(
+            species_names, phase_output.include_in_mass_phase
+        )
+
+        for nn, species in enumerate(species_names):
+            species_dict: dict[str, Any] = out.setdefault(species, {})
+            phase_dict: dict[str, Any] = species_dict.setdefault(phase_output.phase.name, {})
+            phase_dict["activity"] = species_activity[nn]
+            phase_dict["mass"] = species_mass[nn]
+            phase_dict["mass_fraction"] = species_mass_fraction[nn]
+            phase_dict["number_moles"] = species_number_moles[nn]
+            phase_dict["mole_fraction"] = species_mole_fraction[nn]
+            phase_dict["include_in_phase_mass"] = include_in_mass_phase[nn]
+
+        return out
+
+    @override
+    def to_dict(self, to_numpy: bool = False, **kwargs) -> dict[str, Any]:
+        del kwargs  # Unused
+        out: dict[str, Any] = {}
+
+        if not self.gas.is_empty:
+            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.gas))
+
+            # Add the partial pressure of each species in the gas phase to the output
+            species_partial_pressure: list[Array] = self._split_array_by_names(
+                self.gas.phase.species_names, self.gas.species_partial_pressure
+            )
+            for nn, species in enumerate(self.gas.phase.species_names):
+                species_dict: dict[str, Any] = out.setdefault(species, {})
+                phase_dict: dict[str, Any] = species_dict.setdefault(self.gas.phase.name, {})
+                phase_dict["partial_pressure"] = species_partial_pressure[nn]
+
+        if not self.melt.is_empty:
+            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.melt))
+
+        if not self.solid.is_empty:
+            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.solid))
+
+        # FIXME
+        #     # Constraints
+        #     out = recursively_merge_dictionaries(
+        #         out, self.parameters.mass_constraints.to_element_dict()
+        #     )
+
+        if to_numpy:
+            out = convert_jax_arrays_to_numpy(out)
+
+        return out
+
+
+class Output(OutputDict):
+    """Output dictionary split by element and species names"""
+
+    @staticmethod
+    def _split_by_name_and_add(
+        names: tuple[str, ...], inarray: Array, output: dict, keyname: str
+    ) -> None:
+        """Splits the species/element-level data by species/element and adds them to the output.
+
+        Args:
+            names: The species/elements corresponding to the columns of the input array
+            inarray: The input array to split
+            output: The output dictionary to which the split entries will be added
+            keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
+                to use in the output keys
+        """
+        split_data: list[Array] = jnp.split(inarray, max(len(names), 1), axis=-1)
+        out_dict: dict = output.setdefault(keyname, {})
+
+        for ii, name in enumerate(names):
+            out_dict[name] = split_data[ii]
+
+    def _split_by_elements_and_add(
+        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+    ) -> None:
+        """Splits the element-level data by element and adds them to the output.
+
+        Args:
+            phase_output: The phase output object containing the element information
+            inarray: The input array to split, with shape (... n_elements)
+            output: The output dictionary to which the split entries will be added
+            keyname: The name of the property being split (e.g., "mass", "number_moles", etc.)
+                to use in the output keys
+        """
+        self._split_by_name_and_add(
+            phase_output.phase.species.unique_elements, inarray, output, keyname
+        )
+
+    def _split_by_species_and_add(
+        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+    ) -> None:
+        """Splits the species-level data by species' and adds them to the output.
+
+        Args:
+            phase_output: The phase output object containing the species information
+            inarray: The input array to split, with shape (... n_species)
+            output: The output dictionary to which the split entries will be added
+            keyname: The name of the property being split (e.g., "mass", "activity", etc.) to
+                use in the output keys
+        """
+        self._split_by_name_and_add(phase_output.phase.species_names, inarray, output, keyname)
+
+    @override
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+
+        out: dict[str, Any] = {}
+
+        # Phase-level properties
+        out["phase"] = self.phase_to_dict(phase_output)
+
+        # Element-level properties, split by element
+        elements_out: dict = out.setdefault("elements", {})
+        self._split_by_elements_and_add(
+            phase_output, phase_output.element_mass, elements_out, "mass"
+        )
+        self._split_by_elements_and_add(
+            phase_output, phase_output.element_number_moles, elements_out, "number_moles"
+        )
+
+        # Species-level properties, split by species
+        species_out: dict = out.setdefault("species", {})
+        self._split_by_species_and_add(
+            phase_output, phase_output.species_activity, species_out, "activity"
+        )
+        self._split_by_species_and_add(
+            phase_output, phase_output.species_mass, species_out, "mass"
+        )
+        self._split_by_species_and_add(
+            phase_output, phase_output.species_mass_fraction, species_out, "mass_fraction"
+        )
+        self._split_by_species_and_add(
+            phase_output, phase_output.species_number_moles, species_out, "number_moles"
+        )
+        self._split_by_species_and_add(
+            phase_output, phase_output.species_mole_fraction, species_out, "mole_fraction"
+        )
+        self._split_by_species_and_add(
+            phase_output, phase_output.include_in_mass_phase, species_out, "include_in_phase_mass"
+        )
+
+        return out
+
+    def to_dict(
+        self, *, expand_to_batch: bool = False, ravel: bool = False, to_numpy: bool = False
     ) -> dict[str, Any]:
-        """Output as a nested dictionary with JAX or NumPy arrays, split by elements and species
+        """Complete output as a nested dictionary with JAX or NumPy arrays, split by element and
+        species names.
 
         Args:
             expand_to_batch: Whether to expand arrays to the batch size. Defaults to ``False``.
@@ -357,35 +622,48 @@ class Output(eqx.Module):
                 ``to_numpy=False``). Defaults to ``False``.
 
         Returns:
-            Dictionary of the solution with JAX or NumPy arrays, split by elements and species
+            Dictionary of the solution with JAX or NumPy arrays, split by element and species names
         """
         out: dict[str, Any] = {}
 
         if not self.gas.is_empty:
-            out["gas"] = self.gas.asdict_split()
+            out[self.gas.phase.name] = self._phase_output_to_dict(self.gas)
+            self._split_by_species_and_add(
+                self.gas,
+                self.gas.species_partial_pressure,
+                out[self.gas.phase.name]["species"],
+                "partial_pressure",
+            )
+            out[self.gas.phase.name]["phase"]["volume"] = self.gas.volume
+            out[self.gas.phase.name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
+            out[self.gas.phase.name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
+            out[self.gas.phase.name]["phase"]["pressure"] = self.gas.pressure
+
         if not self.melt.is_empty:
-            out["melt"] = self.melt.asdict_split()
+            out[self.melt.phase.name] = self._phase_output_to_dict(self.melt)
+
         if not self.solid.is_empty:
-            out["solid"] = self.solid.asdict_split()
+            out[self.solid.phase.name] = self._phase_output_to_dict(self.solid)
 
         if len(self.condensates) > 0:
             condensate_dict: dict = {}
             for condensate in self.condensates:
                 condensate_dict[condensate.phase.species.species_names[0]] = (
-                    condensate.asdict_split()
+                    self._phase_output_to_dict(condensate)
                 )
+
             out["condensates"] = condensate_dict
 
         out["solver"] = self.multi_attempt_solution.asdict()
-        out["state"] = self.state_asdict()
+        out["state"] = self.state_to_dict()
 
         out["constraints"] = {}
-        out["constraints"].update(self.parameters.mass_constraints.asdict_split())
-        out["constraints"].update(
-            self.parameters.fugacity_constraints.asdict_split(
-                jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
-            )
-        )
+        # out["constraints"].update(self.parameters.mass_constraints.asdict_split())
+        # out["constraints"].update(
+        #     self.parameters.fugacity_constraints.asdict_split(
+        #         jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+        #     )
+        # )
 
         if expand_to_batch:
             out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)
@@ -395,51 +673,165 @@ class Output(eqx.Module):
 
         return out
 
-        # out.update(self.condensates_asdict())
+    def compare(
+        self,
+        d1: dict,
+        rtol: float,
+        atol: float,
+        log: bool = False,
+        d2: Optional[dict] = None,
+        path: tuple = (),
+        all_match: bool = True,
+    ) -> bool:
+        """Compares two nested dictionaries of output.
 
-        # Must vmap the residual evaluation to match what the solver did: parameters contains a
-        # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
-        # solution gives incorrect results. vmap_axes_spec maps None/0 per leaf appropriately.
-        # FIXME: This is breaking because all arrays including numpy are seen as batchable under
-        # jit
-        # objective_function_vmapped = eqx.filter_vmap(
-        #    objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
-        # )
-        # out["residual"] = objective_function_vmapped(self.solution, self.parameters)
-        # out["solution"] = self.solution
-
-        # out["totals"] = self.totals_asdict()
-
-    def to_element_species_dict(self) -> dict[str, Any]:
-        """Groups the output by element and species names.
-
-        Returns:
-            A nested dictionary of the output, grouped by element and species names.
-        """
-        out: dict[str, Any] = {}
-
-        if not self.gas.is_empty:
-            out = dictionary_recursive_merge(out, self.gas.to_element_species_dict())
-        if not self.melt.is_empty:
-            out = dictionary_recursive_merge(out, self.melt.to_element_species_dict())
-        if not self.solid.is_empty:
-            out = dictionary_recursive_merge(out, self.solid.to_element_species_dict())
-
-        # Constraints
-        out = dictionary_recursive_merge(out, self.parameters.mass_constraints.to_element_dict())
-
-        return out
-
-    def quick_look(self) -> dict[str, Any]:
-        """Quick look at the output.
+        Args:
+            d1: Target dictionary
+            rtol: Relative tolerance for comparison
+            atol: Absolute tolerance for comparison
+            log: Whether to compare the base-10 logarithm of the values. Defaults to ``False``.
+            d2: Dictionary to compare against. If ``None``, compares against the current output.
+                Defaults to ``None``.
+            path: Internal parameter for tracking the current path in the nested structure during
+                recursion. Should not be set by the user. Defaults to an empty tuple.
+            all_match: Internal parameter for tracking whether all comparisons have matched so far
+                during recursion. Should not be set by the user. Defaults to ``True``.
 
         Returns:
-            A nested dictionary of the output, suitable for quick inspection and comparison.
+            ``True`` if all values match within the specified tolerances, else ``False``
         """
-        out: dict[str, Any] = self.asdict(to_numpy=True)
-        logger.info("Quick look output:\n%s", pformat(out))
+        if d2 is None:
+            d2 = self.to_dict(expand_to_batch=True, ravel=True, to_numpy=True)
 
-        return out
+        keys = d1.keys()
+
+        for key in keys:
+            v1 = d1.get(key)
+            v2 = d2.get(key)
+            current_path = path + (key,)
+
+            if isinstance(v1, dict) and isinstance(v2, dict):
+                all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
+            else:
+                if isinstance(v1, (np.ndarray, float, int)) and isinstance(
+                    v2, (np.ndarray, float, int)
+                ):
+                    if log:
+                        v1, v2 = np.log10(v1), np.log10(v2)
+                    is_close: bool = np.allclose(v1, v2, rtol=rtol, atol=atol)
+                    all_match = all_match and is_close
+                    logger.info(
+                        "Comparing %s: %s vs %s --> %s",
+                        current_path,
+                        v1,
+                        v2,
+                        "match" if is_close else "mismatch",
+                    )
+
+        return all_match
+
+
+class OutputRefactoring(OutputDict):
+    """Output
+
+    Properties can be called within a jitted context to access output quantites for downstream
+    processing. Arrays are always broadcastable to avoid necessitating expanding all arrays to the
+    batch size.
+
+    Args:
+        parameters: Parameters
+        multi_attempt_solution: Multiple attempt solution object
+    """
+
+    # @property
+    # def constraints_element_mass(self) -> Float[Array, "#n_batch n_elements"]:
+    #     """Element mass constraints in kg"""
+    #     return self.parameters.mass_constraints.abundance_mass()
+
+    # @property
+    # def constraints_element_moles(self) -> Float[Array, "#n_batch n_elements"]:
+    #     """Element abundance constraints in moles"""
+    #     return self.parameters.mass_constraints.abundance_mol()
+
+    # @property
+    # def constraints_fugacity(self) -> Float[Array, "#n_batch n_species"]:
+    #     """Fugacity constraints in bar"""
+    #     constraints: Float[Array, "#n_batch n_species"] = jnp.stack(
+    #         [
+    #             jnp.exp(constraint.log_fugacity(self.temperature, self.pressure))
+    #             for constraint in self.parameters.fugacity_constraints.constraints
+    #         ],
+    #         axis=-1,
+    #     )
+    #     return constraints
+
+    # def asdict_split(
+    #     self, *, expand_to_batch: bool = False, to_numpy: bool = False, ravel: bool = False
+    # ) -> dict[str, Any]:
+    #     """Output as a nested dictionary with JAX or NumPy arrays, split by elements and species
+
+    #     Args:
+    #         expand_to_batch: Whether to expand arrays to the batch size. Defaults to ``False``.
+    #         to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``. Must be
+    #             ``False`` if used within a jitted context, as NumPy arrays are not compatible with
+    #             JAX transformations (jit, vmap, etc.).
+    #         ravel: Whether to ravel arrays to 1-D after expanding. Can be used when the expanded
+    #             arrays are intended for conversion to DataFrames (which also requires
+    #             ``to_numpy=False``). Defaults to ``False``.
+
+    #     Returns:
+    #         Dictionary of the solution with JAX or NumPy arrays, split by elements and species
+    #     """
+    #     out: dict[str, Any] = {}
+
+    #     if not self.gas.is_empty:
+    #         out["gas"] = self.gas.asdict_split()
+    #     if not self.melt.is_empty:
+    #         out["melt"] = self.melt.asdict_split()
+    #     if not self.solid.is_empty:
+    #         out["solid"] = self.solid.asdict_split()
+
+    #     if len(self.condensates) > 0:
+    #         condensate_dict: dict = {}
+    #         for condensate in self.condensates:
+    #             condensate_dict[condensate.phase.species.species_names[0]] = (
+    #                 condensate.asdict_split()
+    #             )
+    #         out["condensates"] = condensate_dict
+
+    #     out["solver"] = self.multi_attempt_solution.asdict()
+    #     out["state"] = self.state_asdict()
+
+    #     out["constraints"] = {}
+    #     out["constraints"].update(self.parameters.mass_constraints.asdict_split())
+    #     out["constraints"].update(
+    #         self.parameters.fugacity_constraints.asdict_split(
+    #             jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
+    #         )
+    #     )
+
+    #     if expand_to_batch:
+    #         out = expand_jax_arrays_to_batch(out, self.batch_size, ravel=ravel)
+
+    #     if to_numpy:
+    #         out = convert_jax_arrays_to_numpy(out)
+
+    #     return out
+
+    # out.update(self.condensates_asdict())
+
+    # Must vmap the residual evaluation to match what the solver did: parameters contains a
+    # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
+    # solution gives incorrect results. vmap_axes_spec maps None/0 per leaf appropriately.
+    # FIXME: This is breaking because all arrays including numpy are seen as batchable under
+    # jit
+    # objective_function_vmapped = eqx.filter_vmap(
+    #    objective_function, in_axes=(0, vmap_axes_spec(self.parameters))
+    # )
+    # out["residual"] = objective_function_vmapped(self.solution, self.parameters)
+    # out["solution"] = self.solution
+
+    # out["totals"] = self.totals_asdict()
 
     def to_dataframes(self, drop_unsuccessful_solves: bool = False) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
@@ -560,63 +952,6 @@ class Output(eqx.Module):
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logger.info("Output written to %s", output_file)
-
-    def compare(
-        self,
-        d1: dict,
-        rtol: float,
-        atol: float,
-        log: bool = False,
-        d2: Optional[dict] = None,
-        path: tuple = (),
-        all_match: bool = True,
-    ) -> bool:
-        """Compares two nested dictionaries of output.
-
-        Args:
-            d1: Target dictionary
-            rtol: Relative tolerance for comparison
-            atol: Absolute tolerance for comparison
-            log: Whether to compare the base-10 logarithm of the values
-            d2: Dictionary to compare against. If ``None``, compares against the current output.
-                Defaults to ``None``.
-            path: Internal parameter for tracking the current path in the nested structure during
-                recursion. Should not be set by the user. Defaults to an empty tuple.
-            all_match: Internal parameter for tracking whether all comparisons have matched so far
-                during recursion. Should not be set by the user. Defaults to ``True``.
-
-        Returns:
-            ``True`` if all values match within the specified tolerances, else ``False``
-        """
-        if d2 is None:
-            d2 = self.asdict_split(to_numpy=True, ravel=True, expand_to_batch=True)
-
-        keys = d1.keys()
-
-        for key in keys:
-            v1 = d1.get(key)
-            v2 = d2.get(key)
-            current_path = path + (key,)
-
-            if isinstance(v1, dict) and isinstance(v2, dict):
-                all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
-            else:
-                if isinstance(v1, (np.ndarray, float, int)) and isinstance(
-                    v2, (np.ndarray, float, int)
-                ):
-                    if log:
-                        v1, v2 = np.log10(v1), np.log10(v2)
-                    is_close: bool = np.allclose(v1, v2, rtol=rtol, atol=atol)
-                    all_match = all_match and is_close
-                    logger.info(
-                        "Comparing %s: %s vs %s --> %s",
-                        current_path,
-                        v1,
-                        v2,
-                        "match" if is_close else "mismatch",
-                    )
-
-        return all_match
 
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]
