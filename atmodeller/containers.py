@@ -281,6 +281,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     """Mask for species included in phase-level mass, mole, and fraction aggregations"""
     number_solution: int
     """Number of solution quantities, which cannot depend on traced quantities"""
+    unique_elements_map: dict[str, int]
 
     def __init__(self, species: Iterable[TSpecies_co]):
         self.species = tuple(species)
@@ -301,6 +302,15 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
 
         # Ensure number_solution is static
         self.number_solution = sum(species.number_solution for species in self)
+
+        # Unique elements in species in alphabetical order
+        elements: list[str] = []
+        for species_ in self.species:
+            elements.extend(species_.data.elements)
+        unique_elements: list[str] = list(set(elements))
+        self.unique_elements_map = {
+            element: index for index, element in enumerate(sorted(unique_elements))
+        }
 
         logger.debug(
             "Creating %s: %s", self.__class__.__name__, tuple(str(species) for species in self)
@@ -345,12 +355,12 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     @property
     def unique_elements(self) -> tuple[str, ...]:
         """Unique elements in species in alphabetical order"""
-        elements: list[str] = []
-        for species in self:
-            elements.extend(species.data.elements)
-        unique_elements: list[str] = list(set(elements))
+        return tuple(self.unique_elements_map.keys())
 
-        return tuple(sorted(unique_elements))
+    def get_element_index(self, element: str) -> int:
+        """Get the index of an element in the unique elements map"""
+        # TODO: Returning a non-existent element with an index of -1 is a bit hacky
+        return self.unique_elements_map.get(element, -1)
 
     def __getitem__(self, index: int) -> TSpecies_co:
         return self.species[index]
@@ -716,6 +726,34 @@ class MassConstraintSet(eqx.Module):
 
         return jnp.atleast_1d(log_abundance)
 
+    def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
+        """Updates the abundance with new values from a dictionary
+
+        Args:
+            new_abundances: Dictionary with new abundance values for some or all elements. The keys
+                should be element names and the values should be the new abundance values in the
+                same units as the original abundance. Original abundances that are not included in
+                the ``new_abundance`` dictionary will be retained.
+
+        Returns:
+            A new MassConstraintSet with the updated abundance
+        """
+        abundance_updated: Array = self.abundance
+
+        for element, new_value in new_abundances.items():
+            element_index: int = self.species.get_element_index(element)
+            # TODO: decide if squeezing is necessary or if the input should be required to have the
+            # same shape as abundance
+            abundance_updated = abundance_updated.at[..., element_index].set(
+                jnp.squeeze(new_value)
+            )
+
+        mass_constaint_set_update: MassConstraintSet = eqx.tree_at(
+            lambda c: c.abundance, self, abundance_updated
+        )
+
+        return mass_constaint_set_update
+
     def asdict(self) -> dict[str, Any]:
         """Gets an output dictionary
 
@@ -750,6 +788,29 @@ class MassConstraintSet(eqx.Module):
         )
 
         return elements_out
+
+    def to_element_dict(self) -> dict[str, Any]:
+        """Gets a dictionary of the abundance by element
+
+        Returns:
+            A dictionary with the abundance by mass and moles for each element separately
+        """
+        out: dict[str, Any] = {}
+
+        def splitter(names: tuple[str, ...], inarray: Array) -> list[Array]:
+            return jnp.split(inarray, max(len(names), 1), axis=-1)
+
+        unique_elements: tuple[str, ...] = self.species.unique_elements
+        element_mass: list[Array] = splitter(unique_elements, self.abundance_mass())
+        element_number_moles: list[Array] = splitter(unique_elements, self.abundance_mol())
+
+        for nn, element in enumerate(unique_elements):
+            element_dict: dict[str, Any] = out.setdefault(element, {})
+            constraints_dict: dict[str, Any] = element_dict.setdefault("constraints", {})
+            constraints_dict["mass"] = element_mass[nn]
+            constraints_dict["number_moles"] = element_number_moles[nn]
+
+        return out
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
