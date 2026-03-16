@@ -17,7 +17,7 @@ from molmass import Formula
 
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import TSpecies_co
-from atmodeller.utilities import split_by_name_and_add
+from atmodeller.utilities import split_array_by_names, split_by_name_and_add
 
 
 def build_species_collection(
@@ -657,12 +657,11 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         """
         out: dict[str, Any] = {}
 
-        def splitter(names: tuple[str, ...], inarray: Array) -> list[Array]:
-            return jnp.split(inarray, max(len(names), 1), axis=-1)
-
         unique_elements: tuple[str, ...] = self.phase.species.unique_elements
-        element_mass: list[Array] = splitter(unique_elements, self.element_mass)
-        element_number_moles: list[Array] = splitter(unique_elements, self.element_number_moles)
+        element_mass: list[Array] = split_array_by_names(unique_elements, self.element_mass)
+        element_number_moles: list[Array] = split_array_by_names(
+            unique_elements, self.element_number_moles
+        )
 
         for nn, element in enumerate(unique_elements):
             element_dict: dict[str, Any] = out.setdefault(element, {})
@@ -671,16 +670,24 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
             phase_dict["number_moles"] = element_number_moles[nn]
 
         species_names: tuple[str, ...] = self.phase.species_names
-        species_activity: list[Array] = splitter(species_names, self.species_activity)
-        species_mass: list[Array] = splitter(species_names, self.species_mass)
-        species_mass_fraction: list[Array] = splitter(species_names, self.species_mass_fraction)
-        species_number_moles: list[Array] = splitter(species_names, self.species_number_moles)
-        species_mole_fraction: list[Array] = splitter(species_names, self.species_mole_fraction)
-        include_in_mass_phase: list[Array] = splitter(species_names, self.include_in_mass_phase)
+        species_activity: list[Array] = split_array_by_names(species_names, self.species_activity)
+        species_mass: list[Array] = split_array_by_names(species_names, self.species_mass)
+        species_mass_fraction: list[Array] = split_array_by_names(
+            species_names, self.species_mass_fraction
+        )
+        species_number_moles: list[Array] = split_array_by_names(
+            species_names, self.species_number_moles
+        )
+        species_mole_fraction: list[Array] = split_array_by_names(
+            species_names, self.species_mole_fraction
+        )
+        include_in_mass_phase: list[Array] = split_array_by_names(
+            species_names, self.include_in_mass_phase
+        )
 
         for nn, species in enumerate(species_names):
             species_dict: dict[str, Any] = out.setdefault(species, {})
-            phase_dict = species_dict.setdefault(self.phase.name, {})
+            phase_dict: dict[str, Any] = species_dict.setdefault(self.phase.name, {})
             phase_dict["activity"] = species_activity[nn]
             phase_dict["mass"] = species_mass[nn]
             phase_dict["mass_fraction"] = species_mass_fraction[nn]

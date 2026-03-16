@@ -51,7 +51,7 @@ from atmodeller.containers import ChemicalSpecies, SpeciesCollection
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol
 from atmodeller.phase_base import BasePhase, PhaseOutput, build_species_collection
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
-from atmodeller.utilities import split_by_name_and_add
+from atmodeller.utilities import split_array_by_names, split_by_name_and_add
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -112,12 +112,28 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
         Returns:
             A dictionary containing phase-level and species-level properties
         """
-        out = super().asdict()
+        out: dict[str, Any] = super().asdict()
 
         out["phase"]["volume"] = self.volume
         out["phase"]["log10dIW_1_bar"] = self.log10dIW_1_bar
         out["phase"]["log10dIW_P"] = self.log10dIW_P
         out["species"]["partial_pressure"] = self.species_partial_pressure
+
+        return out
+
+    @override
+    def to_element_species_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = super().to_element_species_dict()
+
+        species_names: tuple[str, ...] = self.phase.species_names
+        species_partial_pressure: list[Array] = split_array_by_names(
+            species_names, self.species_partial_pressure
+        )
+
+        for nn, species in enumerate(species_names):
+            species_dict: dict[str, Any] = out.setdefault(species, {})
+            phase_dict: dict[str, Any] = species_dict.setdefault(self.phase.name, {})
+            phase_dict["partial_pressure"] = species_partial_pressure[nn]
 
         return out
 
