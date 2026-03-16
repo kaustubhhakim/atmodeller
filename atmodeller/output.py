@@ -431,6 +431,9 @@ class Output(eqx.Module):
         if not self.solid.is_empty:
             out = recursive_merge(out, self.solid.to_element_species_dict())
 
+        # Constraints
+        out = recursive_merge(out, self.parameters.mass_constraints.to_element_dict())
+
         return out
 
     def quick_look(self) -> dict[str, Any]:
