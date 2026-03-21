@@ -135,6 +135,28 @@ def get_reaction_dictionary(
     return reactions
 
 
+def flatten_dictionary(d: dict, parent_key: str = "") -> dict:
+    """Recursively flattens a nested dictionary, joining keys with "." to form column names.
+
+    Args:
+        d: Dictionary to flatten
+        parent_key: Prefix for keys (used during recursion)
+
+    Returns:
+        Flat dictionary with dot-joined keys
+    """
+    items: dict = {}
+
+    for k, v in d.items():
+        new_key: str = f"{parent_key}.{k}" if parent_key else str(k)
+        if isinstance(v, dict):
+            items.update(flatten_dictionary(v, new_key))
+        else:
+            items[new_key] = v
+
+    return items
+
+
 def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
     """Recursively merges two dictionaries.
 
