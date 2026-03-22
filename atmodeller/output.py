@@ -2,7 +2,45 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Output module"""
+"""Output handling and export module.
+
+This module provides a unified interface for extracting, converting, comparing, and exporting model
+results from atmodeller simulations. It supports multiple output formats and is designed for
+compatibility with JAX-based scientific workflows, with explicit warnings for operations that are
+not JAX-compiled safe.
+
+Key features:
+
+- **Multiple output formats:**
+    - Natural (internal) format: closely matches the model's internal array structure
+    - Named arrays: output split and labeled by element and species names
+    - Grouped by element/species: output grouped for easy lookup by element or species
+- **Conversion utilities:**
+    - Convert outputs to nested dictionaries (with JAX or NumPy arrays)
+    - Expand arrays to batch size, ravel arrays for DataFrame conversion
+    - Convert JAX arrays to NumPy arrays (not JAX-compiled safe)
+- **Export options:**
+    - Output as pandas DataFrames (one per top-level key)
+    - Write results to Excel (with highlighting for unsuccessful solves)
+    - Write results to pickle files for later analysis
+- **Comparison and validation:**
+    - Compare outputs for regression testing or validation (with tolerance controls)
+    - Quick inspection/logging of results
+- **JAX compatibility:**
+    - Most output methods are compatible with JAX, but some (e.g., to_dict(to_numpy=True), compare,
+    export methods) are **not** compatible with JAX-compiled workflows (e.g., inside a ``jax.jit``
+    context). Sphinx warnings are included in relevant docstrings.
+
+Classes:
+
+- Output: Master output interface for all formats and exports
+- OutputNaturalDict: Output in the model's natural (internal) format
+- OutputNamedArraysDict: Output split and labeled by element/species names
+- OutputElementsSpeciesDict: Output grouped by element and species
+- BaseOutputDict: Abstract base class for output dictionary representations
+
+Utility functions are provided for expanding, raveling, and converting arrays in PyTrees.
+"""
 
 import logging
 import pickle
