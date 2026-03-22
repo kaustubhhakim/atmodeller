@@ -122,6 +122,9 @@ def get_total_pressure(
         parameters.reaction_system.gas_phase.get_log_phase_mass(log_number_moles_gas)
     )
     gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
+
+    # TODO: For the case of a planet, the pressure should account for the changing surface gravity
+    # as a consequence of the phase mass of solid and melt.
     pressure: Float[Array, "..."] = parameters.state.get_pressure(gas_mass_squeeze)
 
     return pressure

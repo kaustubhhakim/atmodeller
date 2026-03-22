@@ -23,7 +23,8 @@ Key features:
 Classes:
 
 - :class:`ThermodynamicState`: Generic thermodynamic state for any system.
-- :class:`ThinAtmospherePlanet`: Earth-like planet with a thin atmosphere and surface pressure calculation.
+- :class:`ThinAtmospherePlanet`: Earth-like planet with a thin atmosphere and surface pressure
+  calculation.
 - :class:`Planet`: Alias for :class:`ThinAtmospherePlanet` (for future extensibility).
 
 All classes are designed for use in JAX-based scientific workflows and can be extended for more
