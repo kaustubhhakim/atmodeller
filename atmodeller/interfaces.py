@@ -252,14 +252,10 @@ class ThermodynamicStateProtocol(Protocol):
         """Temperature in K"""
         ...
 
-    def get_pressure(
-        self, optional_gas_mass: Optional[Float[Array, "..."]] = None
-    ) -> Float[Array, "..."]:
+    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
         """Pressure in bar"""
         ...
 
-    def asdict(
-        self, gas_mass: Optional[Float[Array, "..."]] = None
-    ) -> dict[str, Float[Array, "..."]]:
+    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Float[Array, "..."]]:
         """Dictionary representation"""
         ...

@@ -32,7 +32,6 @@ complex planetary models.
 """
 
 from dataclasses import asdict
-from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -101,11 +100,13 @@ class ThermodynamicState(eqx.Module):
         """Moles of the solid"""
         return self.solid_mass / self.molar_mass
 
-    def get_pressure(self, gas_mass: Optional[Float[Array, "..."]] = None) -> Float[Array, "..."]:
+    def get_pressure(
+        self, gas_mass: Float[Array, "..."] = jnp.array(jnp.nan)
+    ) -> Float[Array, "..."]:
         """Gets the pressure.
 
         Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface. Defaults to ``None``.
+            gas_mass: Gas mass in kg. Unused but required by the interface.
 
         Returns:
             Pressure in bar
@@ -115,12 +116,12 @@ class ThermodynamicState(eqx.Module):
         return self.pressure
 
     def asdict(
-        self, gas_mass: Optional[Float[Array, "..."]] = None
+        self, gas_mass: Float[Array, "..."] = jnp.array(jnp.nan)
     ) -> dict[str, Float[Array, "..."]]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface. Defaults to ``None``.
+            gas_mass: Gas mass in kg. Unused but required by the interface.
 
         Returns:
             A dictionary of the values
