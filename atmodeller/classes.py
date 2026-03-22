@@ -41,7 +41,7 @@ from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.solvers import make_solve_with_jit
+from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import ThermodynamicStateProtocol
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ class EquilibriumModel:
             leaf.shape for leaf in jax.tree_util.tree_leaves(parameters) if hasattr(leaf, "shape")
         )
         if self._solver is None or self._solver_shapes != solver_shapes:
-            self._solver = make_solve_with_jit(parameters)
+            self._solver = make_solver_with_jit(parameters)
             self._solver_shapes = solver_shapes
 
         # Allow the user to provide initial guesses for the solver, but if they are not provided,

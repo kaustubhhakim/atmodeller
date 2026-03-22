@@ -28,16 +28,16 @@ Key features:
     - Quick inspection/logging of results
 - **JAX compatibility:**
     - Most output methods are compatible with JAX, but some (e.g., to_dict(to_numpy=True), compare,
-    export methods) are **not** compatible with JAX-compiled workflows (e.g., inside a ``jax.jit``
-    context). Sphinx warnings are included in relevant docstrings.
+      export methods) are **not** compatible with JAX-compiled workflows (e.g., inside a
+      :func:`jax.jit` context). Sphinx warnings are included in relevant docstrings.
 
 Classes:
 
-- Output: Master output interface for all formats and exports
-- OutputNaturalDict: Output in the model's natural (internal) format
-- OutputNamedArraysDict: Output split and labeled by element/species names
-- OutputElementsSpeciesDict: Output grouped by element and species
-- BaseOutputDict: Abstract base class for output dictionary representations
+- :func:`Output`: Master output interface for all formats and exports
+- :func:`OutputNaturalDict`: Output in the model's natural (internal) format
+- :func:`OutputNamedArraysDict`: Output split and labeled by element/species names
+- :func:`OutputElementsSpeciesDict`: Output grouped by element and species
+- :func:`BaseOutputDict`: Abstract base class for output dictionary representations
 
 Utility functions are provided for expanding, raveling, and converting arrays in PyTrees.
 """
@@ -563,7 +563,7 @@ class OutputNamedArraysDict(BaseOutputDict):
             "number_moles",
         )
         species_out: dict = out["constraints"].setdefault("species", {})
-        evaluated_fugacity_constraints: Float[Array, "#n_batch n_species"] = jnp.exp(
+        evaluated_fugacity_constraints: Float[Array, "... n_species"] = jnp.exp(
             jnp.stack(
                 [
                     constraint.log_fugacity(
@@ -827,9 +827,10 @@ class Output(eqx.Module):
     This class provides a unified entry point for all output formats, conversions, comparisons,
     and exports. It wraps the various output dictionary representations (natural, named arrays,
     grouped by element/species) and exposes methods for:
-        - Outputting results in different formats (dict, DataFrame, Excel, pickle)
-        - Comparing outputs for regression testing/validation
-        - Quick inspection and logging
+
+    - Outputting results in different formats (dict, DataFrame, Excel, pickle)
+    - Comparing outputs for regression testing/validation
+    - Quick inspection and logging
 
     .. warning::
         Some methods (such as ``to_dict(to_numpy=True)``, ``compare``, and export methods) are
@@ -873,12 +874,12 @@ class Output(eqx.Module):
             return OutputNaturalDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
-        elif format == "elements_species":
-            return OutputElementsSpeciesDict(self.parameters, self.multi_attempt_solution).to_dict(
+        elif format == "named_arrays":
+            return OutputNamedArraysDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
-        elif format == "split":
-            return OutputNamedArraysDict(self.parameters, self.multi_attempt_solution).to_dict(
+        elif format == "elements_species":
+            return OutputElementsSpeciesDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
         else:

@@ -2,11 +2,39 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Non-linear solvers for chemical equilibrium and parameterised systems
+"""JAX-compatible non-linear solvers for chemical equilibrium and parameterized systems.
 
-This module provides JAX-compatible solver utilities for efficiently handling both single-system
-and batched systems of non-linear equations. The solvers are designed to integrate seamlessly with
-JAX transformations and support Equinox-based pytrees for flexible parameter handling.
+This module provides a suite of solver utilities for efficiently handling both single-system and
+batched systems of non-linear equations, with a focus on chemical equilibrium modeling. All solvers
+are designed for seamless integration with JAX transformations (:func:`jax.jit`,
+:func:`jax.vmap`) and support Equinox-based pytrees for flexible parameter handling.
+
+Key features:
+
+- **Single and batched solvers:**
+    - Solve individual or batched systems with automatic initial guess generation
+    - Batch solvers use :func:`equinox.filter_vmap` for efficient parallelism
+- **Robust convergence:**
+    - Retry logic for failed solves with random perturbations and multiple attempts
+    - Objective-based convergence validation, independent of solver's internal status
+- **Tau sweep for stability:**
+    - Automatic tau sweep for systems with active stability species, using a log-spaced schedule
+    - Efficiently finds solutions across a range of tau values when needed
+- **JIT compilation:**
+    - All main solver entry points are JIT-compatible and can be used in compiled workflows
+- **Flexible construction:**
+    - Main entry points allow construction of solvers with or without JIT, and with custom
+      retry/tau sweep logic
+
+Main entry points:
+
+- :func:`make_solver_with_jit`: Returns a fully JIT-compiled solver for production use
+- :func:`make_solver`: Returns a non-JIT solver (can be wrapped with JIT externally)
+- :func:`make_batch_retry_solver_from_parameters`: Builds a batch retry solver from parameters
+- :func:`make_tau_sweep_solver`: Returns a tau sweep solver for active stability systems
+
+Most solvers return results as :class:`jaxmod.solvers.MultiAttemptSolution` or
+:class:`~atmodeller.output.Output` objects, with detailed convergence and step statistics.
 """
 
 from collections.abc import Callable
@@ -20,7 +48,7 @@ from equinox._enum import EnumerationItem
 from jax import lax, random
 from jaxmod.solvers import POSTCHECK_TOLERANCE, MultiAttemptSolution, expand_mask, max_norm
 from jaxmod.utils import vmap_axes_spec
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, PyTree
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
 from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
@@ -36,8 +64,7 @@ LOG_NUMBER_MOLES_VMAP_AXES: int = 0
 def solve_single_with_auto_guess(
     initial_guess: Float[Array, "..."], parameters: Parameters
 ) -> optx.Solution:
-    """Solves a single (unbatched) system via :func:`optimistix.root_find`, generating an initial
-    guess automatically from ``parameters``.
+    """Solves a single (unbatched) system via :func:`optimistix.root_find`.
 
     Intended to be wrapped with :func:`equinox.filter_vmap` by :func:`make_batch_solver`
     rather than called directly. All solver configuration is read from
@@ -46,11 +73,11 @@ def solve_single_with_auto_guess(
     Args:
         initial_guess_in: Initial guess for the solution vector. If any element is ``NaN``,
             the initial guess is replaced by the auto-generated guess from
-            :func:`_auto_initial_guess`.
+            :func:`~atmodeller.initial_solution.auto_initial_guess`.
         parameters: Parameters providing the solver instance, step limit, and options
 
     Returns:
-        :class:`~optimistix.Solution` object
+        :class:`optimistix.Solution` object
     """
     initial_guess = lax.cond(
         jnp.any(jnp.isnan(initial_guess)),
@@ -71,6 +98,7 @@ def solve_single_with_auto_guess(
     )
     # jax.debug.print("solution = {out}", out=sol.value)
 
+    # TODO: Add to output calculation
     # n: int = parameters.species.number_species
     # solution_moles: Float[Array, " n_species"] = sol.value[:n]
     # solution_stability: Float[Array, " n_species"] = sol.value[n:]
@@ -90,17 +118,15 @@ def solve_single_with_auto_guess(
 def make_batch_solver(parameters: Parameters) -> Callable:
     """Gets a vmapped batch solver for independent systems.
 
-    Wraps :func:`solve_single` with :func:`equinox.filter_vmap` so that each batch element is
-    solved independently, producing per-element convergence statistics. The vmapping axes are
-    fixed from ``parameters`` at construction time. JIT compilation is applied by the outer
-    :func:`make_solve_with_jit` context.
+    Wraps :func:`solve_single_with_auto_guess` with :func:`equinox.filter_vmap` so that each batch
+    element is solved independently, producing per-element convergence statistics. The vmapping
+    axes are fixed from ``parameters`` at construction time.
 
     Args:
         parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable that accepts ``(solution, parameters)`` and returns a
-        :class:`MultiAttemptSolution` with ``attempts=1``
+        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` with ``attempts=1``
     """
     solver_function_vmapped: Callable = eqx.filter_vmap(
         solve_single_with_auto_guess,
@@ -119,7 +145,7 @@ def make_batch_solver(parameters: Parameters) -> Callable:
             *args: Unused; present for interface consistency with :func:`make_batch_retry_solver`
 
         Returns:
-            :class:`MultiAttemptSolution` with ``attempts=1`` for all batch elements
+            :class:`jaxmod.solvers.MultiAttemptSolution` with ``attempts=1`` for all batch elements
         """
         del args
         sol: optx.Solution = solver_function_vmapped(solution, parameters)
@@ -133,7 +159,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
     """Makes a batch retry solver.
 
     ``solver_function`` and ``objective_function`` must be pure JAX-callable functions compatible
-    with :func:`equinox.filter_jit``. They must not close over non-JAX state or produce Python side
+    with :func:`equinox.filter_jit`. They must not close over non-JAX state or produce Python side
     effects.
 
     Args:
@@ -142,14 +168,15 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
         objective_function: Callable for the objective function
 
     Returns:
-        Callable
+        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
     """
 
+    # For debugging to determine if this function is jittable in isolation
     # @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
     def batch_retry_solver(
         initial_guess: Float[Array, "... solution"],
-        parameters: PyTree,
+        parameters: Parameters,
         key: PRNGKeyArray,
         perturb_scale: ArrayLike,
         max_retries: int,
@@ -166,14 +193,10 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
         regions of the objective function.
 
         Note:
-            ``solver_function`` may return a solver result indicating success even when the
-            objective residual remains above tolerance. Convergence is therefore validated
-            independently and the result of that validation is tracked in
-            :meth:`MultiAttemptSolution.attempts`.
-                - ``solution.result``: solver's internal convergence classification
-                - ``attempts``: first iteration satisfying objective-based check
-                - ``attempts == 0``: never converged within the initial attempt plus
-                  ``max_retries`` retries
+            - ``solution.result``: solver's internal convergence classification
+            - ``attempts``: first iteration satisfying objective-based check
+            - ``attempts == 0``: never converged within the initial attempt plus
+              ``max_retries`` retries
 
         Args:
             initial_guess: Batched array of initial guesses for the solver
@@ -186,7 +209,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
                 each solve attempt. Defaults to :obj:`POSTCHECK_TOLERANCE`.
 
         Returns:
-            :class:`MultiAttemptSolution` instance
+            :class:`jaxmod.solvers.MultiAttemptSolution` object
         """
 
         def body_fn(state: tuple[Array, Array, Array, Array, Array, Array]) -> tuple:
@@ -425,17 +448,16 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
 def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
     """Gets a batch retry solver, constructing the vmapped batch solver and objective internally.
 
-    A convenience wrapper around :func:`~jaxmod.solvers.make_batch_retry_solver` that accepts
+    A convenience wrapper around :func:`make_batch_retry_solver` that accepts
     ``parameters`` directly, deriving the ``vmap`` axes and building both the batch solver and
     vmapped objective function at construction time. Use this in preference to calling
-    :func:`~jaxmod.solvers.make_batch_retry_solver` directly when the vmap axes are not already
-    available.
+    :func:`make_batch_retry_solver` directly when the vmap axes are not already available.
 
     Args:
         parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable with the same interface as :func:`~jaxmod.solvers.batch_retry_solver`
+        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
     """
     batch_solver: Callable = make_batch_solver(parameters)
     objective_function_vmapped: Callable = eqx.filter_vmap(
@@ -460,7 +482,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
             :func:`make_batch_retry_solver_from_parameters`
 
     Returns:
-        Callable that returns a :class:`MultiAttemptSolution` object
+        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
     """
     get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
     varying_schedule: Float[Array, " tau"] = jnp.logspace(
@@ -480,7 +502,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
         sweep; converged ones simply re-solve quickly from their existing solution.
 
         Args:
-            initial_guess: Batched array of initial guesses with shape ``(batch, solution)``
+            initial_guess: Batched array of initial guesses
             parameters: :class:`~atmodeller.parameters.Parameters` whose ``tau`` leaf will be
                 replaced at each scan step.
             key: JAX PRNG key for reproducible random perturbations
@@ -588,7 +610,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
     return tau_sweep_solver
 
 
-def make_solve_with_jit(parameters: Parameters) -> Callable:
+def make_solver(parameters: Parameters) -> Callable:
     """General assembly function that constructs and returns the JIT-compiled solver.
 
     Builds a :func:`make_batch_retry_solver_from_parameters` and a tau sweep solver from
@@ -599,24 +621,26 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
 
     Note:
         ``active_stability`` is currently not a traced JAX array; its size must be fixed at
-        compile time because it determines the shape of the residual vector. The :func:`lax.cond`
-        branch therefore compiles *both* paths even though only one will execute at runtime. This
-        retains generality for future capabilities (e.g. dynamically switching solver strategy)
-        at the expense of additional — currently unnecessary — compile time.
+        compile time because it determines the shape of the residual vector. The
+        :func:`jax.lax.cond` branch therefore compiles *both* paths even though only one will
+        execute at runtime. This retains generality for future capabilities (e.g. dynamically
+        switching solver strategy based on active species) at the expense of additional — currently
+        unnecessary — compilation time.
 
     Args:
         parameters: Parameters used to derive the vmapping axes and build the sub-solvers at
             construction time
 
     Returns:
-        Callable that returns a :class:`MultiAttemptSolution` object
+        Callable that returns a :class:`~atmodeller.output.Output` object
     """
     batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
     tau_sweep_solver: Callable = make_tau_sweep_solver(batch_retry_solver)
 
-    @eqx.filter_jit
+    # For debugging to determine if this function is jittable in isolation
+    # @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
-    def solve_with_jit(
+    def solver(
         parameters: Parameters,
         key: PRNGKeyArray,
         base_solution_array: Float[Array, "..."] = jnp.array(jnp.nan),
@@ -670,12 +694,25 @@ def make_solve_with_jit(parameters: Parameters) -> Callable:
         )
         output: Output = Output(parameters, multi_sol)
 
-        # test = output.asdict_group()
-
-        # here = test["C"]["gas"]["mass"] + test["H"]["gas"]["mass"]
-
-        # jax.debug.print("here = {out}", out=here)
-
         return output
 
-    return solve_with_jit
+    return solver
+
+
+def make_solver_with_jit(parameters: Parameters) -> Callable:
+    """Gets the JIT-compiled solver function.
+
+    A convenience wrapper around :func:`make_solver` that applies :func:`equinox.filter_jit` to
+    the returned solver function. Use this in preference to calling :func:`make_solver` directly
+    when JIT compilation is desired.
+
+    Args:
+        parameters: Parameters used to derive the vmapping axes and build the sub-solvers at
+            construction time
+
+    Returns:
+        Callable that returns a :class:`~atmodeller.output.Output` object
+    """
+    solver: Callable = make_solver(parameters)
+
+    return eqx.filter_jit(solver)
