@@ -8,15 +8,16 @@ This module defines formal protocol classes (via :class:`typing.Protocol`) that 
 expected interfaces for different thermodynamic components.
 
 It also contains :class:`ChemicalSpeciesData`, a concrete :class:`equinox.Module` that holds
-per-species formula and composition data. It lives here rather than in ``containers.py`` because
-``containers.py`` imports from this module — moving it there would create a circular import.
+per-species formula and composition data. It lives here rather than in
+:mod:`atmodeller.containers.py`` because :mod:`containers.py` imports from this module — moving it
+there would create a circular import.
 """
 
 from typing import Optional, Protocol, TypeVar, runtime_checkable
 
 import equinox as eqx
 from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool
+from jaxtyping import Array, ArrayLike, Bool, Float
 from molmass import Formula
 
 
@@ -132,11 +133,13 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     """Pressure at which to evaluate the buffer, or None to use the total pressure"""
 
     @property
-    def log10_shift(self) -> Array:
+    def log10_shift(self) -> Float[Array, "..."]:
         """Log10 shift relative to the buffer"""
         ...
 
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def log10_fugacity_buffer(
+        self, temperature: ArrayLike, pressure: ArrayLike
+    ) -> Float[Array, "..."]:
         """Log10 fugacity at the unshifted buffer
 
         Args:
@@ -148,7 +151,7 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
         """
         ...
 
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
         """Log10 fugacity including any shift
 
         Args:
@@ -176,7 +179,7 @@ class SolubilityProtocol(Protocol):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array:
+    ) -> Float[Array, "..."]:
         r"""Concentration in ppmw
 
         Args:
@@ -192,7 +195,7 @@ class SolubilityProtocol(Protocol):
 
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> Array:
+    ) -> Float[Array, "..."]:
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:
@@ -204,4 +207,59 @@ class SolubilityProtocol(Protocol):
         Returns:
             Concentration in ppmw
         """
+        ...
+
+
+@runtime_checkable
+class ThermodynamicStateProtocol(Protocol):
+    @property
+    def mass(self) -> Float[Array, "..."]:
+        """Total mass in kg"""
+        ...
+
+    @property
+    def melt_fraction(self) -> Float[Array, "..."]:
+        """Melt mass fraction"""
+        ...
+
+    @property
+    def melt_mass(self) -> Float[Array, "..."]:
+        """Melt mass in kg"""
+        ...
+
+    @property
+    def melt_moles(self) -> Float[Array, "..."]:
+        """Moles of melt"""
+        ...
+
+    @property
+    def molar_mass(self) -> Float[Array, "..."]:
+        """Molar mass of the background in kg/mol"""
+        ...
+
+    @property
+    def solid_mass(self) -> Float[Array, "..."]:
+        """Solid mass in kg"""
+        ...
+
+    @property
+    def solid_moles(self) -> Float[Array, "..."]:
+        """Moles of solid"""
+        ...
+
+    @property
+    def temperature(self) -> Float[Array, "..."]:
+        """Temperature in K"""
+        ...
+
+    def get_pressure(
+        self, optional_gas_mass: Optional[Float[Array, "..."]] = None
+    ) -> Float[Array, "..."]:
+        """Pressure in bar"""
+        ...
+
+    def asdict(
+        self, gas_mass: Optional[Float[Array, "..."]] = None
+    ) -> dict[str, Float[Array, "..."]]:
+        """Dictionary representation"""
         ...

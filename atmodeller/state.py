@@ -2,90 +2,57 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Thermodynamic state"""
+"""Thermodynamic state representations for planetary modeling.
+
+This module provides JAX/Equinox-compatible classes for representing the thermodynamic state of a
+system or planet, including temperature, pressure, mass, melt fraction, and molar mass. All fields
+are stored as JAX arrays for seamless use with JAX transformations (jit, grad, vmap) and to avoid
+unnecessary recompilation.
+
+Key features:
+
+- **JAX/Equinox compatibility:** All fields are JAX arrays, using Equinox modules and field
+  converters.
+- **Protocol adherence:** Classes are designed to comply with
+  :class:`~atmodeller.interfaces.ThermodynamicStateProtocol` for interoperability.
+- **Planetary modeling:** Includes a generic :class:`ThermodynamicState` and a
+  :class:`ThinAtmospherePlanet` model with Earth-like defaults and surface pressure calculation.
+- **Convenience methods:** Properties for melt/solid mass and moles, surface gravity, and area;
+  dictionary export for downstream use.
+
+Classes:
+
+- :class:`ThermodynamicState`: Generic thermodynamic state for any system.
+- :class:`ThinAtmospherePlanet`: Earth-like planet with a thin atmosphere and surface pressure calculation.
+- :class:`Planet`: Alias for :class:`ThinAtmospherePlanet` (for future extensibility).
+
+All classes are designed for use in JAX-based scientific workflows and can be extended for more
+complex planetary models.
+"""
 
 from dataclasses import asdict
-from typing import Protocol, runtime_checkable
+from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
 from jaxmod.constants import GRAVITATIONAL_CONSTANT
 from jaxmod.units import unit_conversion
 from jaxmod.utils import as_j64
 from jaxtyping import Array, ArrayLike, Bool, Float
 
 
-@runtime_checkable
-class ThermodynamicStateProtocol(Protocol):
-    @property
-    def mass(self) -> Float[Array, "..."]:
-        """Total mass in kg"""
-        ...
-
-    @property
-    def melt_fraction(self) -> Float[Array, "..."]:
-        """Melt mass fraction"""
-        ...
-
-    @property
-    def melt_mass(self) -> Float[Array, "..."]:
-        """Melt mass in kg"""
-        ...
-
-    @property
-    def melt_moles(self) -> Float[Array, "..."]:
-        """Moles of melt"""
-        ...
-
-    @property
-    def molar_mass(self) -> Float[Array, "..."]:
-        """Molar mass of the background in kg/mol"""
-        ...
-
-    @property
-    def solid_mass(self) -> Float[Array, "..."]:
-        """Solid mass in kg"""
-        ...
-
-    @property
-    def solid_moles(self) -> Float[Array, "..."]:
-        """Moles of solid"""
-        ...
-
-    @property
-    def temperature(self) -> Float[Array, "..."]:
-        """Temperature in K"""
-        ...
-
-    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
-        """Pressure in bar"""
-        ...
-
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Float[Array, "..."]]:
-        """Dictionary representation"""
-        ...
-
-
 class ThermodynamicState(eqx.Module):
-    """A generic thermodynamic state
+    r"""A generic thermodynamic state
 
-    This must adhere to ThermodynamicStateProtocol.
-
-    Note:
-        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
-        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
-        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
-        between a Python float and an array for the same argument will trigger retracing or
-        recompilation, so keeping everything as arrays avoids this overhead.
+    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Args:
         temperature: Temperature in K
         pressure: Pressure in bar
         mass: Mass in kg. Defaults to ``1`` kg.
-        melt_fraction: Melt fraction by weight in kg/kg. Defaults to ``1`` kg/kg.
-        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
-            value for silicate melts.
+        melt_fraction: Melt fraction by weight in kg kg\ :sup:`-1`. Defaults to ``1``.
+        molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
+            60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
     """
 
     temperature: Float[Array, "..."]
@@ -95,9 +62,9 @@ class ThermodynamicState(eqx.Module):
     mass: Float[Array, "..."]
     """Mass in kg"""
     melt_fraction: Float[Array, "..."]
-    """Mass fraction of melt in kg/kg"""
+    r"""Mass fraction of melt in kg kg\ :sup:`-1`"""
     molar_mass: Float[Array, "..."]
-    """Molar mass of the silicate in kg/mol"""
+    r"""Molar mass of the silicate in kg mol\ :sup:`-1`"""
 
     def __init__(
         self,
@@ -133,11 +100,11 @@ class ThermodynamicState(eqx.Module):
         """Moles of the solid"""
         return self.solid_mass / self.molar_mass
 
-    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
+    def get_pressure(self, gas_mass: Optional[Float[Array, "..."]] = None) -> Float[Array, "..."]:
         """Gets the pressure.
 
         Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
+            gas_mass: Gas mass in kg. Unused but required by the interface. Defaults to ``None``.
 
         Returns:
             Pressure in bar
@@ -146,11 +113,13 @@ class ThermodynamicState(eqx.Module):
 
         return self.pressure
 
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Float[Array, "..."]]:
+    def asdict(
+        self, gas_mass: Optional[Float[Array, "..."]] = None
+    ) -> dict[str, Float[Array, "..."]]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
+            gas_mass: Gas mass in kg. Unused but required by the interface. Defaults to ``None``.
 
         Returns:
             A dictionary of the values
@@ -165,38 +134,39 @@ class ThermodynamicState(eqx.Module):
 
 
 class ThinAtmospherePlanet(eqx.Module):
-    """A planet with a thin atmosphere.
+    r"""A planet with a thin atmosphere.
 
-    This must adhere to ThermodynamicStateProtocol.
+    In this context, "thin atmosphere" means that the surface gravity is determined solely by the
+    mass of the planet (i.e., the solid/liquid body), and is not compensated or significantly
+    altered by the presence of an extended or massive atmosphere above. This is appropriate for
+    cases where the atmospheric mass is much less than the planetary mass, so the gravitational
+    acceleration at the surface is set by the planet alone, not by any self-gravitating atmospheric
+    shell.
+
+    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Default values are for a fully molten Earth.
-
-    Note:
-        All parameters are stored as JAX arrays (``jnp.ndarray``) rather than Python floats. This
-        ensures that JAX sees a consistent type during transformations (e.g., ``jit``, ``grad``,
-        ``vmap``), preventing unnecessary recompilation when values change. In JAX, switching
-        between a Python float and an array for the same argument will trigger retracing or
-        recompilation, so keeping everything as arrays avoids this overhead.
 
     Args:
         planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
         core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to ``0.295334691460966`` kg/kg (Earth).
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to ``1.0`` kg/kg.
+            to ``0.295334691460966`` kg kg\ :sup:`-1` (Earth).
+        mantle_melt_fraction: Mass fraction of the mantle that is molten in kg kg\ :sup:`-1`.
+            Defaults to ``1.0``.
         surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
         temperature: Temperature in K. Defaults to ``2000`` K.
         pressure: Pressure in bar. Defaults to ``np.nan`` to solve for the mechanical pressure
             balance at the surface.
-        molar_mass: Molar mass of the silicate in kg/mol. Defaults to 60 g/mol, which is a typical
-            value for silicate melts.
+        molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
+            60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
     """
 
     planet_mass: Float[Array, "..."]
     """Mass of the planet in kg"""
     core_mass_fraction: Float[Array, "..."]
-    """Mass fraction of the core relative to the planetary mass in kg/kg"""
+    r"""Mass fraction of the core relative to the planetary mass in kg kg\ :sup:`-1`"""
     mantle_melt_fraction: Float[Array, "..."]
-    """Mass fraction of the molten mantle in kg/kg"""
+    r"""Mass fraction of the molten mantle in kg kg\ :sup:`-1`"""
     surface_radius: Float[Array, "..."]
     """Radius of the surface in m"""
     temperature: Float[Array, "..."]
@@ -204,7 +174,7 @@ class ThinAtmospherePlanet(eqx.Module):
     pressure: Float[Array, "..."]
     """Pressure in bar"""
     molar_mass: Float[Array, "..."]
-    """Molar mass of the silicate in kg/mol"""
+    r"""Molar mass of the silicate in kg mol\ :sup:`-1`"""
 
     def __init__(
         self,
@@ -213,7 +183,7 @@ class ThinAtmospherePlanet(eqx.Module):
         mantle_melt_fraction: ArrayLike = 1.0,
         surface_radius: ArrayLike = 6371000,
         temperature: ArrayLike = 2000,
-        pressure: ArrayLike = np.nan,
+        pressure: ArrayLike = jnp.nan,
         molar_mass: ArrayLike = 60e-3,
     ):
         self.planet_mass = as_j64(planet_mass)
@@ -236,7 +206,7 @@ class ThinAtmospherePlanet(eqx.Module):
 
     @property
     def mantle_mass_fraction(self) -> Float[Array, "..."]:
-        """Mantle mass fraction in kg/kg"""
+        r"""Mantle mass fraction in kg kg\ :sup:`-1`"""
         return 1 - self.core_mass_fraction
 
     @property
@@ -277,7 +247,7 @@ class ThinAtmospherePlanet(eqx.Module):
 
     @property
     def melt_fraction(self) -> Float[Array, "..."]:
-        """Mantle melt fraction in kg/kg (alias for :attr:`mantle_melt_fraction`)"""
+        r"""Mantle melt fraction in kg kg\ :sup:`-1` (alias for :attr:`mantle_melt_fraction`)"""
         return self.mantle_melt_fraction
 
     @property

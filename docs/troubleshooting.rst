@@ -26,7 +26,7 @@ A solution cannot be found
   
 - Ensure that a solution physically exists for the system you've constructed. While *Atmodeller* allows arbitrary user-defined constraints (e.g., fugacity, mass balance), this does not guarantee a valid solution. If no solution is found, it may be due to over-constraining or conflicting conditions. To diagnose this, simplify the system by reducing the number of species and/or constraints. If a solution can be found for a simpler case, gradually reintroduce complexity to identify when the system becomes unsolvable.
 
-- *Atmodeller* uses a bounded solver, with upper and lower limits specified in the package's `__init__`. These bounds are generally generous, but it is still possible that a solution lies outside them---particularly when modelling large atmospheres in the absence of solubility. Consider adjusting or inspecting the bounds if appropriate.
+- *Atmodeller* uses a bounded solver, with upper and lower limits specified in the package's `__init__`. These bounds are generally generous, but it is still possible that a solution lies outside them---particularly when modeling large atmospheres in the absence of solubility. Consider adjusting or inspecting the bounds if appropriate.
 
 The solver detects an nan
 ~~~~~~~~~~~~~~~~~~~~~~~~~

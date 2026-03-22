@@ -36,13 +36,12 @@ from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import SolverParameters
-from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import ThermodynamicStateProtocol
 
 logger: logging.Logger = logging.getLogger(__name__)
 

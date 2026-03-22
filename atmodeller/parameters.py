@@ -18,10 +18,14 @@ from atmodeller.containers import (
     SolverParameters,
     SpeciesCollection,
 )
-from atmodeller.interfaces import FugacityConstraintProtocol, SpeciesProtocol
+from atmodeller.interfaces import (
+    FugacityConstraintProtocol,
+    SpeciesProtocol,
+    ThermodynamicStateProtocol,
+)
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.state import Planet, ThermodynamicStateProtocol
+from atmodeller.state import Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
 
