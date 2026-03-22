@@ -99,7 +99,7 @@ autodoc_default_options = {
     "show-inheritance": False,
     "inherited-members": True,
     "undoc-members": False,
-    "private-members": True,
+    "private-members": False,
 }
 
 latex_logo = "logo.png"
