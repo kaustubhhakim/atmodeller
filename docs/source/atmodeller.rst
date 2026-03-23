@@ -78,14 +78,6 @@ atmodeller.parameters module
    :show-inheritance:
    :undoc-members:
 
-atmodeller.phase\_base module
------------------------------
-
-.. automodule:: atmodeller.phase_base
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 atmodeller.phases module
 ------------------------
 
