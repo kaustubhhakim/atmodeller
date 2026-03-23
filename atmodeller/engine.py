@@ -24,9 +24,9 @@ scenarios or parameter sets.
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.utils import safe_exp
 from jaxtyping import Array, Bool, Float, Integer
 
+from atmodeller.jaxhelper import safe_exp
 from atmodeller.parameters import Parameters
 
 
@@ -102,34 +102,6 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-def get_total_pressure(
-    parameters: Parameters, solution: Float[Array, "... twice_species"]
-) -> Float[Array, "..."]:
-    """Gets the total pressure.
-
-    Args:
-        parameters: Parameters
-        solution: Solution array for all species i.e. log number of moles and log stability
-
-    Returns:
-        Total pressure in bar
-    """
-    log_number_moles, _ = jnp.split(solution, 2, axis=-1)
-    log_number_moles_gas: Float[Array, "... gas_species"] = log_number_moles[
-        ..., parameters.reaction_system.phase_system.gas_slice
-    ]
-    gas_mass: Float[Array, "... 1"] = jnp.exp(
-        parameters.reaction_system.phase_system.gas.get_log_phase_mass(log_number_moles_gas)
-    )
-    gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
-
-    # TODO: For the case of a planet, the pressure should account for the changing surface gravity
-    # as a consequence of the phase mass of solid and melt.
-    pressure: Float[Array, "..."] = parameters.state.get_pressure(gas_mass_squeeze)
-
-    return pressure
-
-
 def get_log_activity(
     parameters: Parameters, solution: Float[Array, "... twice_species"]
 ) -> Float[Array, "... n_species"]:
@@ -144,7 +116,7 @@ def get_log_activity(
     """
     log_number_moles, _ = jnp.split(solution, 2, axis=-1)
     temperature: Float[Array, "..."] = parameters.state.temperature
-    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
+    total_pressure: Float[Array, "..."] = parameters.state.get_pressure(solution)
 
     log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
         log_number_moles, temperature, total_pressure
@@ -181,8 +153,8 @@ def objective_function(
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
+    total_pressure: Float[Array, "..."] = parameters.state.get_pressure(solution)
 
     log_activity: Float[Array, "... species"] = get_log_activity(parameters, solution)
     # jax.debug.print("log_activity = {out}", out=log_activity)
