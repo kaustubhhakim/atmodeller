@@ -23,9 +23,10 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
+from atmodeller.phase_system import PhaseSystem
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.state import PhaseSystem, Planet
+from atmodeller.state import Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
 

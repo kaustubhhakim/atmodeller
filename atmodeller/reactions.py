@@ -39,7 +39,7 @@ from jaxtyping import Array, ArrayLike, Float, Integer
 from atmodeller.constants import GAS_STATE
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.state import PhaseSystem
+from atmodeller.phase_system import PhaseSystem
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.utilities import get_reaction_dictionary
 
