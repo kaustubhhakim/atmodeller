@@ -913,7 +913,7 @@ class PurePhase(BasePhase[ChemicalSpecies]):
         super().__init__(species, background_mass, background_molar_mass)
 
     @property
-    def name(self) -> str:  # pyright: ignore This should work as an override (see Equinox docs)
+    def name(self) -> str:  # pyright: ignore - This should work as an override (see Equinox docs)
         """Name of the pure phase, given by the single species it contains."""
         return self.species.species_names[0]
 
