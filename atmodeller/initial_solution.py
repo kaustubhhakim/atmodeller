@@ -127,9 +127,11 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     # jax.debug.print("element_abundance = {out}", out=element_abundance)
 
     condensate_mask: Bool[Array, " n_species"] = jnp.asarray(
-        parameters.reaction_system.condensates_species_mask
+        parameters.reaction_system.phase_system.condensates_species_mask
     )
-    gas_mask: Bool[Array, " n_species"] = jnp.asarray(parameters.reaction_system.gas_species_mask)
+    gas_mask: Bool[Array, " n_species"] = jnp.asarray(
+        parameters.reaction_system.phase_system.gas_species_mask
+    )
     fug_active: Bool[Array, " n_species"] = parameters.fugacity_constraints.active()
     gas_no_fug: Bool[Array, " n_species"] = gas_mask & ~fug_active
     molar_masses: Float[Array, " n_species"] = jnp.asarray(parameters.species.molar_masses)
