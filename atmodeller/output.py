@@ -61,7 +61,6 @@ from openpyxl.styles import PatternFill
 
 from atmodeller import override
 from atmodeller.containers import FugacityConstraintSet, MassConstraintSet
-from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
 from atmodeller.phases import (
     GasPhaseOutput,
@@ -283,7 +282,7 @@ class BaseOutputDict(eqx.Module):
     @property
     def _pressure(self) -> Float[Array, "..."]:
         """Pressure in bar"""
-        return get_total_pressure(self.parameters, self.solution)
+        return self.parameters.state.get_pressure(self.solution)
 
     @property
     def pressure(self) -> Float[Array, "#n_batch 1"]:
@@ -312,7 +311,7 @@ class BaseOutputDict(eqx.Module):
 
     def state_to_dict(self) -> dict[str, Any]:
         """Thermodynamic state of the system"""
-        return self.parameters.state.asdict(jnp.squeeze(self.gas.phase_mass))
+        return self.parameters.state.asdict(self.solution)
 
 
 class OutputNaturalDict(BaseOutputDict):
