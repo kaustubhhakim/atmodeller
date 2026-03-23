@@ -26,6 +26,7 @@ Typical usage:
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
+from pprint import pformat
 from typing import Optional, cast
 
 import jax
