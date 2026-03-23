@@ -26,7 +26,6 @@ Typical usage:
 
 import logging
 from collections.abc import Callable, Iterable, Mapping
-from pprint import pformat
 from typing import Optional, cast
 
 import jax
@@ -42,6 +41,7 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
 from atmodeller.solvers import make_solver_with_jit
+from atmodeller.state import PhaseSystem
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -53,10 +53,10 @@ class EquilibriumModel:
     and retrieve the results.
 
     Args:
-        gas_phase: Gas phase
-        melt_phase: Melt phase. Defaults to ``None``.
-        solid_phase: Solid phase. Defaults to ``None``.
-        condensate_phases: Pure condensate phases. Defaults to ``None``.
+        gas: Gas phase
+        melt: Melt phase. Defaults to ``None``.
+        solid: Solid phase. Defaults to ``None``.
+        condensates: Pure condensate phases. Defaults to ``None``.
     """
 
     reaction_system: ReactionSystem
@@ -66,18 +66,16 @@ class EquilibriumModel:
 
     def __init__(
         self,
-        gas_phase: GasPhase,
+        gas: GasPhase,
         *,
         melt: Optional[MeltPhase] = None,
-        solid_phase: Optional[SolidPhase] = None,
-        condensate_phases: Optional[Iterable[PurePhase]] = None,
+        solid: Optional[SolidPhase] = None,
+        condensates: Optional[Iterable[PurePhase]] = None,
     ):
-        self.reaction_system = ReactionSystem(
-            gas_phase,
-            melt_phase=melt,
-            solid_phase=solid_phase,
-            condensate_phases=condensate_phases,
+        phase_system: PhaseSystem = PhaseSystem(
+            gas, melt=melt, solid=solid, condensates=condensates
         )
+        self.reaction_system = ReactionSystem(phase_system)
         self._solver: Optional[Callable] = None
         self._solver_shapes: Optional[tuple] = None
         self._output: Optional[Output] = None

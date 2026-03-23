@@ -25,7 +25,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import ReactionSystem
-from atmodeller.state import Planet
+from atmodeller.state import PhaseSystem, Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -58,10 +58,10 @@ class Parameters(eqx.Module):
     @classmethod
     def from_phases(
         cls,
-        gas_phase: GasPhase,
-        melt_phase: Optional[MeltPhase] = None,
-        solid_phase: Optional[SolidPhase] = None,
-        condensate_phases: Optional[Iterable[PurePhase]] = None,
+        gas: GasPhase,
+        melt: Optional[MeltPhase] = None,
+        solid: Optional[SolidPhase] = None,
+        condensates: Optional[Iterable[PurePhase]] = None,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
@@ -70,10 +70,10 @@ class Parameters(eqx.Module):
         """Creates an instance from individual phase definitions.
 
         Args:
-            gas_phase: Gas phase
-            melt_phase: Melt phase. Defaults to an empty melt phase if not provided.
-            solid_phase: Solid phase. Defaults to an empty solid phase if not provided.
-            condensate_phases: Pure condensate phases. Defaults to an empty tuple if not provided.
+            gas: Gas phase
+            melt: Melt phase. Defaults to an empty melt phase if not provided.
+            solid: Solid phase. Defaults to an empty solid phase if not provided.
+            condensates: Pure condensate phases. Defaults to an empty tuple if not provided.
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
@@ -85,19 +85,10 @@ class Parameters(eqx.Module):
         Returns:
             An instance
         """
-        if melt_phase is None:
-            melt_phase = MeltPhase.empty()
-        if solid_phase is None:
-            solid_phase = SolidPhase.empty()
-        if condensate_phases is None:
-            condensate_phases = ()
-
-        reaction_system: ReactionSystem = ReactionSystem(
-            gas_phase=gas_phase,
-            melt_phase=melt_phase,
-            solid_phase=solid_phase,
-            condensate_phases=condensate_phases,
+        phase_system: PhaseSystem = PhaseSystem(
+            gas=gas, melt=melt, solid=solid, condensates=condensates
         )
+        reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
         return cls.from_reaction_system(
             reaction_system, state, fugacity_constraints, mass_constraints, solver_parameters
@@ -167,6 +158,7 @@ class Parameters(eqx.Module):
         """Unique elements in the system"""
         return self.reaction_system.species.unique_elements
 
+    # TODO: Generalise to update other quantities on the parameters object
     def update_constraints(
         self, new_mass_constraints: Optional[Mapping[str, ArrayLike]] = None
     ) -> "Parameters":
