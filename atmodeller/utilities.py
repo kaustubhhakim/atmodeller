@@ -14,10 +14,11 @@ from collections.abc import Iterable
 from typing import Optional
 
 import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
 from jaxmod.constants import OCEAN_MASS_H2
 from jaxmod.type_aliases import NpFloat, Scalar
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -180,3 +181,7 @@ def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
             out[k] = v
 
     return out
+
+
+def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
+    return jnp.power(values, exponent) * constant
