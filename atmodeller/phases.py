@@ -50,10 +50,8 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jax.scipy.special import logsumexp
 from jaxmod.constants import GAS_CONSTANT_BAR
 from jaxmod.type_aliases import FloatArray, NpFloat
-from jaxmod.utils import as_j64, safe_exp, to_hashable
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 
@@ -61,6 +59,7 @@ from atmodeller import override
 from atmodeller.constants import GAS_STATE, LIQUID_STATE, SOLID_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol, TSpecies_co
+from atmodeller.jaxhelper import as_j64, masked_logsumexp, safe_exp, to_hashable
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 # Due to a Pyright bug (#4965). See Equinox documentation.
@@ -166,9 +165,23 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         )
 
     @classmethod
-    def empty(cls) -> Self:
-        """Returns an empty phase instance"""
-        return cls([])
+    def empty(
+        cls, background_mass: ArrayLike = 0.0, background_molar_mass: ArrayLike = 1.0
+    ) -> Self:
+        r"""Returns a phase instance with no species, only background properties.
+
+        Args:
+            background_mass: Mass of the background component in kg. Should be a scalar or a 1-D
+                array matching the batch dimension if batching is used. Defaults to zero (i.e., no
+                background mass).
+            background_molar_mass: Molar mass of the background component in kg mol\ :sup:`-1`.
+                Should be a scalar or a 1-D array matching the batch dimension if batching is used.
+                Defaults to ``1.0``; only meaningful when ``background_mass`` is not zero.
+
+        Returns:
+            An instance of the phase with no species and the specified background properties
+        """
+        return cls([], background_mass, background_molar_mass)
 
     @property
     def is_empty(self) -> bool:
@@ -318,7 +331,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             [log_mass, log_background_mass], axis=-1
         )
 
-        return logsumexp(log_mass_with_background, axis=-1, keepdims=True)
+        return masked_logsumexp(log_mass_with_background, axis=-1, keepdims=True)
 
     def get_log_mass_fraction(
         self, log_number_moles: Float[Array, "... n_species"]
@@ -360,7 +373,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             [log_number_moles, log_background_moles], axis=-1
         )
 
-        return logsumexp(log_moles_with_background, axis=-1, keepdims=True)
+        return masked_logsumexp(log_moles_with_background, axis=-1, keepdims=True)
 
     def get_log_mole_fraction(
         self, log_number_moles: Float[Array, "... n_species"]
@@ -535,7 +548,9 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     @property
     def log_element_number_moles(self) -> Float[Array, "#n_batch n_elements"]:
         log_terms: Array = self.log_number_moles[..., None, :] + self.log_stoich_matrix
-        result: Float[Array, "#n_batch n_elements"] = logsumexp(log_terms, axis=-1, keepdims=False)
+        result: Float[Array, "#n_batch n_elements"] = masked_logsumexp(
+            log_terms, axis=-1, keepdims=False
+        )
 
         return result
 
@@ -575,7 +590,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         approximation. Otherwise, depending on the assumptions and objectives of the user, it
         provides a metric of how much the tracked species contribute to the total phase mass.
         """
-        log_species_mass_sum: Float[Array, "#n_batch 1"] = logsumexp(
+        log_species_mass_sum: Float[Array, "#n_batch 1"] = masked_logsumexp(
             self.phase.get_log_mass(self.log_number_moles), axis=-1, keepdims=True
         )
         log_phase_mass: Float[Array, "#n_batch 1"] = self.phase.get_log_phase_mass(
