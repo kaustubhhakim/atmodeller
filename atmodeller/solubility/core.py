@@ -9,12 +9,12 @@ from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.utils import power_law
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
+from atmodeller.utilities import power_law
 
 
 class Solubility(eqx.Module):
