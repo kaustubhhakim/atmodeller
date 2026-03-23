@@ -116,10 +116,10 @@ def get_total_pressure(
     """
     log_number_moles, _ = jnp.split(solution, 2, axis=-1)
     log_number_moles_gas: Float[Array, "... gas_species"] = log_number_moles[
-        ..., parameters.reaction_system.gas_slice
+        ..., parameters.reaction_system.phase_system.gas_slice
     ]
     gas_mass: Float[Array, "... 1"] = jnp.exp(
-        parameters.reaction_system.gas_phase.get_log_phase_mass(log_number_moles_gas)
+        parameters.reaction_system.phase_system.gas.get_log_phase_mass(log_number_moles_gas)
     )
     gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
 
@@ -147,12 +147,7 @@ def get_log_activity(
     total_pressure: Float[Array, "..."] = get_total_pressure(parameters, solution)
 
     log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
-        log_number_moles,
-        temperature,
-        total_pressure,
-        jnp.log(parameters.state.molar_mass),
-        jnp.log(parameters.state.melt_mass),
-        jnp.log(parameters.state.solid_mass),
+        log_number_moles, temperature, total_pressure
     )
 
     return log_activity
@@ -208,20 +203,8 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
-    # NOTE: Molar mass is assumed the same for the background melt and solid components
-    log_background_molar_mass: Float[Array, "..."] = jnp.log(parameters.state.molar_mass)
-    # jax.debug.print("background_molar_mass = {out}", out=jnp.exp(log_background_molar_mass))
-    log_background_melt_mass: Float[Array, "..."] = jnp.log(parameters.state.melt_mass)
-    # jax.debug.print("background_melt_mass = {out}", out=jnp.exp(log_background_melt_mass))
-
     reaction_residual: Float[Array, "... reactions"] = parameters.reaction_system.get_residual(
-        log_number_moles,
-        log_activity,
-        log_stability,
-        temperature,
-        total_pressure,
-        log_background_molar_mass,
-        log_background_melt_mass,
+        log_number_moles, log_activity, log_stability, temperature, total_pressure
     )
     # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 
