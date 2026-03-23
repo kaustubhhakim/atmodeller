@@ -210,44 +210,8 @@ class SolubilityProtocol(Protocol):
         ...
 
 
-# FIXME: Clean this up after refactoring
 @runtime_checkable
 class ThermodynamicStateProtocol(Protocol):
-    # @property
-    # def mass(self) -> Float[Array, "..."]:
-    #     """Total mass in kg"""
-    #     ...
-
-    # @property
-    # def melt_fraction(self) -> Float[Array, "..."]:
-    #     """Melt mass fraction"""
-    #     ...
-
-    # @property
-    # def melt_mass(self) -> Float[Array, "..."]:
-    #     """Melt mass in kg"""
-    #     ...
-
-    # @property
-    # def melt_moles(self) -> Float[Array, "..."]:
-    #     """Moles of melt"""
-    #     ...
-
-    # @property
-    # def molar_mass(self) -> Float[Array, "..."]:
-    #     """Molar mass of the background in kg/mol"""
-    #     ...
-
-    # @property
-    # def solid_mass(self) -> Float[Array, "..."]:
-    #     """Solid mass in kg"""
-    #     ...
-
-    # @property
-    # def solid_moles(self) -> Float[Array, "..."]:
-    #     """Moles of solid"""
-    #     ...
-
     @property
     def temperature(self) -> Float[Array, "..."]:
         """Temperature in K"""
