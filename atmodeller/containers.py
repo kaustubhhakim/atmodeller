@@ -15,7 +15,7 @@ from jax import lax
 from jaxmod.solvers import RootFindParameters
 from jaxmod.type_aliases import NpBool, NpFloat, NpInt
 from jaxmod.units import unit_conversion
-from jaxmod.utils import as_j64, get_batch_size, to_hashable
+from jaxmod.utils import get_batch_size
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import CompositionItem, Formula
 
@@ -38,6 +38,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     TSpecies_co,
 )
+from atmodeller.jaxhelper import as_j64, to_hashable
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
 from atmodeller.thermodata.core import (

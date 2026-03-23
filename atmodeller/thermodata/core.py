@@ -15,10 +15,11 @@ import equinox as eqx
 import jax.numpy as jnp
 import pandas as pd
 from jaxmod.constants import GAS_CONSTANT
-from jaxmod.utils import as_j64, to_native_floats
+from jaxmod.utils import to_native_floats
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.constants import TEMPERATURE_REFERENCE
+from atmodeller.jaxhelper import as_j64
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory"""
