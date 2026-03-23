@@ -31,111 +31,273 @@ All classes are designed for use in JAX-based scientific workflows and can be ex
 complex planetary models.
 """
 
+from collections.abc import Iterable
 from dataclasses import asdict
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxmod.constants import GRAVITATIONAL_CONSTANT
+from jaxmod.type_aliases import FloatArray
 from jaxmod.units import unit_conversion
-from jaxmod.utils import as_j64
 from jaxtyping import Array, ArrayLike, Bool, Float
+
+from atmodeller.containers import ChemicalSpecies
+from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.jaxhelper import as_j64
+from atmodeller.phase_system import PhaseSystem
+from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 
 
 class ThermodynamicState(eqx.Module):
-    r"""A generic thermodynamic state
+    """A generic thermodynamic state
 
     This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Args:
         temperature: Temperature in K
         pressure: Pressure in bar
-        mass: Mass in kg. Defaults to ``1`` kg.
-        melt_fraction: Melt fraction by weight in kg kg\ :sup:`-1`. Defaults to ``1``.
-        molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
-            60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
     """
 
-    temperature: Float[Array, "..."]
+    temperature: FloatArray = eqx.field(converter=as_j64)
     """Temperature in K"""
-    pressure: Float[Array, "..."]
+    pressure: FloatArray = eqx.field(converter=as_j64)
     """Pressure in bar"""
-    mass: Float[Array, "..."]
-    """Mass in kg"""
-    melt_fraction: Float[Array, "..."]
-    r"""Mass fraction of melt in kg kg\ :sup:`-1`"""
-    molar_mass: Float[Array, "..."]
-    r"""Molar mass of the silicate in kg mol\ :sup:`-1`"""
 
-    def __init__(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        mass: ArrayLike = 1,
-        melt_fraction: ArrayLike = 1,
-        molar_mass: ArrayLike = 60e-3,
-    ):
-        self.temperature = as_j64(temperature)
-        self.pressure = as_j64(pressure)
-        self.mass = as_j64(mass)
-        self.melt_fraction = as_j64(melt_fraction)
-        self.molar_mass = as_j64(molar_mass)
-
-    @property
-    def melt_mass(self) -> Float[Array, "..."]:
-        """Mass of the melt in kg"""
-        return self.mass * self.melt_fraction
-
-    @property
-    def melt_moles(self) -> Float[Array, "..."]:
-        """Moles of the melt"""
-        return self.melt_mass / self.molar_mass
-
-    @property
-    def solid_mass(self) -> Float[Array, "..."]:
-        """Mass of the solid in kg"""
-        return self.mass * (1.0 - self.melt_fraction)
-
-    @property
-    def solid_moles(self) -> Float[Array, "..."]:
-        """Moles of the solid"""
-        return self.solid_mass / self.molar_mass
-
-    def get_pressure(
-        self, gas_mass: Float[Array, "..."] = jnp.array(jnp.nan)
-    ) -> Float[Array, "..."]:
+    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> FloatArray:
         """Gets the pressure.
-
-        Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
 
         Returns:
             Pressure in bar
         """
-        del gas_mass
+        del solution
 
         return self.pressure
 
-    def asdict(
-        self, gas_mass: Float[Array, "..."] = jnp.array(jnp.nan)
-    ) -> dict[str, Float[Array, "..."]]:
+
+class ThinAtmospherePlanetNew(eqx.Module):
+    """A new planet class
+
+    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
+    """
+
+    surface_radius: FloatArray
+    """Radius of the surface in m"""
+    metallic_core_mass: FloatArray
+    """Metallic core mass in kg"""
+    temperature: FloatArray
+    """Temperature in K"""
+    pressure: FloatArray
+    """Pressure in bar"""
+    phase_system: PhaseSystem
+    """Phase system representing the thermodynamic state of the planetary body"""
+
+    def __init__(
+        self,
+        gas_species: Iterable[ChemicalSpecies],
+        *,
+        surface_radius: ArrayLike = 6371000,
+        metallic_core_mass: ArrayLike = 1.7637387774048892e24,
+        temperature: ArrayLike = 2000,
+        pressure: ArrayLike = jnp.nan,
+        melt_species: Iterable[SpeciesProtocol] = (),
+        solid_species: Iterable[SpeciesProtocol] = (),
+        condensates: Iterable[PurePhase] = (),
+        background_melt_mass: ArrayLike = 4.208261222595111e24,
+        background_melt_molar_mass: ArrayLike = 60e-3,
+        background_solid_mass: ArrayLike = 0.0,
+        background_solid_molar_mass: ArrayLike = 60e-3,
+    ):
+        self.surface_radius = as_j64(surface_radius)
+        self.metallic_core_mass = as_j64(metallic_core_mass)
+        self.temperature = as_j64(temperature)
+        self.pressure = as_j64(pressure)
+
+        gas: GasPhase = GasPhase(gas_species)
+        melt: MeltPhase = MeltPhase(melt_species, background_melt_mass, background_melt_molar_mass)
+        solid: SolidPhase = SolidPhase(
+            solid_species, background_solid_mass, background_solid_molar_mass
+        )
+        self.phase_system = PhaseSystem(
+            gas, melt=melt, solid=solid, condensates=tuple(condensates)
+        )
+
+    @classmethod
+    def create(
+        cls,
+        gas_species: Iterable[ChemicalSpecies],
+        *,
+        planet_mass: ArrayLike = 5.972e24,
+        core_mass_fraction: ArrayLike = 0.295334691460966,
+        mantle_melt_fraction: ArrayLike = 1.0,
+        surface_radius: ArrayLike = 6371000,
+        temperature: ArrayLike = 2000,
+        pressure: ArrayLike = jnp.nan,
+        molar_mass: ArrayLike = 60e-3,
+        melt_species: Iterable[SpeciesProtocol] = (),
+        solid_species: Iterable[SpeciesProtocol] = (),
+        condensates: Iterable[PurePhase] = (),
+    ):
+        """Maintains the same structure as the previous ThinAtmospherePlanet for compatibility"""
+        background_melt_mass: ArrayLike = (
+            planet_mass * (1 - core_mass_fraction) * mantle_melt_fraction
+        )
+        background_solid_mass: ArrayLike = (
+            planet_mass * (1 - core_mass_fraction) * (1 - mantle_melt_fraction)
+        )
+        metallic_core_mass: ArrayLike = planet_mass * core_mass_fraction
+
+        return cls(
+            gas_species,
+            surface_radius=surface_radius,
+            metallic_core_mass=metallic_core_mass,
+            temperature=temperature,
+            pressure=pressure,
+            melt_species=melt_species,
+            solid_species=solid_species,
+            condensates=condensates,
+            background_melt_mass=background_melt_mass,
+            background_melt_molar_mass=molar_mass,
+            background_solid_mass=background_solid_mass,
+            background_solid_molar_mass=molar_mass,
+        )
+
+    @property
+    def surface_area(self) -> FloatArray:
+        """Surface area"""
+        return 4.0 * jnp.pi * jnp.square(self.surface_radius)
+
+    def get_surface_gravity(self, solution: Float[Array, "... twice_species"]) -> FloatArray:
+        r"""Gets the surface gravity.
+
+        Computes the surface gravity from the mass of condensed phases and the radius of the
+        planet.
+
+        Returns:
+            Surface gravity in m s\ :sup:`-2`
+        """
+        log_number_moles, _ = jnp.split(solution, 2, axis=-1)
+
+        # Melt mass
+        log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
+            ..., self.phase_system.melt_slice
+        ]
+        # jax.debug.print("log_number_moles_melt = {out}", out=log_number_moles_melt)
+        melt_mass: Float[Array, "... 1"] = jnp.exp(
+            self.phase_system.melt.get_log_phase_mass(log_number_moles_melt)
+        )
+        # jax.debug.print("melt_mass = {out}", out=melt_mass)
+
+        # Solid mass
+        log_number_moles_solid: Float[Array, "... solid_species"] = log_number_moles[
+            ..., self.phase_system.solid_slice
+        ]
+        # jax.debug.print("log_number_moles_solid = {out}", out=log_number_moles_solid)
+        solid_mass: Float[Array, "... 1"] = jnp.exp(
+            self.phase_system.solid.get_log_phase_mass(log_number_moles_solid)
+        )
+        # jax.debug.print("solid_mass = {out}", out=solid_mass)
+
+        planet_mass = melt_mass + solid_mass + self.metallic_core_mass[..., None]
+        planet_mass_squeeze: FloatArray = jnp.squeeze(planet_mass, axis=-1)
+        # jax.debug.print("planet_mass_squeeze = {out}", out=planet_mass_squeeze)
+
+        surface_gravity: FloatArray = (
+            GRAVITATIONAL_CONSTANT * planet_mass_squeeze / jnp.square(self.surface_radius)
+        )
+        # jax.debug.print("surface_gravity = {out}", out=surface_gravity)
+
+        return surface_gravity
+
+    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> Float[Array, "..."]:
+        """Gets the pressure.
+
+        A pressure is used if specified, otherwise the default behaviour is to compute the
+        pressure from the mechanical pressure balance at the planetary surface assuming the thin
+        atmosphere approximation. That is, the surface gravity is computed from the mass of the
+        planet alone and is assumed to act on all the mass of the atmosphere.
+
+        Args:
+            solution: Solution array
+
+        Returns:
+            Pressure in bar
+        """
+        pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
+
+        log_number_moles, _ = jnp.split(solution, 2, axis=-1)
+        log_number_moles_gas: Float[Array, "... gas_species"] = log_number_moles[
+            ..., self.phase_system.gas_slice
+        ]
+        # jax.debug.print("log_number_moles_gas = {out}", out=log_number_moles_gas)
+        gas_mass: Float[Array, "... 1"] = jnp.exp(
+            self.phase_system.gas.get_log_phase_mass(log_number_moles_gas)
+        )
+        gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
+        # jax.debug.print("gas_mass = {out}", out=gas_mass_squeeze)
+
+        surface_gravity: Float[Array, "..."] = self.get_surface_gravity(solution)
+        mechanical_pressure: Float[Array, "..."] = (
+            gas_mass_squeeze * surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
+        )
+        # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
+
+        pressure: Float[Array, "..."] = jnp.where(
+            pressure_specified, self.pressure, mechanical_pressure
+        )
+        # jax.debug.print("pressure = {out}", out=pressure)
+
+        return pressure
+
+    def asdict(self, solution: Float[Array, "... twice_species"]) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
-            gas_mass: Gas mass in kg. Unused but required by the interface.
+            gas_mass: Gas mass in kg
 
         Returns:
             A dictionary of the values
         """
-        del gas_mass
-
-        base_dict: dict[str, Float[Array, "..."]] = asdict(self)
-        base_dict["melt_mass"] = self.melt_mass
-        base_dict["solid_mass"] = self.solid_mass
+        base_dict: dict[str, Array] = asdict(self)
+        base_dict["pressure"] = self.get_pressure(solution)
+        # TODO: Reinstate these outputs?
+        # base_dict["mantle_mass"] = self.mantle_mass
+        # base_dict["mantle_melt_mass"] = self.mantle_melt_mass
+        # base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        base_dict["surface_area"] = self.surface_area
+        base_dict["surface_gravity"] = self.get_surface_gravity(solution)
 
         return base_dict
 
 
-class ThinAtmospherePlanet(eqx.Module):
+#     @classmethod
+#     def create(
+#         cls,
+#         planet_mass: ArrayLike = 5.972e24,
+#         core_mass_fraction: ArrayLike = 0.295334691460966,
+#         mantle_melt_fraction: ArrayLike = 1.0,
+#         surface_radius: ArrayLike = 6371000,
+#         molar_mass: ArrayLike = 60e-3,
+#     ) -> "ThinAtmospherePlanet":
+#         r"""Factory method to create a ThinAtmospherePlanet with Earth-like defaults.
+
+#         Args:
+#             planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
+#             core_mass_fraction: Mass fraction of the iron core relative to the planetary mass.
+#                 Defaults to ``0.295334691460966`` kg kg\ :sup:`-1` (Earth).
+#             mantle_melt_fraction: Fraction of the mantle that is molten. Defaults to ``1.0``.
+#             surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
+#             temperature: Temperature in K. Defaults to ``2000`` K.
+#             pressure: Pressure in bar. Defaults to ``jnp.nan`` to solve for the mechanical pressure
+#                 balance at the surface.
+#             molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
+#                 60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
+
+#         Returns:
+#             A ThinAtmospherePlanet instance
+#         """
+
+
+class ThinAtmospherePlanetPrevious(eqx.Module):
     r"""A planet with a thin atmosphere.
 
     In this context, "thin atmosphere" means that the surface gravity is determined solely by the
@@ -321,4 +483,4 @@ class ThinAtmospherePlanet(eqx.Module):
 
 
 # The only planet supported so far is one with a thin atmosphere
-Planet = ThinAtmospherePlanet
+Planet = ThinAtmospherePlanetNew
