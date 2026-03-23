@@ -47,7 +47,7 @@ import pickle
 from abc import abstractmethod
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 import equinox as eqx
 import jax
@@ -63,8 +63,14 @@ from atmodeller import override
 from atmodeller.containers import FugacityConstraintSet, MassConstraintSet
 from atmodeller.engine import get_total_pressure
 from atmodeller.parameters import Parameters
-from atmodeller.phase_base import TPhase_co
-from atmodeller.phases import GasPhaseOutput, MeltPhase, PhaseOutput, PurePhase, SolidPhase
+from atmodeller.phases import (
+    GasPhaseOutput,
+    MeltPhase,
+    PhaseOutput,
+    PurePhase,
+    SolidPhase,
+    TPhase_co,
+)
 from atmodeller.utilities import flatten_dictionary, recursively_merge_dictionaries
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -200,18 +206,16 @@ class BaseOutputDict(eqx.Module):
     def condensate_phases(self) -> tuple[PhaseOutput[PurePhase], ...]:
         """Pure phase condensates output"""
 
-        condensate_slice: slice = self.parameters.reaction_system.condensates_slice
+        condensate_slice: slice = self.parameters.reaction_system.phase_system.condensates_slice
 
         condensates_out = []
 
-        for nn, condensate in enumerate(self.parameters.reaction_system.condensate_phases):
+        for nn, condensate in enumerate(self.parameters.reaction_system.phase_system.condensates):
             condensate_out = condensate.output(
-                jnp.atleast_2d(self.log_number_moles[..., condensate_slice][..., nn]),
-                jnp.atleast_2d(self.log_stability[..., condensate_slice][..., nn]),
-                self.temperature,
-                self.pressure,
-                jnp.atleast_2d(0.0),
-                jnp.atleast_2d(-jnp.inf),
+                self.log_number_moles[..., condensate_slice][..., nn],
+                self.log_stability[..., condensate_slice][..., nn],
+                self._temperature,
+                self._pressure,
             )
             condensates_out.append(condensate_out)
 
@@ -221,32 +225,30 @@ class BaseOutputDict(eqx.Module):
     def gas(self) -> GasPhaseOutput:
         """Gas phase output"""
 
-        gas_slice: slice = self.parameters.reaction_system.gas_slice
+        gas_slice: slice = self.parameters.reaction_system.phase_system.gas_slice
 
-        gas_output: GasPhaseOutput = self.parameters.reaction_system.gas_phase.output(
+        gas_output: PhaseOutput = self.parameters.reaction_system.phase_system.gas.output(
             self.log_number_moles[..., gas_slice],
             self.log_stability[..., gas_slice],
-            self.temperature,
-            self.pressure,
-            jnp.atleast_2d(0.0),
-            jnp.atleast_2d(-jnp.inf),
+            self._temperature,
+            self._pressure,
         )
 
-        return gas_output
+        return cast(GasPhaseOutput, gas_output)
 
     @property
     def melt(self) -> PhaseOutput[MeltPhase]:
         """Melt phase output"""
 
-        melt_slice: slice = self.parameters.reaction_system.melt_slice
+        melt_slice: slice = self.parameters.reaction_system.phase_system.melt_slice
 
-        melt_output: PhaseOutput[MeltPhase] = self.parameters.reaction_system.melt_phase.output(
-            self.log_number_moles[..., melt_slice],
-            self.log_stability[..., melt_slice],
-            self.temperature,
-            self.pressure,
-            jnp.log(jnp.atleast_2d(self.parameters.state.molar_mass)),
-            jnp.log(jnp.atleast_2d(self.parameters.state.melt_mass)),
+        melt_output: PhaseOutput[MeltPhase] = (
+            self.parameters.reaction_system.phase_system.melt.output(
+                self.log_number_moles[..., melt_slice],
+                self.log_stability[..., melt_slice],
+                self._temperature,
+                self._pressure,
+            )
         )
 
         return melt_output
@@ -255,28 +257,38 @@ class BaseOutputDict(eqx.Module):
     def solid(self) -> PhaseOutput[SolidPhase]:
         """Solid phase output"""
 
-        solid_slice: slice = self.parameters.reaction_system.solid_slice
+        solid_slice: slice = self.parameters.reaction_system.phase_system.solid_slice
 
-        solid_output: PhaseOutput[SolidPhase] = self.parameters.reaction_system.solid_phase.output(
-            self.log_number_moles[..., solid_slice],
-            self.log_stability[..., solid_slice],
-            self.temperature,
-            self.pressure,
-            jnp.log(jnp.atleast_2d(self.parameters.state.molar_mass)),
-            jnp.log(jnp.atleast_2d(self.parameters.state.solid_mass)),
+        solid_output: PhaseOutput[SolidPhase] = (
+            self.parameters.reaction_system.phase_system.solid.output(
+                self.log_number_moles[..., solid_slice],
+                self.log_stability[..., solid_slice],
+                self._temperature,
+                self._pressure,
+            )
         )
 
         return solid_output
 
     @property
+    def _temperature(self) -> Float[Array, "..."]:
+        """Temperature in K"""
+        return self.parameters.state.temperature
+
+    @property
     def temperature(self) -> Float[Array, "#n_batch 1"]:
         """Temperature in K"""
-        return jnp.atleast_2d(self.parameters.state.temperature).T
+        return jnp.atleast_1d(self._temperature)[:, None]
+
+    @property
+    def _pressure(self) -> Float[Array, "..."]:
+        """Pressure in bar"""
+        return get_total_pressure(self.parameters, self.solution)
 
     @property
     def pressure(self) -> Float[Array, "#n_batch 1"]:
         """Pressure in bar"""
-        return jnp.atleast_2d(get_total_pressure(self.parameters, self.solution)).T
+        return jnp.atleast_1d(self._pressure)[:, None]
 
     def phase_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
         """Phase-level properties such as total mass, number of moles, molar mass, etc.
