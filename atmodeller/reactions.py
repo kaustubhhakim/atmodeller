@@ -31,14 +31,14 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jax.scipy.special import logsumexp
 from jaxmod.type_aliases import FloatArray, NpBool, NpFloat, NpInt
-from jaxmod.utils import partial_rref, safe_exp, to_hashable
+from jaxmod.utils import partial_rref
 from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import GAS_STATE
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
+from atmodeller.jaxhelper import masked_logsumexp, safe_exp, to_hashable
 from atmodeller.phase_system import PhaseSystem
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.utilities import get_reaction_dictionary
@@ -525,7 +525,7 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles[..., None, :] + self._log_stoich_matrix
         )
 
-        return logsumexp(log_terms, axis=-1)
+        return masked_logsumexp(log_terms, axis=-1, keepdims=False)
 
     def apply_stability(
         self,
