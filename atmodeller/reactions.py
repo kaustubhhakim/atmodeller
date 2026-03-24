@@ -58,10 +58,6 @@ class PhaseIndex(eqx.Module):
     start: int
     stop: int
 
-    def __init__(self, start: int, stop: int):
-        self.start = start
-        self.stop = stop
-
     @property
     def slice(self) -> slice:
         """Slice object for indexing arrays."""
