@@ -4,26 +4,25 @@
 
 """Helpers for JAX operations"""
 
+import logging
 from collections.abc import Callable
-from typing import Any
 
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Bool, Float, PyTree
 
 MAX_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).max)
 """Maximum x for which exp(x) is finite in 64-bit precision to prevent overflow"""
 MIN_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).tiny)
 """Lower bound for stable exp() before underflow to zero"""
 
+logger: logging.Logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-def as_j64(x: ArrayLike | tuple) -> Float[Array, "..."]:
+
+def as_j64(x: ArrayLike | tuple) -> Float[Array, "..."]:  # pragma: no cover
     return jnp.asarray(x, dtype=jnp.float64)
-
-
-def is_jax_array(element: Any) -> bool:  # pragma: no cover
-    return isinstance(element, jax.Array)
 
 
 def safe_exp(x: ArrayLike) -> Array:
@@ -133,3 +132,27 @@ def to_hashable(x: Callable) -> Callable:  # pragma: no cover
         A hashable lambda forwarding all arguments to the original callable.
     """
     return lambda *args, **kwargs: x(*args, **kwargs)
+
+
+def get_batch_size(x: PyTree) -> int:  # pragma: no cover
+    """Determines the maximum batch size (i.e., length along axis ``0``) amongst all JAX arrays.
+
+    This inspects every leaf in the pytree and checks whether it is a JAX array. Scalars contribute
+    a size of ``1``, while arrays contribute the length of their leading dimension (``shape[0]``).
+    The result is the largest such size found.
+
+    Args:
+        x: Pytree of nested containers
+
+    Returns:
+        The maximum leading dimension size across all JAX arrays
+    """
+    max_size: int = 1
+    for leaf in jax.tree_util.tree_leaves(x):
+        # logger.debug("leaf = %s", leaf)
+        if isinstance(leaf, jax.Array):
+            # logger.debug("Found JAX array")
+            max_size = max(max_size, leaf.shape[0] if leaf.ndim else 1)
+            # logger.debug("max_size: %s", max_size)
+
+    return max_size

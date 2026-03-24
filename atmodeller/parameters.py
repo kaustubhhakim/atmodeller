@@ -9,7 +9,6 @@ from collections.abc import Iterable, Mapping
 from typing import Optional
 
 import equinox as eqx
-from jaxmod.utils import get_batch_size
 from jaxtyping import ArrayLike
 
 from atmodeller.containers import (
@@ -23,9 +22,9 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     ThermodynamicStateProtocol,
 )
-from atmodeller.phase_system import PhaseSystem
+from atmodeller.jaxhelper import get_batch_size
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
-from atmodeller.reactions import ReactionSystem
+from atmodeller.reactions import PhaseSystem, ReactionSystem
 from atmodeller.state import Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -127,8 +126,6 @@ class Parameters(eqx.Module):
             reaction_system.species, mass_constraints
         )
 
-        # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
-        # that should remain scalar)
         batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
 
         solver_parameters_: SolverParameters = (

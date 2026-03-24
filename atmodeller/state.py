@@ -44,8 +44,8 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jaxhelper import as_j64
-from atmodeller.phase_system import PhaseSystem
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
+from atmodeller.reactions import PhaseSystem
 
 
 class ThermodynamicState(eqx.Module):
