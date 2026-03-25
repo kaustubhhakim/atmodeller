@@ -750,7 +750,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         return jnp.array(jnp.nan, dtype=float)
 
 
-class CondensedPhase(BasePhase[SpeciesProtocol]):
+class CondensedPhase(BasePhase[TSpecies_co]):
     r"""Multicomponent condensed phase (e.g., silicate melt or solid)
 
     A condensed phase can optionally treat dissolved and/or condensed species as additional to the
@@ -804,7 +804,7 @@ class CondensedPhase(BasePhase[SpeciesProtocol]):
         return super().from_species(species, background_mass, background_molar_mass, **kwargs)
 
 
-class MeltPhase(CondensedPhase):
+class MeltPhase(CondensedPhase[SpeciesProtocol]):
     """Multicomponent silicate melt with optionally dissolved volatiles"""
 
     name: str = "melt"
@@ -814,14 +814,14 @@ class MeltPhase(CondensedPhase):
     @override
     def __init__(
         self,
-        species: Iterable[TSpecies_co] = (),
+        species: Iterable[SpeciesProtocol] = (),
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
     ):
         super().__init__(species, background_mass, background_molar_mass)
 
 
-class SolidPhase(CondensedPhase):
+class SolidPhase(CondensedPhase[SpeciesProtocol]):
     """Multicomponent silicate solid"""
 
     name: str = "solid"
@@ -831,14 +831,14 @@ class SolidPhase(CondensedPhase):
     @override
     def __init__(
         self,
-        species: Iterable[TSpecies_co] = (),
+        species: Iterable[SpeciesProtocol] = (),
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
     ):
         super().__init__(species, background_mass, background_molar_mass)
 
 
-class PurePhase(CondensedPhase):
+class PurePhase(CondensedPhase[ChemicalSpecies]):
     """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid)"""
 
     # Without an override pylance gets confused, throwing missing argument warnings even though
@@ -846,7 +846,7 @@ class PurePhase(CondensedPhase):
     @override
     def __init__(
         self,
-        species: Iterable[TSpecies_co] = (),
+        species: Iterable[ChemicalSpecies] = (),
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
     ):
