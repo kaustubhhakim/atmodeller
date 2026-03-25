@@ -104,13 +104,15 @@ class ThinAtmospherePlanetNew(eqx.Module):
     This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Args:
+        reaction_system: Reaction system representing the thermodynamic state of the planetary body
         surface_radius: Radius of the surface in m
         metallic_core_mass: Metallic core mass in kg
         temperature: Temperature in K
         pressure: Pressure in bar
-        reaction_system: Reaction system representing the thermodynamic state of the planetary body
     """
 
+    reaction_system: ReactionSystem
+    """Reaction system representing the thermodynamic state of the planetary body"""
     surface_radius: FloatArray
     """Radius of the surface in m"""
     metallic_core_mass: FloatArray
@@ -119,22 +121,21 @@ class ThinAtmospherePlanetNew(eqx.Module):
     """Temperature in K"""
     pressure: FloatArray
     """Pressure in bar"""
-    reaction_system: ReactionSystem
-    """Reaction system representing the thermodynamic state of the planetary body"""
 
+    # For helpful typing information
     def __init__(
         self,
-        surface_radius: ArrayLike,
-        metallic_core_mass: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
         reaction_system: ReactionSystem,
+        surface_radius: ArrayLike = 6371000,
+        metallic_core_mass: ArrayLike = 1.7637387774048892e24,
+        temperature: ArrayLike = 2000,
+        pressure: ArrayLike = jnp.nan,
     ):
+        self.reaction_system = reaction_system
         self.surface_radius = as_j64(surface_radius)
         self.metallic_core_mass = as_j64(metallic_core_mass)
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
-        self.reaction_system = reaction_system
 
     @property
     def phase_system(self) -> PhaseSystem:
@@ -190,7 +191,7 @@ class ThinAtmospherePlanetNew(eqx.Module):
         phase_system = PhaseSystem(gas, melt=melt, solid=solid, condensates=tuple(condensates))
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
-        return cls(surface_radius, metallic_core_mass, temperature, pressure, reaction_system)
+        return cls(reaction_system, surface_radius, metallic_core_mass, temperature, pressure)
 
     @property
     def surface_area(self) -> FloatArray:
@@ -288,7 +289,9 @@ class ThinAtmospherePlanetNew(eqx.Module):
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, Array] = asdict(self)
+        # FIXME: This breaks because of nested phase system
+        # base_dict: dict[str, Array] = asdict(self)
+        base_dict = {}
         base_dict["pressure"] = self.get_pressure(solution)
         # TODO: Reinstate these outputs?
         # base_dict["mantle_mass"] = self.mantle_mass
