@@ -9,10 +9,7 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Bool, Float
 
-from atmodeller.constants import (
-    INITIAL_LOG_NUMBER_MOLES,
-    INITIAL_LOG_STABILITY,
-)
+from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.engine import get_min_log_elemental_abundance_per_species
 from atmodeller.parameters import Parameters
 
