@@ -137,7 +137,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
     def __init__(
         self,
-        species: Iterable[TSpecies_co],
+        species: Iterable[TSpecies_co] = (),
         background_mass: ArrayLike = 0.0,
         background_molar_mass: ArrayLike = 1.0,
     ):

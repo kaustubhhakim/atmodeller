@@ -33,6 +33,7 @@ complex planetary models.
 
 from collections.abc import Iterable
 from dataclasses import asdict
+from typing import Protocol, runtime_checkable
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -45,7 +46,30 @@ from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jaxhelper import as_j64
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
-from atmodeller.reactions import PhaseSystem
+from atmodeller.reactions import PhaseSystem, ReactionSystem
+
+
+@runtime_checkable
+class ThermodynamicStateProtocol(Protocol):
+    reaction_system: ReactionSystem
+
+    @property
+    def phase_system(self) -> PhaseSystem: ...
+
+    @property
+    def temperature(self) -> Float[Array, "..."]:
+        """Temperature in K"""
+        ...
+
+    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> Float[Array, "..."]:
+        """Pressure in bar"""
+        ...
+
+    def asdict(
+        self, solution: Float[Array, "... twice_species"]
+    ) -> dict[str, Float[Array, "..."]]:
+        """Dictionary representation"""
+        ...
 
 
 class ThermodynamicState(eqx.Module):
@@ -78,6 +102,13 @@ class ThinAtmospherePlanetNew(eqx.Module):
     """A new planet class
 
     This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
+
+    Args:
+        surface_radius: Radius of the surface in m
+        metallic_core_mass: Metallic core mass in kg
+        temperature: Temperature in K
+        pressure: Pressure in bar
+        reaction_system: Reaction system representing the thermodynamic state of the planetary body
     """
 
     surface_radius: FloatArray
@@ -88,38 +119,27 @@ class ThinAtmospherePlanetNew(eqx.Module):
     """Temperature in K"""
     pressure: FloatArray
     """Pressure in bar"""
-    phase_system: PhaseSystem
-    """Phase system representing the thermodynamic state of the planetary body"""
+    reaction_system: ReactionSystem
+    """Reaction system representing the thermodynamic state of the planetary body"""
 
     def __init__(
         self,
-        gas_species: Iterable[ChemicalSpecies],
-        *,
-        surface_radius: ArrayLike = 6371000,
-        metallic_core_mass: ArrayLike = 1.7637387774048892e24,
-        temperature: ArrayLike = 2000,
-        pressure: ArrayLike = jnp.nan,
-        melt_species: Iterable[SpeciesProtocol] = (),
-        solid_species: Iterable[SpeciesProtocol] = (),
-        condensates: Iterable[PurePhase] = (),
-        background_melt_mass: ArrayLike = 4.208261222595111e24,
-        background_melt_molar_mass: ArrayLike = 60e-3,
-        background_solid_mass: ArrayLike = 0.0,
-        background_solid_molar_mass: ArrayLike = 60e-3,
+        surface_radius: ArrayLike,
+        metallic_core_mass: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        reaction_system: ReactionSystem,
     ):
         self.surface_radius = as_j64(surface_radius)
         self.metallic_core_mass = as_j64(metallic_core_mass)
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
+        self.reaction_system = reaction_system
 
-        gas: GasPhase = GasPhase(gas_species)
-        melt: MeltPhase = MeltPhase(melt_species, background_melt_mass, background_melt_molar_mass)
-        solid: SolidPhase = SolidPhase(
-            solid_species, background_solid_mass, background_solid_molar_mass
-        )
-        self.phase_system = PhaseSystem(
-            gas, melt=melt, solid=solid, condensates=tuple(condensates)
-        )
+    @property
+    def phase_system(self) -> PhaseSystem:
+        """Phase system representing the thermodynamic state of the planetary body"""
+        return self.reaction_system.phase_system
 
     @classmethod
     def create(
@@ -137,29 +157,40 @@ class ThinAtmospherePlanetNew(eqx.Module):
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ):
-        """Maintains the same structure as the previous ThinAtmospherePlanet for compatibility"""
-        background_melt_mass: ArrayLike = (
-            planet_mass * (1 - core_mass_fraction) * mantle_melt_fraction
-        )
-        background_solid_mass: ArrayLike = (
-            planet_mass * (1 - core_mass_fraction) * (1 - mantle_melt_fraction)
-        )
+        r"""Creates a new instance.
+
+        Args:
+            gas_species: Iterable of species in the gas phase
+            planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
+            core_mass_fraction: Mass fraction of the iron core relative to the planetary mass.
+                Defaults to ``0.295334691460966`` kg kg\ :sup:`-1
+            mantle_melt_fraction: Mantle melt fraction. Defaults to ``1.0``.
+            surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m
+                (Earth).
+            temperature: Temperature in K. Defaults to ``2000`` K.
+            pressure: Pressure in bar. Defaults to ``jnp.nan`` to solve for the mechanical pressure
+                balance at the surface.
+            molar_mass: Molar mass. Defaults to 60 g mol\ :sup:`-1`, which is a typical value for
+                silicate melts based on SiO\ :sub:`2`.
+            melt_species: Iterable of species in the melt phase
+            solid_species: Iterable of species in the solid phase
+            condensates: Iterable of pure phases representing condensates in the system
+
+        Returns:
+            An instance
+        """
+        mantle_mass: ArrayLike = planet_mass * (1 - core_mass_fraction)
+        background_melt_mass: ArrayLike = mantle_mass * mantle_melt_fraction
+        background_solid_mass: ArrayLike = mantle_mass * (1 - mantle_melt_fraction)
         metallic_core_mass: ArrayLike = planet_mass * core_mass_fraction
 
-        return cls(
-            gas_species,
-            surface_radius=surface_radius,
-            metallic_core_mass=metallic_core_mass,
-            temperature=temperature,
-            pressure=pressure,
-            melt_species=melt_species,
-            solid_species=solid_species,
-            condensates=condensates,
-            background_melt_mass=background_melt_mass,
-            background_melt_molar_mass=molar_mass,
-            background_solid_mass=background_solid_mass,
-            background_solid_molar_mass=molar_mass,
-        )
+        gas: GasPhase = GasPhase(gas_species)
+        melt: MeltPhase = MeltPhase(melt_species, background_melt_mass, molar_mass)
+        solid: SolidPhase = SolidPhase(solid_species, background_solid_mass, molar_mass)
+        phase_system = PhaseSystem(gas, melt=melt, solid=solid, condensates=tuple(condensates))
+        reaction_system: ReactionSystem = ReactionSystem(phase_system)
+
+        return cls(surface_radius, metallic_core_mass, temperature, pressure, reaction_system)
 
     @property
     def surface_area(self) -> FloatArray:
@@ -267,34 +298,6 @@ class ThinAtmospherePlanetNew(eqx.Module):
         base_dict["surface_gravity"] = self.get_surface_gravity(solution)
 
         return base_dict
-
-
-#     @classmethod
-#     def create(
-#         cls,
-#         planet_mass: ArrayLike = 5.972e24,
-#         core_mass_fraction: ArrayLike = 0.295334691460966,
-#         mantle_melt_fraction: ArrayLike = 1.0,
-#         surface_radius: ArrayLike = 6371000,
-#         molar_mass: ArrayLike = 60e-3,
-#     ) -> "ThinAtmospherePlanet":
-#         r"""Factory method to create a ThinAtmospherePlanet with Earth-like defaults.
-
-#         Args:
-#             planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
-#             core_mass_fraction: Mass fraction of the iron core relative to the planetary mass.
-#                 Defaults to ``0.295334691460966`` kg kg\ :sup:`-1` (Earth).
-#             mantle_melt_fraction: Fraction of the mantle that is molten. Defaults to ``1.0``.
-#             surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
-#             temperature: Temperature in K. Defaults to ``2000`` K.
-#             pressure: Pressure in bar. Defaults to ``jnp.nan`` to solve for the mechanical pressure
-#                 balance at the surface.
-#             molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
-#                 60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
-
-#         Returns:
-#             A ThinAtmospherePlanet instance
-#         """
 
 
 class ThinAtmospherePlanetPrevious(eqx.Module):

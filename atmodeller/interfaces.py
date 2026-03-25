@@ -208,21 +208,3 @@ class SolubilityProtocol(Protocol):
             Concentration in ppmw
         """
         ...
-
-
-@runtime_checkable
-class ThermodynamicStateProtocol(Protocol):
-    @property
-    def temperature(self) -> Float[Array, "..."]:
-        """Temperature in K"""
-        ...
-
-    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> Float[Array, "..."]:
-        """Pressure in bar"""
-        ...
-
-    def asdict(
-        self, solution: Float[Array, "... twice_species"]
-    ) -> dict[str, Float[Array, "..."]]:
-        """Dictionary representation"""
-        ...
