@@ -131,7 +131,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     )
     fug_active: Bool[Array, " n_species"] = parameters.fugacity_constraints.active()
     gas_no_fug: Bool[Array, " n_species"] = gas_mask & ~fug_active
-    molar_masses: Float[Array, " n_species"] = jnp.asarray(parameters.species.molar_masses)
+    molar_masses: Float[Array, " n_species"] = parameters.species.molar_masses
     temperature: Float[Array, ""] = parameters.state.temperature
     fallback: Float[Array, ""] = jnp.exp(jnp.array(INITIAL_LOG_NUMBER_MOLES, dtype=float))
 
