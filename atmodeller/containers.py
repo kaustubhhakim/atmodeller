@@ -578,6 +578,7 @@ class MassConstraintSet(eqx.Module):
             mass_constraints if mass_constraints is not None else {}
         )
 
+        # FIXME: Must work on numpy arrays. get_batch_size only works on JAX arrays
         # Determine the maximum length of any array in mass_constraints_
         max_len: int = get_batch_size(mass_constraints_)
 
