@@ -57,18 +57,26 @@ class ThermodynamicStateProtocol(Protocol):
     def phase_system(self) -> PhaseSystem: ...
 
     @property
+    def pressure(self) -> Float[Array, "..."]:
+        """Pressure in bar
+
+        Note:
+            This should not be used directly; use :meth:`get_pressure` instead to ensure the
+            correct pressure is used based on the state of the system.
+        """
+        ...
+
+    @property
     def temperature(self) -> Float[Array, "..."]:
         """Temperature in K"""
         ...
 
-    def get_pressure(
-        self, log_number_moles: Float[Array, "... twice_species"]
-    ) -> Float[Array, "..."]:
+    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> Float[Array, "..."]:
         """Pressure in bar"""
         ...
 
     def asdict(
-        self, log_number_moles: Float[Array, "... twice_species"]
+        self, log_number_moles: Float[Array, "... n_species"]
     ) -> dict[str, Float[Array, "..."]]:
         """Dictionary representation"""
         ...
@@ -80,16 +88,19 @@ class ThermodynamicState(eqx.Module):
     This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Args:
+        reaction_system: Reaction system representing the thermodynamic state of the system
         temperature: Temperature in K
         pressure: Pressure in bar
     """
 
+    reaction_system: ReactionSystem
+    """Reaction system representing the thermodynamic state of the system"""
     temperature: FloatArray = eqx.field(converter=as_j64)
     """Temperature in K"""
     pressure: FloatArray = eqx.field(converter=as_j64)
     """Pressure in bar"""
 
-    def get_pressure(self, log_number_moles: Float[Array, "... twice_species"]) -> FloatArray:
+    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Gets the pressure.
 
         Returns:
@@ -200,9 +211,7 @@ class ThinAtmospherePlanetNew(eqx.Module):
         """Surface area"""
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
-    def get_surface_gravity(
-        self, log_number_moles: Float[Array, "... twice_species"]
-    ) -> FloatArray:
+    def get_surface_gravity(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         r"""Gets the surface gravity.
 
         Computes the surface gravity from the mass of condensed phases and the radius of the
@@ -245,9 +254,7 @@ class ThinAtmospherePlanetNew(eqx.Module):
 
         return surface_gravity
 
-    def get_pressure(
-        self, log_number_moles: Float[Array, "... twice_species"]
-    ) -> Float[Array, "..."]:
+    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> Float[Array, "..."]:
         """Gets the pressure.
 
         A pressure is used if specified, otherwise the default behaviour is to compute the
@@ -286,7 +293,7 @@ class ThinAtmospherePlanetNew(eqx.Module):
 
         return pressure
 
-    def asdict(self, log_number_moles: Float[Array, "... twice_species"]) -> dict[str, Array]:
+    def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
@@ -298,13 +305,15 @@ class ThinAtmospherePlanetNew(eqx.Module):
         # FIXME: This breaks because of nested phase system
         # base_dict: dict[str, Array] = asdict(self)
         base_dict = {}
-        base_dict["pressure"] = self.get_pressure(log_number_moles)
         # TODO: Reinstate these outputs?
         # base_dict["mantle_mass"] = self.mantle_mass
         # base_dict["mantle_melt_mass"] = self.mantle_melt_mass
         # base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        base_dict["metallic_core_mass"] = self.metallic_core_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
+        base_dict["temperature"] = self.temperature
+        base_dict["pressure"] = self.pressure
 
         return base_dict
 
