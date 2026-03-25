@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 from jaxmod.solvers import RootFindParameters
-from jaxmod.type_aliases import NpBool, NpFloat, NpInt
+from jaxmod.type_aliases import NpFloat, NpInt
 from jaxmod.units import unit_conversion
 from jaxmod.utils import get_batch_size
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
@@ -269,36 +269,14 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
     """Species in the collection"""
     species_names: tuple[str, ...]
     """Unique names of all species"""
-    molar_masses: NpFloat
-    """Molar masses"""
-    active_stability: NpBool
-    """Active stability mask"""
-    reaction_species_mask: NpBool
-    """Mask for reaction species in the collection"""
-    reservoir_species_mask: NpBool
-    """Mask for reservoir species in the collection"""
-    phase_mass_mask: NpBool
-    """Mask for species included in phase-level mass, mole, and fraction aggregations"""
     number_solution: int
     """Number of solution quantities, which cannot depend on traced quantities"""
     unique_elements_map: dict[str, int]
+    """Mapping of unique element name to index in the unique elements array"""
 
     def __init__(self, species: Iterable[TSpecies_co]):
         self.species = tuple(species)
         self.species_names = tuple(species_.data.name for species_ in self)
-        self.molar_masses = np.array([species_.data.molar_mass for species_ in self], dtype=float)
-        self.active_stability = np.array(
-            [species.solve_for_stability for species in self], dtype=bool
-        )
-        self.reaction_species_mask = np.array(
-            [isinstance(species_, ChemicalSpecies) for species_ in self], dtype=bool
-        )
-        self.reservoir_species_mask = np.array(
-            [isinstance(species_, ReservoirSpecies) for species_ in self], dtype=bool
-        )
-        self.phase_mass_mask = np.array(
-            [species.include_in_phase_mass for species in self], dtype=bool
-        )
 
         # Ensure number_solution is static
         self.number_solution = sum(species.number_solution for species in self)
@@ -317,6 +295,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         )
 
     @property
+    def active_stability(self) -> Bool[Array, "..."]:
+        """Active stability mask"""
+        return jnp.array([species.solve_for_stability for species in self], dtype=bool)
+
+    @property
     def element_molar_masses(self) -> NpFloat:
         """Element molar masses for the unique elements in the species"""
         element_molar_masses: list[float] = []
@@ -329,6 +312,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         return np.array(element_molar_masses, dtype=float)
 
     @property
+    def molar_masses(self) -> Float[Array, " species"]:
+        """Molar masses for all species in the collection"""
+        return jnp.array([species_.data.molar_mass for species_ in self], dtype=float)
+
+    @property
     def number_elements(self) -> int:
         """Number of unique elements in the species"""
         return len(self.unique_elements)
@@ -339,6 +327,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         return len(self)
 
     @property
+    def phase_mass_mask(self) -> Bool[Array, "..."]:
+        """Mask for species included in phase-level mass, mole, and fraction aggregations"""
+        return jnp.array([species.include_in_phase_mass for species in self], dtype=bool)
+
+    @property
     def reaction_species(self) -> "SpeciesCollection[ChemicalSpecies]":
         """Reaction species collection"""
         return SpeciesCollection(
@@ -346,11 +339,21 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         )
 
     @property
+    def reaction_species_mask(self) -> Bool[Array, "..."]:
+        """Mask for reaction species in the collection"""
+        return jnp.array([isinstance(species_, ChemicalSpecies) for species_ in self], dtype=bool)
+
+    @property
     def reservoir_species(self) -> "SpeciesCollection[ReservoirSpecies]":
         """Reservoir species collection"""
         return SpeciesCollection(
             [species for species in self if isinstance(species, ReservoirSpecies)]
         )
+
+    @property
+    def reservoir_species_mask(self) -> Bool[Array, "..."]:
+        """Mask for reservoir species in the collection"""
+        return jnp.array([isinstance(species_, ReservoirSpecies) for species_ in self], dtype=bool)
 
     @property
     def unique_elements(self) -> tuple[str, ...]:
