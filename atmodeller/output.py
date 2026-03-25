@@ -282,7 +282,7 @@ class BaseOutputDict(eqx.Module):
     @property
     def _pressure(self) -> Float[Array, "..."]:
         """Pressure in bar"""
-        return self.parameters.state.get_pressure(self.solution)
+        return self.parameters.state.get_pressure(self.log_number_moles)
 
     @property
     def pressure(self) -> Float[Array, "#n_batch 1"]:
@@ -592,10 +592,11 @@ class OutputNamedArraysDict(BaseOutputDict):
             "activity",
         )
 
+        # TODO: Could split solution and label by species with stability suffix. Currently this is
+        # just the raw solution array
+        out["solution"] = self.solution
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
-
-        # TODO: Could split solution and label by species with stability suffix
 
         # Must vmap the residual evaluation to match what the solver did: parameters contains a
         # mix of scalar and batched leaves, so calling objective_function directly on the 2-D
