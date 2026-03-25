@@ -61,12 +61,14 @@ class ThermodynamicStateProtocol(Protocol):
         """Temperature in K"""
         ...
 
-    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> Float[Array, "..."]:
+    def get_pressure(
+        self, log_number_moles: Float[Array, "... twice_species"]
+    ) -> Float[Array, "..."]:
         """Pressure in bar"""
         ...
 
     def asdict(
-        self, solution: Float[Array, "... twice_species"]
+        self, log_number_moles: Float[Array, "... twice_species"]
     ) -> dict[str, Float[Array, "..."]]:
         """Dictionary representation"""
         ...
@@ -87,13 +89,13 @@ class ThermodynamicState(eqx.Module):
     pressure: FloatArray = eqx.field(converter=as_j64)
     """Pressure in bar"""
 
-    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> FloatArray:
+    def get_pressure(self, log_number_moles: Float[Array, "... twice_species"]) -> FloatArray:
         """Gets the pressure.
 
         Returns:
             Pressure in bar
         """
-        del solution
+        del log_number_moles
 
         return self.pressure
 
@@ -198,17 +200,20 @@ class ThinAtmospherePlanetNew(eqx.Module):
         """Surface area"""
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
-    def get_surface_gravity(self, solution: Float[Array, "... twice_species"]) -> FloatArray:
+    def get_surface_gravity(
+        self, log_number_moles: Float[Array, "... twice_species"]
+    ) -> FloatArray:
         r"""Gets the surface gravity.
 
         Computes the surface gravity from the mass of condensed phases and the radius of the
         planet.
 
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
         Returns:
             Surface gravity in m s\ :sup:`-2`
         """
-        log_number_moles, _ = jnp.split(solution, 2, axis=-1)
-
         # Melt mass
         log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
             ..., self.phase_system.melt_slice
@@ -240,7 +245,9 @@ class ThinAtmospherePlanetNew(eqx.Module):
 
         return surface_gravity
 
-    def get_pressure(self, solution: Float[Array, "... twice_species"]) -> Float[Array, "..."]:
+    def get_pressure(
+        self, log_number_moles: Float[Array, "... twice_species"]
+    ) -> Float[Array, "..."]:
         """Gets the pressure.
 
         A pressure is used if specified, otherwise the default behaviour is to compute the
@@ -249,14 +256,13 @@ class ThinAtmospherePlanetNew(eqx.Module):
         planet alone and is assumed to act on all the mass of the atmosphere.
 
         Args:
-            solution: Solution array
+            log_number_moles: Log number of moles for all species in the system
 
         Returns:
             Pressure in bar
         """
         pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
 
-        log_number_moles, _ = jnp.split(solution, 2, axis=-1)
         log_number_moles_gas: Float[Array, "... gas_species"] = log_number_moles[
             ..., self.phase_system.gas_slice
         ]
@@ -267,7 +273,7 @@ class ThinAtmospherePlanetNew(eqx.Module):
         gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
         # jax.debug.print("gas_mass = {out}", out=gas_mass_squeeze)
 
-        surface_gravity: Float[Array, "..."] = self.get_surface_gravity(solution)
+        surface_gravity: Float[Array, "..."] = self.get_surface_gravity(log_number_moles)
         mechanical_pressure: Float[Array, "..."] = (
             gas_mass_squeeze * surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
         )
@@ -280,11 +286,11 @@ class ThinAtmospherePlanetNew(eqx.Module):
 
         return pressure
 
-    def asdict(self, solution: Float[Array, "... twice_species"]) -> dict[str, Array]:
+    def asdict(self, log_number_moles: Float[Array, "... twice_species"]) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:
-            gas_mass: Gas mass in kg
+            log_number_moles: Log number of moles for all species in the system
 
         Returns:
             A dictionary of the values
@@ -292,13 +298,13 @@ class ThinAtmospherePlanetNew(eqx.Module):
         # FIXME: This breaks because of nested phase system
         # base_dict: dict[str, Array] = asdict(self)
         base_dict = {}
-        base_dict["pressure"] = self.get_pressure(solution)
+        base_dict["pressure"] = self.get_pressure(log_number_moles)
         # TODO: Reinstate these outputs?
         # base_dict["mantle_mass"] = self.mantle_mass
         # base_dict["mantle_melt_mass"] = self.mantle_melt_mass
         # base_dict["mantle_solid_mass"] = self.mantle_solid_mass
         base_dict["surface_area"] = self.surface_area
-        base_dict["surface_gravity"] = self.get_surface_gravity(solution)
+        base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
 
         return base_dict
 
