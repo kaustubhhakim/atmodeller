@@ -54,7 +54,7 @@ def safe_exp(x: ArrayLike) -> Array:
     x_safe = jnp.where(is_neg_inf, 0.0, x)
 
     # Apply overflow clipping only to finite values
-    x_clipped = jnp.clip(x_safe, a_max=MAX_EXP_INPUT)
+    x_clipped = jnp.clip(x_safe, max=MAX_EXP_INPUT)
 
     y = jnp.exp(x_clipped)
 
