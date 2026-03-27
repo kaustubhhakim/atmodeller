@@ -5,7 +5,7 @@
 """Tests for C-H-O systems"""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import jax
@@ -15,12 +15,12 @@ from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import debug_logger
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
-from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import Planet
+from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -37,12 +37,12 @@ TOLERANCE: float = 5.0e-2
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
 # Gas species
-H2O_g = ChemicalSpecies.create_gas("H2O")
-H2_g = ChemicalSpecies.create_gas("H2")
-O2_g = ChemicalSpecies.create_gas("O2")
-CO_g = ChemicalSpecies.create_gas("CO")
-CO2_g = ChemicalSpecies.create_gas("CO2")
-CH4_g = ChemicalSpecies.create_gas("CH4")
+H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
 
 # Melt species
 H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
@@ -59,10 +59,10 @@ key, subkey = jax.random.split(key)  # Split the key for use in this function
 def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
-    melt_species = (H2O_d, CO2_d)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
-    planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -76,7 +76,7 @@ def test_H_and_C() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -104,9 +104,9 @@ def test_CHO_reduced() -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet = Planet.create(gas_species, temperature=1400)
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
 
@@ -119,7 +119,7 @@ def test_CHO_reduced() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -147,9 +147,9 @@ def test_CHO_IW() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet = Planet.create(gas_species, temperature=1400)
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
@@ -162,7 +162,7 @@ def test_CHO_IW() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -207,9 +207,9 @@ def test_CHO_oxidised() -> None:
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet = Planet.create(gas_species, temperature=1400)
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
@@ -222,7 +222,7 @@ def test_CHO_oxidised() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -251,9 +251,9 @@ def test_CHO_highly_oxidised() -> None:
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet = Planet.create(gas_species, temperature=1400)
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
@@ -268,7 +268,7 @@ def test_CHO_highly_oxidised() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -293,7 +293,7 @@ def test_CHO_highly_oxidised() -> None:
 def test_CHO_middle_temperature() -> None:
     """Tests C-H-O system at 873 K"""
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
     planet = Planet.create(gas_species, temperature=873)
 
@@ -308,7 +308,7 @@ def test_CHO_middle_temperature() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -333,9 +333,9 @@ def test_CHO_middle_temperature() -> None:
 def test_CHO_low_temperature() -> None:
     """Tests C-H-O system at 450 K"""
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet = Planet.create(gas_species, temperature=450)
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=450)
 
     # TODO: to revisit this below, since currently this test recreates the solver.
     # This is a trick to keep the same argument structure and avoid JAX recompilation, even though
@@ -353,7 +353,7 @@ def test_CHO_low_temperature() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
