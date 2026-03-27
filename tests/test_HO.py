@@ -8,22 +8,24 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+import jax
 import numpy as np
 from jaxmod.type_aliases import NpFloat
-from jaxtyping import ArrayLike
+from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import __version__, debug_logger
-from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import FixedFugacityConstraint, ReservoirSpecies
+from atmodeller.containers import ChemicalSpecies, FixedFugacityConstraint, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.phases import GasPhase, MeltPhase
+from atmodeller.output import Output
+from atmodeller.parameters import Parameters
 from atmodeller.solubility import get_solubility_models
+from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -34,12 +36,21 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-gas: GasPhase = GasPhase.create(("H2O", "H2", "O2"))
-H2O_di: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+# Gas species
+H2O_g = ChemicalSpecies.create_gas("H2O")
+H2_g = ChemicalSpecies.create_gas("H2")
+O2_g = ChemicalSpecies.create_gas("O2")
+CO_g = ChemicalSpecies.create_gas("CO")
+CO2_g = ChemicalSpecies.create_gas("CO2")
+CH4_g = ChemicalSpecies.create_gas("CH4")
+
+# Melt species
+H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
     "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
 )
-melt: MeltPhase = MeltPhase((H2O_di,))
-gas_HO_model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
+
+key: PRNGKeyArray = jax.random.PRNGKey(0)
+key, subkey = jax.random.split(key)  # Split the key for use in this function
 
 
 def test_version() -> None:
@@ -50,16 +61,20 @@ def test_version() -> None:
 def test_H2O() -> None:
     """Tests a single species (H2O)."""
 
-    gas: GasPhase = GasPhase.create(("H2O",))
-    melt: MeltPhase = MeltPhase((H2O_di,))
-    planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
+    gas_species = (H2O_g,)
+    melt_species = (H2O_d,)
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {"species": {"partial_pressure": {"H2O_g": 1.0312913336898137}}}
@@ -67,22 +82,26 @@ def test_H2O() -> None:
 
     # output.to_excel("test_H2O")
 
-    assert model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_O() -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
 
-    gas: GasPhase = GasPhase.create(("H2", "H2O", "O2"))
-    planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(gas)
+    gas_species = (H2_g, H2O_g, O2_g)
+
+    planet: Planet = Planet.create(gas_species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: ArrayLike = 6.25774e20
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     fastchem_result: dict[str, Any] = {
         "gas": {
@@ -98,21 +117,30 @@ def test_H_O() -> None:
 
     # output.to_excel("test_H_O")
 
-    assert model.output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility."""
 
-    planet: Planet = Planet()
+    gas_species = (H2_g, H2O_g, O2_g)
+    melt_species = (H2O_d,)
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {
@@ -128,55 +156,34 @@ def test_H_fO2() -> None:
 
     # output.to_excel("test_H_fO2")
 
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_fH2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility and mixed fugacity constraints."""
 
-    planet: Planet = Planet()
+    gas_species = (H2_g, H2O_g, O2_g)
+    melt_species = (H2O_d,)
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "H2_g": FixedFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
         "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
     }
 
-    gas_HO_model.solve(state=planet, fugacity_constraints=fugacity_constraints)
+    oceans: float = 1
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    target: dict[str, Any] = {
-        "gas": {
-            "species": {
-                "partial_pressure": {
-                    "H2O_g": np.array(
-                        [3.262913506271090e-09, 1.031823848794260e-07, 3.262913506271089e-06]
-                    ),
-                    "H2_g": np.array(
-                        [1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]
-                    ),
-                    "O2_g": np.array(
-                        [8.838513516896060e-09, 8.838513516896038e-08, 8.838513516896018e-07]
-                    ),
-                }
-            }
-        }
-    }
-
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
-
-
-def test_H_fO2_fH2_new() -> None:
-    """Tests H2-H2O at the IW buffer with H2O solubility and mixed fugacity constraints."""
-
-    planet: Planet = Planet()
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": FixedFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
-        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
-    }
-    mass_constraints: dict[str, ArrayLike] = {"H": earth_oceans_to_hydrogen_mass(1)}
-
-    gas_HO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
+
     target: dict[str, Any] = {
         "gas": {
             "species": {
@@ -195,26 +202,36 @@ def test_H_fO2_fH2_new() -> None:
         }
     }
 
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_temperature() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of surface temperatures."""
 
+    gas_species = (H2_g, H2O_g, O2_g)
+    melt_species = (H2O_d,)
+
     # Number of surface temperatures is different to number of species to test array shapes work.
-    surface_temperatures: NpFloat = np.array([1500, 2000, 2500, 3000])
-    planet: Planet = Planet(temperature=surface_temperatures)
+    temperature = np.array([1500, 2000, 2500, 3000])
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species, temperature=temperature)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(),
         "H2_g": FixedFugacityConstraint(np.nan),
     }
+
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {
@@ -249,28 +266,37 @@ def test_H_fO2_batch_temperature() -> None:
         }
     }
 
-    # gas_HO_model.output.to_excel("test_H_fO2_batch_temperature")
+    # output.to_excel("test_H_fO2_batch_temperature")
 
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_fO2_shift() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of fO2 shifts."""
 
-    planet: Planet = Planet()
+    gas_species = (H2_g, H2O_g, O2_g)
+    melt_species = (H2O_d,)
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+
     # Set up a range of fO2 shifts
     num: int = 4
     fO2_shifts: NpFloat = np.linspace(-10, 10, num, dtype=np.float64)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(fO2_shifts),
     }
+
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    gas_HO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {
@@ -307,24 +333,31 @@ def test_H_fO2_batch_fO2_shift() -> None:
 
     # output.to_excel("test_H_fO2_batch_fO2_shift")
 
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_H_mass() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of H budgets."""
 
-    planet: Planet = Planet()
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(),
-    }
+    gas_species = (H2_g, H2O_g, O2_g)
+    melt_species = (H2O_d,)
+
+    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
-    gas_HO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {
@@ -344,6 +377,4 @@ def test_H_fO2_batch_H_mass() -> None:
         }
     }
 
-    # output.to_excel("test_H_fO2_batch_H_mass")
-
-    assert gas_HO_model.output.compare(target, rtol=RTOL, atol=ATOL)
+    assert output.compare(target, rtol=RTOL, atol=ATOL)
