@@ -84,8 +84,8 @@ def get_min_log_elemental_abundance_per_species(
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
-    log_abundance: Float[Array, "... elements"] = parameters.mass_constraints.log_abundance()
-    # jax.debug.print("log_abundance = {out}", out=log_abundance)
+    log_abundance: Float[Array, "... elements"] = jnp.log(parameters.mass_constraints.abundance())
+    # jax.debug.print("log_abundance (engine) = {out}", out=log_abundance)
 
     # Mask log_abundance to nan where element is absent from species, then take min over elements
     # formula_matrix != 0 has shape (elements, species); log_abundance[..., :, None] broadcasts
@@ -197,7 +197,9 @@ def objective_function(
     )
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
-    log_target_moles: Float[Array, "... elements"] = parameters.mass_constraints.log_abundance()
+    log_target_moles: Float[Array, "... elements"] = jnp.log(
+        parameters.mass_constraints.abundance()
+    )
     # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
 
     # Dimensionless (ratio error - 1)

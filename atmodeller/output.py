@@ -382,9 +382,9 @@ class OutputNaturalDict(BaseOutputDict):
 
         out["constraints"] = {
             "elements": {
-                "number_moles": self.parameters.mass_constraints.abundance_mol(),
+                "number_moles": self.parameters.mass_constraints.abundance_mol(self.batch_size),
                 "names": self.parameters.mass_constraints.species.unique_elements,
-                "mass": self.parameters.mass_constraints.abundance_mass(),
+                "mass": self.parameters.mass_constraints.abundance_mass(self.batch_size),
             }
         }
         out["constraints"]["species"] = {
@@ -563,13 +563,13 @@ class OutputNamedArraysDict(BaseOutputDict):
         elements_out: dict = out["constraints"].setdefault("elements", {})
         self._split_by_name_and_add(
             self.parameters.mass_constraints.species.unique_elements,
-            self.parameters.mass_constraints.abundance_mass(),
+            self.parameters.mass_constraints.abundance_mass(self.batch_size),
             elements_out,
             "mass",
         )
         self._split_by_name_and_add(
             self.parameters.mass_constraints.species.unique_elements,
-            self.parameters.mass_constraints.abundance_mol(),
+            self.parameters.mass_constraints.abundance_mol(self.batch_size),
             elements_out,
             "number_moles",
         )
@@ -791,10 +791,10 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         mass_constraints: MassConstraintSet = self.parameters.mass_constraints
         unique_elements: tuple[str, ...] = mass_constraints.species.unique_elements
         element_mass: list[Array] = self._split_array_by_names(
-            unique_elements, mass_constraints.abundance_mass()
+            unique_elements, mass_constraints.abundance_mass(self.batch_size)
         )
         element_number_moles: list[Array] = self._split_array_by_names(
-            unique_elements, mass_constraints.abundance_mol()
+            unique_elements, mass_constraints.abundance_mol(self.batch_size)
         )
 
         for nn, element in enumerate(unique_elements):

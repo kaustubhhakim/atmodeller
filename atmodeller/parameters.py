@@ -75,7 +75,10 @@ class Parameters(eqx.Module):
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
             state.reaction_system.phase_system.species, mass_constraints
         )
-        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
+        # TODO: NOTE: fugacity_constraints and not fugacity_constraints_ here. Potentially to
+        # change during a refactor.
+        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints_))
+        # jax.debug.print("batch_size (parameters) = {out}", out=batch_size)
 
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters

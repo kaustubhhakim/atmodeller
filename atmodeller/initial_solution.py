@@ -116,10 +116,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     )
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
 
-    # log_abundance() squeezes the leading batch dimension when unbatched, giving a 1-D array.
-    element_abundance: Float[Array, " n_elements"] = jnp.exp(
-        parameters.mass_constraints.log_abundance()
-    )
+    element_abundance: Float[Array, " n_elements"] = parameters.mass_constraints.abundance()
     # jax.debug.print("element_abundance = {out}", out=element_abundance)
 
     condensate_mask: Bool[Array, " n_species"] = jnp.asarray(

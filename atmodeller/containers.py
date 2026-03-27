@@ -15,7 +15,6 @@ from jax import lax
 from jaxmod.solvers import RootFindParameters
 from jaxmod.type_aliases import NpFloat, NpInt
 from jaxmod.units import unit_conversion
-from jaxmod.utils import get_batch_size
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import CompositionItem, Formula
 
@@ -547,17 +546,17 @@ class MassConstraintSet(eqx.Module):
     """A set of mass constraints
 
     Args:
-        abundance: Abundance
+        abundance_dict: Dictionary mapping element names to abundance (in moles) arrays. Note that
+            all elements in the species collection must be included as keys in the dictionary and
+            in the same order as the unique elements in the species collection. Elements for which
+            there are no active constraints should be included with abundance values of NaN.
         species: Species collection
-        units: Units of the abundance. Defaults to ``mass``.
     """
 
-    abundance: Float[Array, "#n_batch n_elements"] = eqx.field(converter=as_j64)
-    """Abundance"""
+    abundance_dict: dict[str, Array]
+    """Abundance dictionary mapping element name to abundance array"""
     species: SpeciesCollection
     """Species collection"""
-    units: Literal["mass", "moles"] = "mass"
-    """Units of the abundance"""
 
     @classmethod
     def create(
@@ -571,8 +570,8 @@ class MassConstraintSet(eqx.Module):
         Args:
             species: Species collection
             mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
-                ``None``.
-            units: Units of the abundance. Defaults to ``mass``.
+                ``None`` to create an empty set of mass constraints.
+            units: Units of ``mass_constraints``. Defaults to ``mass``.
 
         Returns:
             An instance
@@ -581,125 +580,122 @@ class MassConstraintSet(eqx.Module):
             mass_constraints if mass_constraints is not None else {}
         )
 
-        # FIXME: Must work on numpy arrays. get_batch_size only works on JAX arrays
-        # Determine the maximum length of any array in mass_constraints_
-        max_len: int = get_batch_size(mass_constraints_)
-
-        # Initialise to all nans — shape (batch, elements), always 2-D
-        shape: tuple[int, int] = (max_len, len(species.unique_elements))
-        abundance: NpFloat = np.full(shape, np.nan, dtype=float)
-
         # Populate mass constraints. This accommodates mass constraints given as mass or moles of
-        # species as well as elements
-        for nn, element in enumerate(species.unique_elements):
+        # species as well as elements.
+        abundance_dict: dict[str, Array] = {}
+
+        for element in species.unique_elements:
             element_sum: ArrayLike = 0
             for species_, value_ in mass_constraints_.items():
+                # Does the species formula contain the element? If not, skip to the next species.
                 try:
                     element_composition: CompositionItem = Formula(species_).composition()[element]
                 except KeyError:
                     continue
+                # Always convert to moles for storage
                 if units == "mass":
-                    # mass fraction
-                    scale: float = element_composition.fraction
+                    # value_ is in mass units, convert to moles
+                    # To get moles: (mass of element in species) / (molar mass of element)
+                    # But here, value_ is the mass of the species, so:
+                    # moles of element = (mass of species * element_composition.fraction) /
+                    # element molar mass
+                    element_index: int = species.get_element_index(element)
+                    element_molar_mass: float = species.element_molar_masses[element_index]
+                    scale: float = element_composition.fraction / element_molar_mass
                 elif units == "moles":
-                    # element count
+                    # element_composition.count is the atom count
+                    # value_ is in moles of species, so moles of element = count * value_
                     scale = element_composition.count
                 element_sum += scale * value_
 
-            if np.any(element_sum != 0):
-                # Broadcasts scalar along that column
-                abundance[:, nn] = element_sum
+            # All elements must be included as keys in the abundance dictionary, even if they
+            # are not present in any constraints. In the latter case, the abundance is set to
+            # NaN to indicate that the constraint is inactive.
+            if jnp.any(element_sum != 0):
+                abundance_dict[element] = as_j64(element_sum)
+            else:
+                abundance_dict[element] = as_j64(jnp.nan)
 
-        return cls(abundance, species, units)
+        return cls(abundance_dict, species)
 
-    def abundance_mol(self) -> Float[Array, "... n_elements"]:
-        """Abundance by moles for all elements
+    def abundance(self) -> Float[Array, " n_elements"]:
+        """Abundance array constructed from the abundance dictionary
+
+        .. warning::
+            This method should only be called inside a vmapped context so the abundance arrays are
+            correctly broadcast and the output array is always 1-D.
+
+        Returns:
+            Abundance array constructed from the abundance dictionary
+        """
+        arrays: list[Array] = [
+            self.abundance_dict[element] for element in self.species.unique_elements
+        ]
+        abundance_array: Float[Array, "... n_elements"] = jnp.stack(arrays, axis=-1)
+        # jax.debug.print("abundance_array = {out}", out=abundance_array)
+
+        return abundance_array
+
+    def abundance_mol(self, batch_size: int = 1) -> Float[Array, "#n_batch n_elements"]:
+        """Abundance by moles for all elements with broadcasting to a specified batch size.
+
+        Args:
+            batch_size: Batch size to broadcast the abundance arrays to. Defaults to ``1``.
 
         Returns:
             Abundance by moles for all elements
         """
-        if self.units == "mass":
-            return self.abundance / self.species.element_molar_masses
-        elif self.units == "moles":
-            return self.abundance
-        else:
-            raise ValueError("Units must be 'mass' or 'moles'")
+        arrays: list[Array] = []
 
-    def abundance_mass(self) -> Float[Array, "... n_elements"]:
-        """Abundance by mass for all elements
+        for element in self.species.unique_elements:
+            arr: Array = self.abundance_dict[element]
+            arr = jnp.broadcast_to(arr, (batch_size,) + arr.shape[1:])
+            arrays.append(arr)
+
+        abundance_array: Float[Array, "... n_elements"] = jnp.stack(arrays, axis=-1)
+        # jax.debug.print("abundance_array = {out}", out=abundance_array)
+
+        return abundance_array
+
+    def abundance_mass(self, batch_size: int = 1) -> Float[Array, "#n_batch n_elements"]:
+        """Abundance by mass for all elements with broadcasting to a specified batch size.
+
+        Args:
+            batch_size: Batch size to broadcast the abundance arrays to. Defaults to ``1``.
 
         Returns:
             Abundance by mass for all elements
         """
-        if self.units == "mass":
-            return self.abundance
-        elif self.units == "moles":
-            return self.abundance * self.species.element_molar_masses
-        else:
-            raise ValueError("Units must be 'mass' or 'moles'")
+        return self.abundance_mol(batch_size) * self.species.element_molar_masses
 
-    def log_abundance(self) -> Float[Array, "... n_elements"]:
-        """Element abundances in log-space
+    # TODO: reinstate this later
+    # def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
+    #     """Updates the abundance with new values from a dictionary
 
-        The output shape depends on the calling context:
+    #     Args:
+    #         new_abundances: Dictionary with new abundance values for some or all elements. The keys
+    #             should be element names and the values should be the new abundance values in the
+    #             same units as the original abundance. Original abundances that are not included in
+    #             the ``new_abundance`` dictionary will be retained.
 
-        - **Unbatched** (``abundance`` shape ``(1, elements)``): the leading singleton is squeezed
-          away, returning a 1-D array of shape ``(elements,)``.
-        - **Batched, not vmapped** (``abundance`` shape ``(batch, elements)``): returns a 2-D array
-          of shape ``(batch, elements)``.
-        - **Vmapped** (``abundance`` shape ``(elements,)`` inside the vmap): returns a 1-D array of
-          shape ``(elements,)``.
+    #     Returns:
+    #         A new MassConstraintSet with the updated abundance
+    #     """
+    #     abundance_updated: Array = self.abundance
 
-        ``atleast_1d`` guards against collapse to a scalar when there is only a single element.
+    #     for element, new_value in new_abundances.items():
+    #         element_index: int = self.species.get_element_index(element)
+    #         # TODO: decide if squeezing is necessary or if the input should be required to have the
+    #         # same shape as abundance
+    #         abundance_updated = abundance_updated.at[..., element_index].set(
+    #             jnp.squeeze(new_value)
+    #         )
 
-        Returns:
-            Log abundance by moles
-        """
-        log_abundance: Float[Array, "... elements"] = jnp.log(self.abundance_mol())
-        # Below was a consideration for handling native batching with an objective function that
-        # accepts 2-D arrays of shape (batch, elements), but this would require every operation
-        # in the full call chain — solubility laws, real-gas EOS, phase activity calculations - to
-        # be consistently broadcast-compatible with an arbitrary leading batch dimension. This is
-        # fragile: a single stray ``.squeeze()``, ``reshape``, or assumption of 1-D input anywhere
-        # in the pipeline silently produces wrong shapes. Vmapping is safer and more robust because
-        # each function only ever sees scalar (0-D) or 1-D inputs and JAX mechanically handles the
-        # batch dimension, making shape errors impossible by construction.
+    #     mass_constaint_set_update: MassConstraintSet = eqx.tree_at(
+    #         lambda c: c.abundance, self, abundance_updated
+    #     )
 
-        # Only squeeze the leading batch axis when unbatched (shape[0] == 1). A bare .squeeze()
-        # would also remove a trailing size-1 elements axis, collapsing (batch, 1) --> (batch,) and
-        # causing incorrect broadcasting against (batch, 1) totals.
-        if log_abundance.ndim == 2 and log_abundance.shape[0] == 1:
-            return log_abundance.squeeze(axis=0)
-
-        return jnp.atleast_1d(log_abundance)
-
-    def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
-        """Updates the abundance with new values from a dictionary
-
-        Args:
-            new_abundances: Dictionary with new abundance values for some or all elements. The keys
-                should be element names and the values should be the new abundance values in the
-                same units as the original abundance. Original abundances that are not included in
-                the ``new_abundance`` dictionary will be retained.
-
-        Returns:
-            A new MassConstraintSet with the updated abundance
-        """
-        abundance_updated: Array = self.abundance
-
-        for element, new_value in new_abundances.items():
-            element_index: int = self.species.get_element_index(element)
-            # TODO: decide if squeezing is necessary or if the input should be required to have the
-            # same shape as abundance
-            abundance_updated = abundance_updated.at[..., element_index].set(
-                jnp.squeeze(new_value)
-            )
-
-        mass_constaint_set_update: MassConstraintSet = eqx.tree_at(
-            lambda c: c.abundance, self, abundance_updated
-        )
-
-        return mass_constaint_set_update
+    #     return mass_constaint_set_update
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
@@ -707,7 +703,7 @@ class MassConstraintSet(eqx.Module):
         Returns:
             Mask indicating whether elemental mass constraints are active or not
         """
-        return ~jnp.isnan(self.log_abundance())
+        return ~jnp.isnan(self.abundance())
 
 
 class SolverParameters(RootFindParameters):
