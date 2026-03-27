@@ -20,7 +20,7 @@ from atmodeller.containers import (
 from atmodeller.interfaces import FugacityConstraintProtocol, SpeciesProtocol
 from atmodeller.jaxhelper import get_batch_size
 from atmodeller.reactions import ReactionSystem
-from atmodeller.state import ThermodynamicStateProtocol
+from atmodeller.state import BaseThermodynamicState
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class Parameters(eqx.Module):
         batch_size: Batch size. Defaults to ``1``.
     """
 
-    state: ThermodynamicStateProtocol
+    state: BaseThermodynamicState
     """Thermodynamic state"""
     fugacity_constraints: FugacityConstraintSet
     """Fugacity constraints"""
@@ -50,7 +50,7 @@ class Parameters(eqx.Module):
     @classmethod
     def create(
         cls,
-        state: ThermodynamicStateProtocol,
+        state: BaseThermodynamicState,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,

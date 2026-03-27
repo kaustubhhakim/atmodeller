@@ -42,7 +42,7 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import ThermodynamicStateProtocol
+from atmodeller.state import BaseThermodynamicState
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class EquilibriumModel:
         *,
         initial_log_number_moles: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
-        state: Optional[ThermodynamicStateProtocol] = None,
+        state: Optional[BaseThermodynamicState] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
