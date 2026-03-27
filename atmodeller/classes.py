@@ -28,7 +28,8 @@ from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import Parameters, SolverParameters, SpeciesNetwork
-from atmodeller.interfaces import FugacityConstraintProtocol, ThermodynamicStateProtocol
+from atmodeller.interfaces import (FugacityConstraintProtocol, ThermodynamicStateProtocol, 
+                                   ActivityConstraintProtocol)
 from atmodeller.output import Output, OutputDisequilibrium, OutputSolution
 from atmodeller.solvers import MultiAttemptSolution, make_independent_solver, make_solver
 from atmodeller.type_aliases import NpFloat
@@ -99,6 +100,7 @@ class EquilibriumModel:
         initial_log_stability: Optional[ArrayLike] = None,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
         solver: Literal["basic", "robust"] = "robust",
@@ -121,6 +123,7 @@ class EquilibriumModel:
             initial_log_stability: Initial log stability. Defaults to ``None``.
             state: Thermodynamic state. Defaults to ``None``.
             fugacity_constraints: Fugacity constraints. Defaults to ``None``.
+            activity_constraints: Activity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
             solver: Build a ``basic`` (faster compile time) or a ``robust`` (slower compile time)
@@ -128,7 +131,8 @@ class EquilibriumModel:
             solver_recompile: Force recompilation of the solver. Defaults to ``False``.
         """
         parameters: Parameters = Parameters.create(
-            self.species_network, state, fugacity_constraints, mass_constraints, solver_parameters
+            self.species_network, state, fugacity_constraints, activity_constraints, 
+            mass_constraints, solver_parameters
         )
         base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_moles,

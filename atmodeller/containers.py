@@ -44,6 +44,7 @@ from atmodeller.constants import (
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import (
     ActivityProtocol,
+    ActivityConstraintProtocol,
     FugacityConstraintProtocol,
     SolubilityProtocol,
     ThermodynamicStateProtocol,
@@ -631,6 +632,30 @@ class FixedFugacityConstraint(eqx.Module):
 
         return jnp.log(self.fugacity)
 
+class FixedActivityConstraint(eqx.Module):
+    """A fixed activity constraint
+
+    This must adhere to ActivityConstraintProtocol
+
+    Args:
+        activity: Activity. Defaults to ``np.nan``.
+    """
+    activity: Array = eqx.field(converter=as_j64, default=np.nan)
+
+    def active(self) -> Bool[Array, "..."]:
+        """Active activity constraint
+
+        Returns:
+            ``True`` if the activity constraint is active, otherwise ``False``
+        """
+        return ~jnp.isnan(self.activity)
+
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
+        del temperature
+        del pressure
+
+        return jnp.log(self.activity)
+
 
 class FugacityConstraintSet(eqx.Module):
     """A set of fugacity constraints
@@ -745,6 +770,102 @@ class FugacityConstraintSet(eqx.Module):
 
         return log_fugacity
 
+
+class ActivityConstraintSet(eqx.Module):
+    """A set of Activity constraints
+
+    These are applied as constraints on the condensed phase activity.
+
+    Args:
+        constraints: Activity constraints
+        species: Species network
+    """
+    constraints: tuple[ActivityConstraintProtocol, ...]
+    """Activity constraints"""
+    species_network: SpeciesNetwork
+    """Species network"""
+
+    @classmethod
+    def create(
+        cls,
+        species_network: SpeciesNetwork,
+        activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
+    ) -> "ActivityConstraintSet":
+        """Creates an instance
+
+        Args:
+            species_network: Species network
+            activity_constraints: Mapping of a species name and an activity constraint. Defaults to
+                ``None``.
+
+        Returns:
+            An instance
+        """
+        activity_constraints_: Mapping[str, ActivityConstraintProtocol] = (
+            activity_constraints if activity_constraints is not None else {}
+        )
+
+        constraints: list[ActivityConstraintProtocol] = []
+        for species_name in species_network.species_names:
+            if species_name in activity_constraints_:
+                constraints.append(activity_constraints_[species_name])
+            else:
+                constraints.append(FixedActivityConstraint())  # means "not constrained"
+        return cls(tuple(constraints), species_network)
+
+    def active(self) -> Bool[Array, "..."]:
+        """Active activity constraints
+
+        Returns:
+            Mask indicating whether activity constraints are active or not
+        """
+        return jnp.array([c.active() for c in self.constraints])
+    
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
+        """Gets a dictionary of the evaluated activity constraints as NumPy Arrays
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            A dictionary of the evaluated activity constraints
+        """
+        log_activity_list: list[NpFloat] = []
+
+        for constraint in self.constraints:
+            log_activity: NpFloat = np.asarray(constraint.log_activity(temperature, pressure))
+            log_activity_list.append(log_activity)
+
+        out: dict[str, NpArray] = {
+            f"{key}_activity": np.exp(np.atleast_1d(log_activity_list[idx]))
+            for idx, key in enumerate(self.species_network.species_names)
+            if not np.all(np.isnan(log_activity_list[idx]))
+        }
+
+        return out
+
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log activity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity
+        """
+        activity_funcs = [to_hashable(c.log_activity) for c in self.constraints]
+        temperature = as_j64(temperature)
+
+        def apply_activity(index, temperature, pressure):
+            return lax.switch(index, activity_funcs, temperature, pressure)
+
+        indices = jnp.arange(len(self.constraints))
+        vmap_activity: Callable = eqx.filter_vmap(apply_activity, in_axes=(0, None, None))
+        log_activity: Array = vmap_activity(indices, temperature, pressure)
+        return log_activity
+    
 
 class MassConstraintSet(eqx.Module):
     """A set of mass constraints
@@ -1005,6 +1126,7 @@ class Parameters(eqx.Module):
         species: Species network
         state: Thermodynamic state
         fugacity_constraints: Fugacity constraints
+        activity_constraints: Activity constraints
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
         batch_size: Batch size. Defaults to ``1``.
@@ -1016,6 +1138,8 @@ class Parameters(eqx.Module):
     """Thermodynamic state"""
     fugacity_constraints: FugacityConstraintSet
     """Fugacity constraints"""
+    activity_constraints: ActivityConstraintSet
+    """Activity constraints"""
     mass_constraints: MassConstraintSet
     """Mass constraints"""
     solver_parameters: SolverParameters
@@ -1029,6 +1153,7 @@ class Parameters(eqx.Module):
         species_network: SpeciesNetwork,
         state: Optional[ThermodynamicStateProtocol] = None,
         fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
     ):
@@ -1039,6 +1164,8 @@ class Parameters(eqx.Module):
             state: Thermodynamic state. Defaults to a new instance of ``Planet``.
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 a new instance of ``FugacityConstraints``.
+            activity_constraints: Mapping of a species name and an activity constraint. Defaults to
+                a new instance of ``ActivityConstraints``.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
                 a new instance of ``MassConstraints``.
             solver_parameters: Solver parameters. Defaults to a new instance of
@@ -1051,13 +1178,17 @@ class Parameters(eqx.Module):
         fugacity_constraints_: FugacityConstraintSet = FugacityConstraintSet.create(
             species_network, fugacity_constraints
         )
+        activity_constraints_: ActivityConstraintSet = ActivityConstraintSet.create(
+            species_network, activity_constraints
+        )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
             species_network, mass_constraints
         )
 
         # These pytrees only contain arrays intended for vectorisation (no hidden JAX/NumPy arrays
         # that should remain scalar)
-        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints))
+        batch_size: int = get_batch_size((state, fugacity_constraints, activity_constraints, 
+                                          mass_constraints))
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
@@ -1073,6 +1204,7 @@ class Parameters(eqx.Module):
             species_network,
             state_,
             fugacity_constraints_,
+            activity_constraints_,
             mass_constraints_,
             solver_parameters_,
             batch_size,

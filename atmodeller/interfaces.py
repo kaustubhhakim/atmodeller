@@ -38,6 +38,12 @@ class FugacityConstraintProtocol(Protocol):
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
+@runtime_checkable
+class ActivityConstraintProtocol(Protocol):
+    def active(self) -> Bool[Array, "..."]: ...
+    
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):

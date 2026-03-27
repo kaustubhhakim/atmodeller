@@ -531,6 +531,15 @@ def objective_function(
     #     out2=jnp.nanstd(fugacity_residual),
     # )
 
+    # Activity constraints residual 
+    # Computed for all species; inactive slots produce NaN which are dropped by the final mask.
+    log_activity_target: Float[Array, " species"] = parameters.activity_constraints.log_activity(
+        temperature, total_pressure
+    )
+    activity_residual: Float[Array, " species"] = log_activity - log_activity_target
+    # jax.debug.print("activity_residual = {out}", out=activity_residual)
+ 
+
     # Reaction network residual
     reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(
         parameters.species_network.reaction_matrix
@@ -622,7 +631,7 @@ def objective_function(
 
     # NOTE: Order must be identical to get_active_mask()
     residual: Float[Array, " residual"] = jnp.concatenate(
-        [fugacity_residual, reaction_residual, mass_residual, stability_residual]
+        [fugacity_residual, activity_residual, reaction_residual, mass_residual, stability_residual]
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
