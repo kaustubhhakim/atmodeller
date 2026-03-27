@@ -17,8 +17,8 @@ import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.constants import TEMPERATURE_REFERENCE
-from atmodeller.jaxhelper import FloatArray, as_j64, to_native_floats
-from atmodeller.sciencehelper import GAS_CONSTANT
+from atmodeller.jax_utils import FloatArray, as_j64, to_native_floats
+from atmodeller.sci_utils import GAS_CONSTANT
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory"""

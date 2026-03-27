@@ -37,8 +37,8 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     TSpecies_co,
 )
-from atmodeller.jaxhelper import FloatArray, NpFloat, NpInt, OptxSolver, as_j64, to_hashable
-from atmodeller.sciencehelper import unit_conversion
+from atmodeller.jax_utils import FloatArray, NpFloat, NpInt, OptxSolver, as_j64, to_hashable
+from atmodeller.sci_utils import unit_conversion
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
 from atmodeller.thermodata.core import (

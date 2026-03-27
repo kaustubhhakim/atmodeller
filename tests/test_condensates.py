@@ -19,10 +19,10 @@ from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
+from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.WARNING)

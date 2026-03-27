@@ -18,7 +18,7 @@ from atmodeller.containers import (
     SpeciesCollection,
 )
 from atmodeller.interfaces import FugacityConstraintProtocol, SpeciesProtocol
-from atmodeller.jaxhelper import get_batch_size
+from atmodeller.jax_utils import get_batch_size
 from atmodeller.reactions import ReactionSystem
 from atmodeller.state import BaseThermodynamicState
 

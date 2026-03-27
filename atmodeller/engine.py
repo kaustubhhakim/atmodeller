@@ -26,7 +26,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Integer
 
-from atmodeller.jaxhelper import FloatArray, safe_exp
+from atmodeller.jax_utils import FloatArray, safe_exp
 from atmodeller.parameters import Parameters
 
 

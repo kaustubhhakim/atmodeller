@@ -12,8 +12,8 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller.jaxhelper import as_j64
-from atmodeller.sciencehelper import unit_conversion
+from atmodeller.jax_utils import as_j64
+from atmodeller.sci_utils import unit_conversion
 from atmodeller.solubility.core import Solubility
 
 

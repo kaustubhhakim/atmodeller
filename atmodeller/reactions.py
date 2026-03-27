@@ -37,7 +37,7 @@ from jaxtyping import Array, ArrayLike, Float, Integer
 from atmodeller.constants import GAS_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.jaxhelper import (
+from atmodeller.jax_utils import (
     FloatArray,
     NpArray,
     NpBool,
@@ -50,9 +50,42 @@ from atmodeller.jaxhelper import (
 )
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
-from atmodeller.utilities import get_reaction_dictionary
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def get_reaction_dictionary(
+    reaction_matrix: NpFloat, species_names: Iterable[str]
+) -> dict[int, str]:
+    """Gets reactions as a dictionary.
+
+    Args:
+        reaction_matrix: Reaction matrix of shape (number_reactions, number_species)
+        species_names: Species names corresponding to the columns of the reaction matrix
+
+    Returns:
+        Reactions as a dictionary
+    """
+    reactions: dict[int, str] = {}
+
+    if reaction_matrix.size != 0:
+        for reaction_index in range(reaction_matrix.shape[0]):
+            reactants: str = ""
+            products: str = ""
+            for species_index, name in enumerate(species_names):
+                coeff: float = reaction_matrix[reaction_index, species_index].item()
+                if coeff != 0:
+                    if coeff < 0:
+                        reactants += f"{abs(coeff)} {name} + "
+                    else:
+                        products += f"{coeff} {name} + "
+
+            reactants = reactants.rstrip(" + ")
+            products = products.rstrip(" + ")
+            reaction: str = f"{reactants} = {products}"
+            reactions[reaction_index] = reaction
+
+    return reactions
 
 
 class PhaseIndex(eqx.Module):

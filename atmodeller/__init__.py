@@ -129,10 +129,10 @@ from atmodeller.reactions import (  # noqa: E402, F401
     ReactionNetwork,
     ReactionSystem,
 )
-from atmodeller.solvers import make_solver, make_solver_with_jit  # noqa: E402, F401
-from atmodeller.state import Planet, ThermodynamicState  # noqa: E402, F401
-from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401
-from atmodeller.utilities import (  # noqa: E402, F401
+from atmodeller.sci_utils import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
     earth_oceans_to_hydrogen_mass,
 )
+from atmodeller.solvers import make_solver, make_solver_with_jit  # noqa: E402, F401
+from atmodeller.state import Planet, ThermodynamicState  # noqa: E402, F401
+from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401

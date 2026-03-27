@@ -6,7 +6,7 @@
 
 from atmodeller.eos import RealGas
 from atmodeller.eos._holland_powell import H2O_cork_holland91_bounded, H2O_cork_holland98_bounded
-from atmodeller.sciencehelper import unit_conversion
+from atmodeller.sci_utils import unit_conversion
 
 
 def test_H2O_volume_1kbar(check_values) -> None:

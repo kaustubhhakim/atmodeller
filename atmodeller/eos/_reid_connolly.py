@@ -13,9 +13,8 @@ from jaxtyping import ArrayLike
 from atmodeller import override
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas, RedlichKwongABC
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, ExperimentalCalibration
 from atmodeller.thermodata import CriticalData, critical_data_dictionary
-from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = logging.getLogger(__name__)
 

@@ -13,11 +13,10 @@ from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.interfaces import RedoxBufferProtocol
-from atmodeller.jaxhelper import Scalar, safe_exp
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR, unit_conversion
+from atmodeller.jax_utils import Scalar, power_law, safe_exp
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, unit_conversion
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, fO2_temperature_correction
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import power_law
 
 Cl2_ano_dio_for_thomas21: Solubility = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5

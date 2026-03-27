@@ -20,8 +20,8 @@ from jaxtyping import Array, ArrayLike
 from atmodeller import override
 from atmodeller.constants import STANDARD_FUGACITY
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
-from atmodeller.jaxhelper import OptxSolver, as_j64, safe_exp, to_native_floats
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR
+from atmodeller.jax_utils import OptxSolver, as_j64, safe_exp, to_native_floats
+from atmodeller.sci_utils import GAS_CONSTANT_BAR
 from atmodeller.thermodata import CriticalData
 
 logger: logging.Logger = logging.getLogger(__name__)

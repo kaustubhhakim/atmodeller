@@ -24,10 +24,9 @@ from atmodeller.eos.core import (
     RedlichKwongImplicitGasABC,
     VirialCompensation,
 )
-from atmodeller.jaxhelper import Scalar, as_j64, to_native_floats
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR
+from atmodeller.jax_utils import Scalar, as_j64, to_native_floats
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, ExperimentalCalibration
 from atmodeller.thermodata import CriticalData, critical_data_dictionary
-from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = logging.getLogger(__name__)
 

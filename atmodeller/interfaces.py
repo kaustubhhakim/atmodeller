@@ -19,8 +19,8 @@ import equinox as eqx
 from jaxtyping import Array, ArrayLike, Bool
 from molmass import Formula
 
-from atmodeller.jaxhelper import FloatArray
-from atmodeller.sciencehelper import unit_conversion
+from atmodeller.jax_utils import FloatArray
+from atmodeller.sci_utils import unit_conversion
 
 
 class ChemicalSpeciesData(eqx.Module):

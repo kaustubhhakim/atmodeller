@@ -51,6 +51,10 @@ def as_j64(x: ArrayLike | tuple) -> FloatArray:  # pragma: no cover
     return jnp.asarray(x, dtype=jnp.float64)
 
 
+def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
+    return jnp.power(values, exponent) * constant
+
+
 def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
     """Computes a numerically stable elementwise exponential with explicit handling of -inf.
 

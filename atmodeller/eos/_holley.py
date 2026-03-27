@@ -15,9 +15,13 @@ from atmodeller import override
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.jaxhelper import OptxSolver, Scalar
-from atmodeller.sciencehelper import ATMOSPHERE, GAS_CONSTANT_BAR, unit_conversion
-from atmodeller.utilities import ExperimentalCalibration
+from atmodeller.jax_utils import OptxSolver, Scalar
+from atmodeller.sci_utils import (
+    ATMOSPHERE,
+    GAS_CONSTANT_BAR,
+    ExperimentalCalibration,
+    unit_conversion,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 

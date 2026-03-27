@@ -9,11 +9,11 @@ from collections.abc import Callable
 import numpy as np
 import numpy.testing as nptest
 import pytest
+from atmodeller.jax_utils import as_j64
 from jaxtyping import Array, ArrayLike
 
 from atmodeller.eos import RealGas, get_eos_models
 from atmodeller.eos.core import RealGasBase
-from atmodeller.jaxhelper import as_j64
 
 # logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)

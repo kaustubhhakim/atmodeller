@@ -59,7 +59,7 @@ from openpyxl.styles import PatternFill
 
 from atmodeller import override
 from atmodeller.containers import FugacityConstraintSet, MassConstraintSet, MultiAttemptSolution
-from atmodeller.jaxhelper import FloatArray, NpArray
+from atmodeller.jax_utils import FloatArray, NpArray
 from atmodeller.parameters import Parameters
 from atmodeller.phases import (
     GasPhaseOutput,

@@ -57,8 +57,8 @@ from molmass import Formula
 from atmodeller import override
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol, TSpecies_co
-from atmodeller.jaxhelper import FloatArray, as_j64, masked_logsumexp, safe_exp, to_hashable
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR, unit_conversion
+from atmodeller.jax_utils import FloatArray, as_j64, masked_logsumexp, safe_exp, to_hashable
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, unit_conversion
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 # Due to a Pyright bug (#4965). See Equinox documentation.

@@ -53,7 +53,7 @@ from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import MultiAttemptSolution
 from atmodeller.engine import objective_function
 from atmodeller.initial_solution import auto_initial_guess
-from atmodeller.jaxhelper import FloatArray, expand_mask, max_norm, vmap_axes_spec
+from atmodeller.jax_utils import FloatArray, expand_mask, max_norm, vmap_axes_spec
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 

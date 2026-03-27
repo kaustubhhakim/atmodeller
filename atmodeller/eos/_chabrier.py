@@ -23,9 +23,8 @@ from atmodeller.constants import STANDARD_PRESSURE
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos._aggregators import CombinedRealGas, CombinedRealGasFugacity
 from atmodeller.eos.core import IdealGas, RealGas, RealGasBase
-from atmodeller.jaxhelper import as_j64, to_native_floats
-from atmodeller.sciencehelper import GAS_CONSTANT_BAR, unit_conversion
-from atmodeller.utilities import ExperimentalCalibration
+from atmodeller.jax_utils import as_j64, to_native_floats
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, ExperimentalCalibration, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 

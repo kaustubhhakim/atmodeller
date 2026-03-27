@@ -12,9 +12,8 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool
 
 from atmodeller import override
-from atmodeller.jaxhelper import Scalar, as_j64, to_native_floats
-from atmodeller.sciencehelper import unit_conversion
-from atmodeller.utilities import ExperimentalCalibration
+from atmodeller.jax_utils import Scalar, as_j64, to_native_floats
+from atmodeller.sci_utils import ExperimentalCalibration, unit_conversion
 
 
 class RedoxBuffer(eqx.Module):

@@ -4,8 +4,9 @@
 
 """Tests for the EOS models from :cite:t:`HWZ58`"""
 
+from atmodeller.sci_utils import unit_conversion
+
 from atmodeller.eos import RealGas
-from atmodeller.sciencehelper import unit_conversion
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
 # table in the paper don't quite match exactly with what we compute. Hence relax the tolerance.

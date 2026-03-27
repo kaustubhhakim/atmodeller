@@ -18,11 +18,11 @@ from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
+from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.DEBUG)

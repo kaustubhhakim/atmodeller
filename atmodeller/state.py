@@ -43,10 +43,10 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.jaxhelper import FloatArray, as_j64
+from atmodeller.jax_utils import FloatArray, as_j64
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
-from atmodeller.sciencehelper import GRAVITATIONAL_CONSTANT, unit_conversion
+from atmodeller.sci_utils import GRAVITATIONAL_CONSTANT, unit_conversion
 
 
 class BaseThermodynamicState(eqx.Module):
