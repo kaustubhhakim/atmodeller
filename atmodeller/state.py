@@ -31,9 +31,10 @@ All classes are designed for use in JAX-based scientific workflows and can be ex
 complex planetary models.
 """
 
+from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import asdict
-from typing import Protocol, runtime_checkable
+from typing import Self
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -42,6 +43,7 @@ from jaxmod.type_aliases import FloatArray
 from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 
+from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jaxhelper import as_j64
@@ -49,43 +51,33 @@ from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
 
 
-@runtime_checkable
-class ThermodynamicStateProtocol(Protocol):
+class BaseThermodynamicState(eqx.Module):
     reaction_system: ReactionSystem
+    """Reaction system representing the thermodynamic state of the system"""
+    pressure: FloatArray
+    """Pressure in bar. Should not be used directly; use :meth:`get_pressure` instead"""
+    temperature: FloatArray
+    """Temperature in K"""
+
+    @abstractmethod
+    def __init__(self, *args, **kwargs) -> None: ...
 
     @property
-    def phase_system(self) -> PhaseSystem: ...
+    def phase_system(self) -> PhaseSystem:
+        """Phase system representing the thermodynamic state of the planetary body"""
+        return self.reaction_system.phase_system
 
-    @property
-    def pressure(self) -> Float[Array, "..."]:
-        """Pressure in bar
-
-        Note:
-            This should not be used directly; use :meth:`get_pressure` instead to ensure the
-            correct pressure is used based on the state of the system.
-        """
-        ...
-
-    @property
-    def temperature(self) -> Float[Array, "..."]:
-        """Temperature in K"""
-        ...
-
-    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> Float[Array, "..."]:
+    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Pressure in bar"""
         ...
 
-    def asdict(
-        self, log_number_moles: Float[Array, "... n_species"]
-    ) -> dict[str, Float[Array, "..."]]:
-        """Dictionary representation"""
+    def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
+        """Gets a dictionary representation."""
         ...
 
 
-class ThermodynamicState(eqx.Module):
+class ThermodynamicState(BaseThermodynamicState):
     """A generic thermodynamic state
-
-    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the system
@@ -98,9 +90,10 @@ class ThermodynamicState(eqx.Module):
     temperature: FloatArray
     """Temperature in K"""
     pressure: FloatArray
-    """Pressure in bar"""
+    """Pressure in bar. Should not be used directly; use :meth:`get_pressure` instead"""
 
     # For helpful typing information
+    @override
     def __init__(
         self, reaction_system: ReactionSystem, temperature: ArrayLike, pressure: ArrayLike
     ):
@@ -121,7 +114,7 @@ class ThermodynamicState(eqx.Module):
         melt_species: Iterable[SpeciesProtocol] = (),
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
-    ) -> "ThermodynamicState":
+    ) -> Self:
         r"""Creates a new instance.
 
         Args:
@@ -134,9 +127,10 @@ class ThermodynamicState(eqx.Module):
             temperature: Temperature in K. Defaults to ``2000`` K.
             molar_mass: Molar mass. Defaults to 60 g mol\ :sup:`-1`, which is a typical value for
                 silicate melts based on SiO\ :sub:`2`.
-            melt_species: Iterable of species in the melt phase
-            solid_species: Iterable of species in the solid phase
-            condensates: Iterable of pure phases representing condensates in the system
+            melt_species: Iterable of species in the melt phase. Defaults to an empty tuple.
+            solid_species: Iterable of species in the solid phase. Defaults to an empty tuple.
+            condensates: Iterable of pure phases representing condensates in the system. Defaults
+                to an empty tuple.
 
         Returns:
             An instance
@@ -152,11 +146,7 @@ class ThermodynamicState(eqx.Module):
 
         return cls(reaction_system, temperature, pressure)
 
-    @property
-    def phase_system(self) -> PhaseSystem:
-        """Phase system representing the thermodynamic state of the planetary body"""
-        return self.reaction_system.phase_system
-
+    @override
     def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Gets the pressure.
 
@@ -167,8 +157,9 @@ class ThermodynamicState(eqx.Module):
 
         return self.pressure
 
+    @override
     def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
-        """Gets a dictionary of the values as NumPy arrays.
+        """Gets a dictionary representation.
 
         Args:
             log_number_moles: Log number of moles for all species in the system
@@ -194,10 +185,18 @@ class ThermodynamicState(eqx.Module):
         return base_dict
 
 
-class ThinAtmospherePlanet(eqx.Module):
-    """A new planet class
+class ThinAtmospherePlanet(BaseThermodynamicState):
+    """A planet with a thin atmosphere.
 
-    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
+    In this context, "thin atmosphere" means that the surface gravity is determined solely by the
+    mass of the planet (i.e., the solid/liquid body), and is not compensated or significantly
+    altered by the presence of an extended or massive atmosphere above. This is appropriate for
+    cases where the atmospheric mass is much less than the planetary mass, so the gravitational
+    acceleration at the surface is set by the planet alone, not by any self-gravitating atmospheric
+    shell. Note, however, that the surface gravity is self-consistently computed from the combined
+    mass of the condensed phases (melt and solid) and the metallic core.
+
+    Default values are for a fully molten Earth.
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the planetary body
@@ -219,13 +218,14 @@ class ThinAtmospherePlanet(eqx.Module):
     """Pressure in bar"""
 
     # For helpful typing information
+    @override
     def __init__(
         self,
         reaction_system: ReactionSystem,
-        surface_radius: ArrayLike = 6371000,
-        metallic_core_mass: ArrayLike = 1.7637387774048892e24,
-        temperature: ArrayLike = 2000,
-        pressure: ArrayLike = jnp.nan,
+        surface_radius: ArrayLike,
+        metallic_core_mass: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
     ):
         self.reaction_system = reaction_system
         self.surface_radius = as_j64(surface_radius)
@@ -248,7 +248,7 @@ class ThinAtmospherePlanet(eqx.Module):
         melt_species: Iterable[SpeciesProtocol] = (),
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
-    ):
+    ) -> Self:
         r"""Creates a new instance.
 
         Args:
@@ -264,9 +264,10 @@ class ThinAtmospherePlanet(eqx.Module):
                 balance at the surface.
             molar_mass: Molar mass. Defaults to 60 g mol\ :sup:`-1`, which is a typical value for
                 silicate melts based on SiO\ :sub:`2`.
-            melt_species: Iterable of species in the melt phase
-            solid_species: Iterable of species in the solid phase
-            condensates: Iterable of pure phases representing condensates in the system
+            melt_species: Iterable of species in the melt phase. Defaults to an empty tuple.
+            solid_species: Iterable of species in the solid phase. Defaults to an empty tuple.
+            condensates: Iterable of pure phases representing condensates in the system. Defaults
+                to an empty tuple.
 
         Returns:
             An instance
@@ -283,11 +284,6 @@ class ThinAtmospherePlanet(eqx.Module):
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
         return cls(reaction_system, surface_radius, metallic_core_mass, temperature, pressure)
-
-    @property
-    def phase_system(self) -> PhaseSystem:
-        """Phase system representing the thermodynamic state of the planetary body"""
-        return self.reaction_system.phase_system
 
     @property
     def surface_area(self) -> FloatArray:
@@ -337,7 +333,8 @@ class ThinAtmospherePlanet(eqx.Module):
 
         return surface_gravity
 
-    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> Float[Array, "..."]:
+    @override
+    def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Gets the pressure.
 
         A pressure is used if specified, otherwise the default behaviour is to compute the
@@ -360,24 +357,23 @@ class ThinAtmospherePlanet(eqx.Module):
         gas_mass: Float[Array, "... 1"] = jnp.exp(
             self.phase_system.gas.get_log_phase_mass(log_number_moles_gas)
         )
-        gas_mass_squeeze: Float[Array, "..."] = jnp.squeeze(gas_mass, axis=-1)
+        gas_mass_squeeze: FloatArray = jnp.squeeze(gas_mass, axis=-1)
         # jax.debug.print("gas_mass = {out}", out=gas_mass_squeeze)
 
-        surface_gravity: Float[Array, "..."] = self.get_surface_gravity(log_number_moles)
-        mechanical_pressure: Float[Array, "..."] = (
+        surface_gravity: FloatArray = self.get_surface_gravity(log_number_moles)
+        mechanical_pressure: FloatArray = (
             gas_mass_squeeze * surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
         )
         # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
 
-        pressure: Float[Array, "..."] = jnp.where(
-            pressure_specified, self.pressure, mechanical_pressure
-        )
+        pressure: FloatArray = jnp.where(pressure_specified, self.pressure, mechanical_pressure)
         # jax.debug.print("pressure = {out}", out=pressure)
 
         return pressure
 
+    @override
     def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
-        """Gets a dictionary of the values as NumPy arrays.
+        """Gets a dictionary representation.
 
         Args:
             log_number_moles: Log number of moles for all species in the system
@@ -396,11 +392,13 @@ class ThinAtmospherePlanet(eqx.Module):
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
         base_dict["temperature"] = self.temperature
-        base_dict["pressure"] = self.pressure
+        base_dict["pressure"] = self.get_pressure(log_number_moles)
 
         return base_dict
 
 
+# TODO: This is the previous implementation, but retained for the time being until the outputs are
+# fully supported in the new implementation. It will be removed in the future.
 class ThinAtmospherePlanetPrevious(eqx.Module):
     r"""A planet with a thin atmosphere.
 
