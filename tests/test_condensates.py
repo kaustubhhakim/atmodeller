@@ -7,15 +7,19 @@
 import logging
 from typing import Any
 
+import jax
 import numpy as np
-from jaxtyping import ArrayLike
+from jaxtyping import ArrayLike, PRNGKeyArray
 from molmass import Formula
 
 from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.output import Output
+from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, PurePhase
+from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -30,28 +34,47 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
 
-gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
-graphite: PurePhase = PurePhase.create("C", state="s")
+# Gas species
+H2O_g = ChemicalSpecies.create_gas("H2O")
+H2_g = ChemicalSpecies.create_gas("H2")
+O2_g = ChemicalSpecies.create_gas("O2")
+CO_g = ChemicalSpecies.create_gas("CO")
+CO2_g = ChemicalSpecies.create_gas("CO2")
+CH4_g = ChemicalSpecies.create_gas("CH4")
 
-CHO_model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(graphite,))
+# Condensates
+graphite: PurePhase = PurePhase.from_species("C", state="s")
+water: PurePhase = PurePhase.from_species("H2O", state="l")
+
+key: PRNGKeyArray = jax.random.PRNGKey(0)
+key, subkey = jax.random.split(key)  # Split the key for use in this function
 
 
 def test_graphite_stable() -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
 
-    planet: Planet = Planet(temperature=873)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates = (graphite,)
+
+    planet: Planet = Planet.create(gas_species, temperature=873, condensates=condensates)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
+
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 5 * h_kg
     o_kg: ArrayLike = 2.73159e19
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -71,9 +94,7 @@ def test_graphite_stable() -> None:
         },
     }
 
-    # CHO_model.output.to_excel("test_graphite_stable")
-
-    assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_unstable() -> None:
@@ -82,16 +103,24 @@ def test_graphite_unstable() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    planet: Planet = Planet(temperature=1400)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates = (graphite,)
+
+    planet: Planet = Planet.create(gas_species, temperature=1400, condensates=condensates)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -109,25 +138,29 @@ def test_graphite_unstable() -> None:
         "condensates": {"C_s": {"species": {"activity": {"C_s": 0.12202}}}},
     }
 
-    # CHO_model.output.to_excel("test_graphite_unstable")
+    # output.to_excel("test_graphite_unstable")
 
-    assert CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_water_stable() -> None:
     """Condensed water at 10 bar"""
 
-    gas: GasPhase = GasPhase.create(("H2", "H2O", "O2"))
-    water: PurePhase = PurePhase.create("H2O", state="l")
-    planet: Planet = Planet(temperature=411.75)
-    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(water,))
+    gas_species = (H2_g, H2O_g, O2_g)
+    condensates = (water,)
+
+    planet: Planet = Planet.create(gas_species, temperature=411.75, condensates=condensates)
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 1.14375e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {"partial_pressure": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
@@ -136,26 +169,29 @@ def test_water_stable() -> None:
         },
     }
 
-    # CHO_model.output.to_excel("test_water_stable")
+    # output.to_excel("test_water_stable")
 
-    assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_water_stable() -> None:
     """Tests C and water in equilibrium at 430 K and 10 bar"""
 
-    gas: GasPhase = GasPhase.create(("H2O", "H2", "O2", "CO", "CO2", "CH4"))
-    water: PurePhase = PurePhase.create("H2O", state="l")
-    graphite: PurePhase = PurePhase.create("C", state="s")
-    planet: Planet = Planet(temperature=430)
-    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(water, graphite))
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates = (water, graphite)
+
+    planet: Planet = Planet.create(gas_species, temperature=430, condensates=condensates)
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
     o_kg: float = 2.48298883581636e21
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    model.solve(state=planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -176,9 +212,9 @@ def test_graphite_water_stable() -> None:
         },
     }
 
-    # CHO_model.output.to_excel("test_graphite_water_stable")
+    # output.to_excel("test_graphite_water_stable")
 
-    assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_impose_stable() -> None:
@@ -192,7 +228,7 @@ def test_impose_stable() -> None:
     gas: GasPhase = GasPhase.create(("H2", "N2", "CH4", "CHN", "H"))
     graphite: PurePhase = PurePhase((C_cr,))
 
-    model: EquilibriumModel = EquilibriumModel(gas, condensate_phases=(graphite,))
+    model: EquilibriumModel = EquilibriumModel(gas, condensates=(graphite,))
 
     # Set the temperature and pressure
     state: ThermodynamicState = ThermodynamicState(
