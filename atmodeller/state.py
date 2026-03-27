@@ -204,6 +204,9 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         metallic_core_mass: Metallic core mass in kg
         temperature: Temperature in K
         pressure: Pressure in bar
+        default_planet_mass: Planet mass in kg from only the background melt and solid mass, plus
+            the metallic core mass. This value will only be equal to the actual planet mass if
+            ``include_in_phase_mass`` is ``False`` for all species in the melt and solid phases.
     """
 
     reaction_system: ReactionSystem
@@ -216,6 +219,8 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
     """Temperature in K"""
     pressure: FloatArray
     """Pressure in bar"""
+    default_planet_mass: FloatArray
+    """Planet mass in kg from only the background melt and solid mass, plus the metallic core mass"""
 
     # For helpful typing information
     @override
@@ -226,12 +231,14 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         metallic_core_mass: ArrayLike,
         temperature: ArrayLike,
         pressure: ArrayLike,
+        default_planet_mass: ArrayLike,
     ):
         self.reaction_system = reaction_system
         self.surface_radius = as_j64(surface_radius)
         self.metallic_core_mass = as_j64(metallic_core_mass)
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
+        self.default_planet_mass = as_j64(default_planet_mass)
 
     @classmethod
     def create(
@@ -283,7 +290,9 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         phase_system = PhaseSystem(gas, melt=melt, solid=solid, condensates=tuple(condensates))
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
-        return cls(reaction_system, surface_radius, metallic_core_mass, temperature, pressure)
+        return cls(
+            reaction_system, surface_radius, metallic_core_mass, temperature, pressure, planet_mass
+        )
 
     @property
     def surface_area(self) -> FloatArray:
