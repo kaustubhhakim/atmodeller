@@ -5,7 +5,7 @@
 """Tests for H-O systems"""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import jax
@@ -15,12 +15,12 @@ from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import __version__, debug_logger
 from atmodeller.containers import ChemicalSpecies, FixedFugacityConstraint, ReservoirSpecies
-from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import Planet
+from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -61,10 +61,10 @@ def test_version() -> None:
 def test_H2O() -> None:
     """Tests a single species (H2O)."""
 
-    gas_species = (H2O_g,)
-    melt_species = (H2O_d,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g,)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -72,7 +72,7 @@ def test_H2O() -> None:
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -88,9 +88,9 @@ def test_H2O() -> None:
 def test_H_O() -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
 
-    planet: Planet = Planet.create(gas_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -99,7 +99,7 @@ def test_H_O() -> None:
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -123,10 +123,10 @@ def test_H_O() -> None:
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
-    melt_species = (H2O_d,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -138,7 +138,7 @@ def test_H_fO2() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -162,10 +162,10 @@ def test_H_fO2() -> None:
 def test_H_fO2_fH2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility and mixed fugacity constraints."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
-    melt_species = (H2O_d,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "H2_g": FixedFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
@@ -180,7 +180,7 @@ def test_H_fO2_fH2() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -208,7 +208,7 @@ def test_H_fO2_fH2() -> None:
 def test_H_fO2_batch_temperature() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of surface temperatures."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species = (H2O_d,)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
@@ -229,7 +229,7 @@ def test_H_fO2_batch_temperature() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -274,10 +274,10 @@ def test_H_fO2_batch_temperature() -> None:
 def test_H_fO2_batch_fO2_shift() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of fO2 shifts."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
-    melt_species = (H2O_d,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     # Set up a range of fO2 shifts
     num: int = 4
@@ -294,7 +294,7 @@ def test_H_fO2_batch_fO2_shift() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -339,10 +339,10 @@ def test_H_fO2_batch_fO2_shift() -> None:
 def test_H_fO2_batch_H_mass() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of H budgets."""
 
-    gas_species = (H2_g, H2O_g, O2_g)
-    melt_species = (H2O_d,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
+    melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -355,7 +355,7 @@ def test_H_fO2_batch_H_mass() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 

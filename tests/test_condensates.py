@@ -5,6 +5,7 @@
 """Tests for C-H-O systems with stable or unstable condensates"""
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import jax
@@ -19,7 +20,7 @@ from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import Planet, ThermodynamicState
+from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -55,10 +56,12 @@ key, subkey = jax.random.split(key)  # Split the key for use in this function
 def test_graphite_stable() -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-    condensates = (graphite,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates: tuple[PurePhase, ...] = (graphite,)
 
-    planet: Planet = Planet.create(gas_species, temperature=873, condensates=condensates)
+    planet: BaseThermodynamicState = Planet.create(
+        gas_species, temperature=873, condensates=condensates
+    )
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
@@ -74,7 +77,7 @@ def test_graphite_stable() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -105,10 +108,12 @@ def test_graphite_unstable() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-    condensates = (graphite,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates: tuple[PurePhase, ...] = (graphite,)
 
-    planet: Planet = Planet.create(gas_species, temperature=1400, condensates=condensates)
+    planet: BaseThermodynamicState = Planet.create(
+        gas_species, temperature=1400, condensates=condensates
+    )
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
@@ -120,7 +125,7 @@ def test_graphite_unstable() -> None:
         planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -148,10 +153,12 @@ def test_graphite_unstable() -> None:
 def test_water_stable() -> None:
     """Condensed water at 10 bar"""
 
-    gas_species = (H2_g, H2O_g, O2_g)
-    condensates = (water,)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
+    condensates: tuple[PurePhase, ...] = (water,)
 
-    planet: Planet = Planet.create(gas_species, temperature=411.75, condensates=condensates)
+    planet: BaseThermodynamicState = Planet.create(
+        gas_species, temperature=411.75, condensates=condensates
+    )
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -160,7 +167,7 @@ def test_water_stable() -> None:
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -179,10 +186,12 @@ def test_water_stable() -> None:
 def test_graphite_water_stable() -> None:
     """Tests C and water in equilibrium at 430 K and 10 bar"""
 
-    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-    condensates = (water, graphite)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+    condensates: tuple[PurePhase, ...] = (water, graphite)
 
-    planet: Planet = Planet.create(gas_species, temperature=430, condensates=condensates)
+    planet: BaseThermodynamicState = Planet.create(
+        gas_species, temperature=430, condensates=condensates
+    )
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
@@ -191,7 +200,7 @@ def test_graphite_water_stable() -> None:
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
@@ -222,13 +231,13 @@ def test_graphite_water_stable() -> None:
 def test_impose_stable() -> None:
     """Tests a user-imposed stable condensate"""
 
-    gas_species = (H2_g, N2_g, CH4_g, CHN_g, H_g)
+    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, N2_g, CH4_g, CHN_g, H_g)
 
     # Since in this example we do not provide carbon in the injected gas stream, we cannot solve
     # for the stability of any carbon-bearing products because in order to do so requires
     # specification of the mass of carbon in the system.
-    graphite = PurePhase.from_species("C", state="s", solve_for_stability=False)
-    condensates = (graphite,)
+    graphite: PurePhase = PurePhase.from_species("C", state="s", solve_for_stability=False)
+    condensates: tuple[PurePhase, ...] = (graphite,)
 
     # Set the temperature and pressure
     state: ThermodynamicState = ThermodynamicState.create(
@@ -245,7 +254,7 @@ def test_impose_stable() -> None:
 
     parameters: Parameters = Parameters.create(state, mass_constraints=mass_constraints)
 
-    solver = make_solver_with_jit(parameters)
+    solver: Callable = make_solver_with_jit(parameters)
 
     output: Output = solver(parameters, subkey)
 
