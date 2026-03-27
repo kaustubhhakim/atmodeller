@@ -13,12 +13,11 @@ from jaxtyping import ArrayLike, PRNGKeyArray
 from molmass import Formula
 
 from atmodeller import debug_logger
-from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, PurePhase
+from atmodeller.phases import PurePhase
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
@@ -41,6 +40,9 @@ O2_g = ChemicalSpecies.create_gas("O2")
 CO_g = ChemicalSpecies.create_gas("CO")
 CO2_g = ChemicalSpecies.create_gas("CO2")
 CH4_g = ChemicalSpecies.create_gas("CH4")
+N2_g = ChemicalSpecies.create_gas("N2")
+CHN_g = ChemicalSpecies.create_gas("CHN")
+H_g = ChemicalSpecies.create_gas("H")
 
 # Condensates
 graphite: PurePhase = PurePhase.from_species("C", state="s")
@@ -220,19 +222,17 @@ def test_graphite_water_stable() -> None:
 def test_impose_stable() -> None:
     """Tests a user-imposed stable condensate"""
 
+    gas_species = (H2_g, N2_g, CH4_g, CHN_g, H_g)
+
     # Since in this example we do not provide carbon in the injected gas stream, we cannot solve
     # for the stability of any carbon-bearing products because in order to do so requires
     # specification of the mass of carbon in the system.
-    C_cr = ChemicalSpecies.create_condensed("C", state="s", solve_for_stability=False)
-
-    gas: GasPhase = GasPhase.create(("H2", "N2", "CH4", "CHN", "H"))
-    graphite: PurePhase = PurePhase((C_cr,))
-
-    model: EquilibriumModel = EquilibriumModel(gas, condensates=(graphite,))
+    graphite = PurePhase.from_species("C", state="s", solve_for_stability=False)
+    condensates = (graphite,)
 
     # Set the temperature and pressure
-    state: ThermodynamicState = ThermodynamicState(
-        temperature=1773.15, melt_fraction=0, pressure=1
+    state: ThermodynamicState = ThermodynamicState.create(
+        gas_species, pressure=1, temperature=1773.15, condensates=condensates
     )
 
     # Define the mole fractions of input gases
@@ -243,7 +243,11 @@ def test_impose_stable() -> None:
         key: value * Formula(key).mass for key, value in mole_fractions.items()
     }
 
-    model.solve(state=state, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters.create(state, mass_constraints=mass_constraints)
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -261,6 +265,6 @@ def test_impose_stable() -> None:
         },
     }
 
-    # CHO_model.output.to_excel("test_impose_stable")
+    # output.to_excel("test_impose_stable")
 
-    assert model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

@@ -95,10 +95,67 @@ class ThermodynamicState(eqx.Module):
 
     reaction_system: ReactionSystem
     """Reaction system representing the thermodynamic state of the system"""
-    temperature: FloatArray = eqx.field(converter=as_j64)
+    temperature: FloatArray
     """Temperature in K"""
-    pressure: FloatArray = eqx.field(converter=as_j64)
+    pressure: FloatArray
     """Pressure in bar"""
+
+    # For helpful typing information
+    def __init__(
+        self, reaction_system: ReactionSystem, temperature: ArrayLike, pressure: ArrayLike
+    ):
+        self.reaction_system = reaction_system
+        self.temperature = as_j64(temperature)
+        self.pressure = as_j64(pressure)
+
+    @classmethod
+    def create(
+        cls,
+        gas_species: Iterable[ChemicalSpecies],
+        pressure: ArrayLike,
+        *,
+        mass: ArrayLike = 1.0,
+        melt_fraction: ArrayLike = 0.0,
+        temperature: ArrayLike = 2000,
+        molar_mass: ArrayLike = 60e-3,
+        melt_species: Iterable[SpeciesProtocol] = (),
+        solid_species: Iterable[SpeciesProtocol] = (),
+        condensates: Iterable[PurePhase] = (),
+    ) -> "ThermodynamicState":
+        r"""Creates a new instance.
+
+        Args:
+            gas_species: Iterable of species in the gas phase
+            pressure: Pressure in bar
+            mass: Mass in kg. Defaults to ``1`` kg (reference unit mass).
+            melt_fraction: Melt fraction. Defaults to ``1.0``.
+            surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m
+                (Earth).
+            temperature: Temperature in K. Defaults to ``2000`` K.
+            molar_mass: Molar mass. Defaults to 60 g mol\ :sup:`-1`, which is a typical value for
+                silicate melts based on SiO\ :sub:`2`.
+            melt_species: Iterable of species in the melt phase
+            solid_species: Iterable of species in the solid phase
+            condensates: Iterable of pure phases representing condensates in the system
+
+        Returns:
+            An instance
+        """
+        background_melt_mass: ArrayLike = mass * melt_fraction
+        background_solid_mass: ArrayLike = mass * (1 - melt_fraction)
+
+        gas: GasPhase = GasPhase(gas_species)
+        melt: MeltPhase = MeltPhase(melt_species, background_melt_mass, molar_mass)
+        solid: SolidPhase = SolidPhase(solid_species, background_solid_mass, molar_mass)
+        phase_system = PhaseSystem(gas, melt=melt, solid=solid, condensates=tuple(condensates))
+        reaction_system: ReactionSystem = ReactionSystem(phase_system)
+
+        return cls(reaction_system, temperature, pressure)
+
+    @property
+    def phase_system(self) -> PhaseSystem:
+        """Phase system representing the thermodynamic state of the planetary body"""
+        return self.reaction_system.phase_system
 
     def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Gets the pressure.
@@ -110,8 +167,34 @@ class ThermodynamicState(eqx.Module):
 
         return self.pressure
 
+    def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
+        """Gets a dictionary of the values as NumPy arrays.
 
-class ThinAtmospherePlanetNew(eqx.Module):
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
+        Returns:
+            A dictionary of the values
+        """
+        del log_number_moles
+
+        # FIXME: This breaks because of nested phase system
+        # base_dict: dict[str, Array] = asdict(self)
+        base_dict = {}
+        # TODO: Reinstate these outputs?
+        # base_dict["mantle_mass"] = self.mantle_mass
+        # base_dict["mantle_melt_mass"] = self.mantle_melt_mass
+        # base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        # base_dict["metallic_core_mass"] = self.metallic_core_mass
+        # base_dict["surface_area"] = self.surface_area
+        # base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
+        base_dict["temperature"] = self.temperature
+        base_dict["pressure"] = self.pressure
+
+        return base_dict
+
+
+class ThinAtmospherePlanet(eqx.Module):
     """A new planet class
 
     This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
@@ -149,11 +232,6 @@ class ThinAtmospherePlanetNew(eqx.Module):
         self.metallic_core_mass = as_j64(metallic_core_mass)
         self.temperature = as_j64(temperature)
         self.pressure = as_j64(pressure)
-
-    @property
-    def phase_system(self) -> PhaseSystem:
-        """Phase system representing the thermodynamic state of the planetary body"""
-        return self.reaction_system.phase_system
 
     @classmethod
     def create(
@@ -205,6 +283,11 @@ class ThinAtmospherePlanetNew(eqx.Module):
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
         return cls(reaction_system, surface_radius, metallic_core_mass, temperature, pressure)
+
+    @property
+    def phase_system(self) -> PhaseSystem:
+        """Phase system representing the thermodynamic state of the planetary body"""
+        return self.reaction_system.phase_system
 
     @property
     def surface_area(self) -> FloatArray:
@@ -504,4 +587,4 @@ class ThinAtmospherePlanetPrevious(eqx.Module):
 
 
 # The only planet supported so far is one with a thin atmosphere
-Planet = ThinAtmospherePlanetNew
+Planet = ThinAtmospherePlanet
