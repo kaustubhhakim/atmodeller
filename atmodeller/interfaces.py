@@ -16,9 +16,11 @@ there would create a circular import.
 from typing import Optional, Protocol, TypeVar, runtime_checkable
 
 import equinox as eqx
-from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool, Float
+from jaxtyping import Array, ArrayLike, Bool
 from molmass import Formula
+
+from atmodeller.jaxhelper import FloatArray
+from atmodeller.sciencehelper import unit_conversion
 
 
 class ChemicalSpeciesData(eqx.Module):
@@ -133,13 +135,11 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     """Pressure at which to evaluate the buffer, or None to use the total pressure"""
 
     @property
-    def log10_shift(self) -> Float[Array, "..."]:
+    def log10_shift(self) -> FloatArray:
         """Log10 shift relative to the buffer"""
         ...
 
-    def log10_fugacity_buffer(
-        self, temperature: ArrayLike, pressure: ArrayLike
-    ) -> Float[Array, "..."]:
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
         """Log10 fugacity at the unshifted buffer
 
         Args:
@@ -151,7 +151,7 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
         """
         ...
 
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
         """Log10 fugacity including any shift
 
         Args:
@@ -179,7 +179,7 @@ class SolubilityProtocol(Protocol):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Float[Array, "..."]:
+    ) -> FloatArray:
         r"""Concentration in ppmw
 
         Args:
@@ -195,7 +195,7 @@ class SolubilityProtocol(Protocol):
 
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> Float[Array, "..."]:
+    ) -> FloatArray:
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:

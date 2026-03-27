@@ -4,12 +4,18 @@
 
 """Helpers for JAX operations"""
 
-import logging
-from collections.abc import Callable
+# import logging
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, TypeAlias
 
 import jax
 import jax.numpy as jnp
+import numpy as np
+import numpy.typing as npt
+import optimistix as optx
+import pandas as pd
 from jax.scipy.special import logsumexp
+from jax.tree_util import tree_map
 from jaxtyping import Array, ArrayLike, Bool, Float, PyTree
 
 MAX_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).max)
@@ -17,15 +23,35 @@ MAX_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).max)
 MIN_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).tiny)
 """Lower bound for stable exp() before underflow to zero"""
 
-logger: logging.Logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# Type aliases
+NpArray: TypeAlias = npt.NDArray
+"""NumPy array"""
+NpBool: TypeAlias = npt.NDArray[np.bool_]
+"""NumPy :obj:`numpy.bool_` array"""
+NpFloat: TypeAlias = npt.NDArray[np.float64]
+"""NumPy :obj:`numpy.float64` array"""
+NpInt: TypeAlias = npt.NDArray[np.int_]
+"""NumPy :obj:`numpy.int_` array"""
+Scalar: TypeAlias = int | float
+"""Scalar"""
+OptxSolver: TypeAlias = (
+    optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+)
+"""Optimistix solver"""
+
+# JAX types
+FloatArray: TypeAlias = Float[Array, "..."]
+"""Float array of any shape"""
+
+# logger: logging.Logger = logging.getLogger(__name__)
+# logger.setLevel(logging.DEBUG)
 
 
-def as_j64(x: ArrayLike | tuple) -> Float[Array, "..."]:  # pragma: no cover
+def as_j64(x: ArrayLike | tuple) -> FloatArray:  # pragma: no cover
     return jnp.asarray(x, dtype=jnp.float64)
 
 
-def safe_exp(x: ArrayLike) -> Array:
+def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
     """Computes a numerically stable elementwise exponential with explicit handling of -inf.
 
     This function extends ``jnp.exp`` with safeguards for common numerical issues:
@@ -69,7 +95,7 @@ def safe_exp(x: ArrayLike) -> Array:
 
 def masked_logsumexp(
     log_x: Float[Array, "... n"], axis: int = -1, keepdims: bool = True
-) -> Float[Array, "..."]:
+) -> FloatArray:  # pragma: no cover
     """Computes a numerically stable log-sum-exp with explicit masking of -inf values.
 
     This function extends the standard ``logsumexp`` with support for masked inputs, where ``-inf``
@@ -103,16 +129,16 @@ def masked_logsumexp(
     is_finite: Bool[Array, "..."] = jnp.isfinite(log_x)
 
     # Replace -inf with large negative number (safe for autodiff)
-    safe_log_x: Float[Array, "..."] = jnp.where(is_finite, log_x, neg_large)
+    safe_log_x: FloatArray = jnp.where(is_finite, log_x, neg_large)
 
-    out: Float[Array, "..."] = logsumexp(safe_log_x, axis=axis, keepdims=keepdims)
+    out: FloatArray = logsumexp(safe_log_x, axis=axis, keepdims=keepdims)
 
     # If everything was masked -> return -inf (strict logic)
     all_invalid: Bool[Array, "..."] = ~jnp.any(is_finite, axis=axis, keepdims=keepdims)
-    out: Float[Array, "..."] = jnp.where(all_invalid, -jnp.inf, out)
+    out: FloatArray = jnp.where(all_invalid, -jnp.inf, out)
 
     # Kill gradients if nothing exists
-    # out: Float[Array, "..."] = jnp.where(all_invalid, jax.lax.stop_gradient(out), out)
+    # out: FloatArray = jnp.where(all_invalid, jax.lax.stop_gradient(out), out)
 
     return out
 
@@ -156,3 +182,189 @@ def get_batch_size(x: PyTree) -> int:  # pragma: no cover
             # logger.debug("max_size: %s", max_size)
 
     return max_size
+
+
+def to_native_floats(value: Any) -> Any:
+    """Recursively converts any structure to nested tuples of native floats.
+
+    Args:
+        value: A scalar, list/tuple/array of floats, or nested thereof
+
+    Returns:
+        A float or nested tuple of floats
+    """
+    # Scalars (covers Python, NumPy, JAX scalars)
+    if jnp.isscalar(value):
+        return float(value)
+
+    # Pandas DataFrame: convert to list of rows (as tuples)
+    if isinstance(value, pd.DataFrame):
+        iterable: Iterable = value.itertuples(index=False, name=None)
+        return tuple(to_native_floats(row) for row in iterable)
+
+    # Array-like (NumPy, JAX)
+    if hasattr(value, "ndim"):
+        return tuple(to_native_floats(sub) for sub in value.tolist())
+
+    # Generic iterables (lists, tuples, etc.)
+    try:
+        iterable = list(value)
+    except Exception:
+        raise TypeError(f"Cannot convert to float or iterate over type {type(value)}")
+
+    return tuple(to_native_floats(item) for item in iterable)
+
+
+def get_batch_axis(x: Any) -> Literal[0, None]:
+    """Determines the batch axis for a JAX array.
+
+    Determines whether an object should be treated as batched along axis ``0`` for
+    :func:`jax.vmap`.
+
+    This function only considers JAX arrays for batching. While :func:`equinox.is_array` regards
+    both JAX and NumPy arrays as arrays for tracing, NumPy arrays are treated here as static
+    constants and are never batched. This allows fixed matrices to remain inside pytrees without
+    being inadvertently vectorised.
+
+    Rules:
+        - 1-D JAX arrays: Batched along axis 0
+        - 2-D JAX arrays: Batched along axis 0 if ``shape[0]``>1
+        - 0-D (scalar) JAX arrays: Not batched
+        - NumPy arrays or other objects: Not batched
+
+    Args:
+        x: Object to check for batching
+
+    Returns:
+        ``0`` if batched along axis ``0``, otherwise ``None``
+    """
+    if isinstance(x, jax.Array):
+        # Vectorise over any 1-D array
+        if x.ndim == 1:
+            return 0
+        # Any 2-D array should be vectorised over the first dimension if it is not unity
+        elif x.ndim == 2 and x.shape[0] > 1:
+            return 0
+    return None  # explicit fallback
+
+
+def vmap_axes_spec(x: PyTree) -> PyTree[Literal[0, None]]:
+    """Recursively generate ``in_axes`` for :func:`jax.vmap` over a pytree.
+
+    Only JAX arrays are considered for batching. NumPy arrays and other objects are treated as
+    static constants (not batched).
+
+    Args:
+        x: A pytree potentially containing JAX arrays, NumPy arrays, or scalars
+
+    Returns:
+        A pytree with the same structure as ``x``. Each leaf is ``0`` if batched, or ``None``
+        if not.
+    """
+    return tree_map(get_batch_axis, x)
+
+
+def partial_rref(matrix: NpArray) -> NpArray:
+    """Computes a partial reduced row echelon form (RREF) to determine linear components.
+
+    This function performs the computation using NumPy in-place operations and is therefore not
+    compatible with JAX transformations. The returned matrix represents the linear components of
+    the input, extracted from the augmented RREF procedure.
+
+    Args:
+        matrix: A 2-D NumPy array of shape (nrows, ncols).
+
+    Returns:
+        A :class:`numpy.ndarray` containing the linear components.
+    """
+    nrows, ncols = matrix.shape
+
+    augmented_matrix: NpArray = np.hstack((matrix, np.eye(nrows)))
+    # logger.debug("augmented_matrix = \n%s", augmented_matrix)
+    # Permutation matrix
+    # P: NpArray = np.eye(nrows)
+
+    # Forward elimination with partial pivoting
+    for i in range(min(nrows, ncols)):
+        # Pivot selection with check
+        nonzero: NpInt = np.flatnonzero(augmented_matrix[i:, i])
+        # logger.debug("nonzero = %s", nonzero)
+        if nonzero.size == 0:
+            # logger.debug("i: %d. No pivot in this column.", i)
+            continue  # no pivot in this column
+        # Absolute row index of first non-zero index
+        pivot_row: np.int_ = nonzero[0] + i
+        # Swap if pivot row is not already in place
+        if pivot_row != i:
+            augmented_matrix[[i, pivot_row], :] = augmented_matrix[[pivot_row, i], :]
+            # P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
+
+        # Perform row operations to eliminate values below the pivot.
+        pivot_value: np.float64 = augmented_matrix[i, i]
+        if i + 1 < nrows:
+            factors = augmented_matrix[i + 1 :, i : i + 1] / pivot_value  # shape (nrows-i-1, 1)
+            augmented_matrix[i + 1 :] -= factors * augmented_matrix[i]
+
+    # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
+
+    # Backward substitution
+    for i in range(min(nrows, ncols) - 1, -1, -1):
+        pivot_value = augmented_matrix[i, i]
+        if pivot_value == 0:
+            # logger.debug("i: %d. Pivot is zero, skipping backward elimination.", i)
+            continue  # skip columns with no pivot
+        # Normalize the pivot row.
+        augmented_matrix[i] /= augmented_matrix[i, i]
+
+        # Eliminate entries above the pivot
+        if i > 0:
+            factors = augmented_matrix[:i, i : i + 1] / pivot_value  # shape (i, 1)
+            augmented_matrix[:i] -= factors * augmented_matrix[i]
+
+    # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
+
+    # reduced_matrix: NpArray = augmented_matrix[:, :ncols]
+    component_matrix: NpArray = augmented_matrix[min(ncols, nrows) :, ncols:]
+    # logger.debug("reduced_matrix = \n%s", reduced_matrix)
+    # logger.debug("component_matrix = \n%s", component_matrix)
+    # logger.debug("permutation_matrix = \n%s", P)
+
+    return component_matrix
+
+
+def max_norm(
+    objective_function: Callable, solution: Float[Array, "... solution"], parameters: PyTree
+) -> FloatArray:  # pragma: no cover
+    """Computes the L-infinity norm of batched objective residuals.
+
+    Evaluates the objective function for each model in the batch and returns the maximum absolute
+    residual across all components of each system. This is a vectorised variant of
+    :func:`optimistix.max_norm`, producing one scalar L-infinity norm per system in the batch.
+
+    See: https://docs.kidger.site/optimistix/api/norms/
+
+    Args:
+        objective_function: A callable taking ``solution`` and ``parameters`` that returns the
+            objective residuals for each model in the batch
+        solution: Batched array of candidate solutions
+        parameters: Parameters passed to the objective function
+
+    Returns:
+        An array of the L-infinity norm
+    """
+    return jnp.linalg.norm(objective_function(solution, parameters), ord=jnp.inf, axis=-1)
+
+
+def expand_mask(
+    mask: Bool[Array, "..."], target: Float[Array, "... solution"]
+) -> Bool[Array, "... 1"]:
+    """Expands a batch mask to broadcast over trailing solution dimensions.
+
+    Args:
+        mask: Boolean array indicating  entries to update
+        target: Array with shape ``(... solution)`` that the mask will be expanded to match
+
+    Returns:
+        Boolean array with shape ``(... 1)`` that can be broadcast to the shape of ``target``
+    """
+    return jnp.reshape(mask, mask.shape + (1,) * (target.ndim - mask.ndim))

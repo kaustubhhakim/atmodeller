@@ -12,14 +12,14 @@ import logging
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.utils import to_native_floats
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.constants import STANDARD_PRESSURE
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
+from atmodeller.jaxhelper import to_native_floats
+from atmodeller.sciencehelper import GAS_CONSTANT_BAR
 from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -31,11 +31,10 @@ from typing import Optional, cast
 
 import jax
 import jax.numpy as jnp
-from jaxmod.solvers import MultiAttemptSolution
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import SolverParameters
+from atmodeller.containers import MultiAttemptSolution, SolverParameters
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters

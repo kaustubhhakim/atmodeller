@@ -16,9 +16,10 @@ from typing import Optional
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
-from jaxmod.constants import OCEAN_MASS_H2
-from jaxmod.type_aliases import NpFloat, Scalar
 from jaxtyping import Array, ArrayLike
+
+from atmodeller.jaxhelper import NpFloat, Scalar
+from atmodeller.sciencehelper import OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 

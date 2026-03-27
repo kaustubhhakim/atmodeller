@@ -10,12 +10,12 @@ from typing import Any, Generic, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
+import lineax as lx
 import numpy as np
+import optimistix as optx
 from jax import lax
-from jaxmod.solvers import RootFindParameters
-from jaxmod.type_aliases import NpFloat, NpInt
-from jaxmod.units import unit_conversion
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PyTree
+from lineax import AbstractLinearSolver
 from molmass import CompositionItem, Formula
 
 from atmodeller.constants import (
@@ -37,7 +37,8 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     TSpecies_co,
 )
-from atmodeller.jaxhelper import as_j64, to_hashable
+from atmodeller.jaxhelper import FloatArray, NpFloat, NpInt, OptxSolver, as_j64, to_hashable
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
 from atmodeller.thermodata.core import (
@@ -426,7 +427,7 @@ class FixedFugacityConstraint(eqx.Module):
         """
         return ~jnp.isnan(self.fugacity)
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
         """Log fugacity
 
         Args:
@@ -706,6 +707,50 @@ class MassConstraintSet(eqx.Module):
         return ~jnp.isnan(self.abundance())
 
 
+class RootFindParameters(eqx.Module):
+    """Parameters for Optimistix root finding
+
+    Args:
+        solver: Solver. Defaults to :class:`optimistix.Newton`.
+        atol: Absolute tolerance. Defaults to ``1.0e-6``.
+        rtol: Relative tolerance. Defaults to ``1.0e-6``.
+        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=False)``.
+        norm: Norm. Defaults to :func:`optimistix.max_norm`.
+        throw: How to report any failures. Defaults to ``False``.
+        max_steps: The maximum number of steps the solver can take. Defaults to ``256``.
+        jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
+            Can be either ``fwd`` or ``bwd``. Defaults to ``fwd``.
+    """
+
+    solver: type[OptxSolver] = optx.Newton
+    """Solver"""
+    atol: float = 1.0e-6
+    """Absolute tolerance"""
+    rtol: float = 1.0e-6
+    """Relative tolerance"""
+    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
+    """Linear solver (see https://docs.kidger.site/lineax/api/solvers/)"""
+    norm: Callable = optx.max_norm
+    """Norm"""
+    throw: bool = False
+    """How to report any failures"""
+    max_steps: int = 256
+    """Maximum number of steps the solver can take"""
+    jac: Literal["fwd", "bwd"] = "fwd"
+    """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
+
+    def get_solver_instance(self) -> OptxSolver:
+        """Instantiates the solver"""
+        return self.solver(
+            rtol=self.rtol,
+            atol=self.atol,
+            norm=self.norm,
+            linear_solver=self.linear_solver,  # type: ignore because there is a parameter
+            # For debugging LM solver. Not valid for all solvers (e.g. Newton)
+            # verbose=frozenset({"step_size", "y", "loss", "accepted"}),
+        )
+
+
 class SolverParameters(RootFindParameters):
     """Solver parameters
 
@@ -795,3 +840,74 @@ class SolverParameters(RootFindParameters):
         )
 
         return bound
+
+
+class MultiAttemptSolution(eqx.Module):  # pragma: no cover
+    """A solution wrapper for handling multiple solver attempts per problem
+
+    This class standardises solver outputs from multi-attempt strategies. Some attributes
+    (e.g. ``converged``, ``solver_success``, ``num_steps``) are broadcast to the batch dimension
+    to ensure consistent shapes across all outputs, whether the underlying solver returns scalar
+    or per-attempt values.
+
+    Args:
+        solution: Optimistix solution
+        _attempts: Number of attempts required for each batch element to converge (``0`` indicates
+            no successful attempt). Defaults to ``0``.
+    """
+
+    solution: optx.Solution
+    _attempts: ArrayLike = 0
+
+    @property
+    def attempts(self) -> Integer[Array, " batch"]:
+        return jnp.broadcast_to(self._attempts, self.batch_shape)
+
+    @property
+    def aux(self):
+        return self.solution.aux
+
+    @property
+    def batch_shape(self) -> tuple[int, ...]:
+        """Batch shape (all dimensions except the trailing solution dimension)"""
+        return self.solution.value.shape[:-1]
+
+    @property
+    def converged(self) -> Bool[Array, " batch"]:
+        """Boolean mask indicating objective-based convergence"""
+        return jnp.broadcast_to(self.attempts > 0, self.batch_shape)
+
+    @property
+    def num_steps(self) -> Integer[Array, " batch"]:
+        """Number of steps"""
+        return jnp.broadcast_to(self.stats["num_steps"], self.batch_shape)
+
+    @property
+    def result(self) -> optx.RESULTS:
+        return self.solution.result
+
+    @property
+    def value(self) -> Float[Array, "batch solution"]:
+        return self.solution.value
+
+    @property
+    def solver_success(self) -> Bool[Array, " batch"]:
+        """Whether the underlying solver claims success"""
+        return jnp.broadcast_to(self.solution.result == optx.RESULTS.successful, self.batch_shape)
+
+    @property
+    def state(self) -> Any:
+        return self.solution.state
+
+    @property
+    def stats(self) -> dict[str, PyTree[ArrayLike]]:
+        return self.solution.stats
+
+    def asdict(self) -> dict[str, ArrayLike]:
+        """Converts pertinent solution statistics to a dictionary"""
+        return {
+            "status": self.solver_success,
+            "steps": self.num_steps,
+            "attempts": self.attempts,
+            "converged": self.converged,
+        }

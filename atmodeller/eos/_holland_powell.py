@@ -11,9 +11,6 @@ from collections.abc import Callable
 import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
-from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.type_aliases import Scalar
-from jaxmod.utils import to_native_floats
 from jaxtyping import Array, ArrayLike
 from scipy.constants import kilo
 
@@ -27,7 +24,8 @@ from atmodeller.eos.core import (
     RedlichKwongImplicitGasABC,
     VirialCompensation,
 )
-from atmodeller.jaxhelper import as_j64
+from atmodeller.jaxhelper import Scalar, as_j64, to_native_floats
+from atmodeller.sciencehelper import GAS_CONSTANT_BAR
 from atmodeller.thermodata import CriticalData, critical_data_dictionary
 from atmodeller.utilities import ExperimentalCalibration
 

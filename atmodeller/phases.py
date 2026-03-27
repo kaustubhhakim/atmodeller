@@ -51,16 +51,14 @@ from typing import TYPE_CHECKING, ClassVar, Generic, Self, TypeVar
 import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
-from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.type_aliases import FloatArray
-from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 
 from atmodeller import override
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol, TSpecies_co
-from atmodeller.jaxhelper import as_j64, masked_logsumexp, safe_exp, to_hashable
+from atmodeller.jaxhelper import FloatArray, as_j64, masked_logsumexp, safe_exp, to_hashable
+from atmodeller.sciencehelper import GAS_CONSTANT_BAR, unit_conversion
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 # Due to a Pyright bug (#4965). See Equinox documentation.

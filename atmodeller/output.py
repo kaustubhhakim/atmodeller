@@ -54,13 +54,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-from jaxmod.solvers import MultiAttemptSolution
-from jaxmod.type_aliases import NpArray
 from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
-from atmodeller.containers import FugacityConstraintSet, MassConstraintSet
+from atmodeller.containers import FugacityConstraintSet, MassConstraintSet, MultiAttemptSolution
+from atmodeller.jaxhelper import FloatArray, NpArray
 from atmodeller.parameters import Parameters
 from atmodeller.phases import (
     GasPhaseOutput,
@@ -270,7 +269,7 @@ class BaseOutputDict(eqx.Module):
         return solid_output
 
     @property
-    def _temperature(self) -> Float[Array, "..."]:
+    def _temperature(self) -> FloatArray:
         """Temperature in K"""
         return self.parameters.state.temperature
 
@@ -280,7 +279,7 @@ class BaseOutputDict(eqx.Module):
         return jnp.atleast_1d(self._temperature)[:, None]
 
     @property
-    def _pressure(self) -> Float[Array, "..."]:
+    def _pressure(self) -> FloatArray:
         """Pressure in bar"""
         return self.parameters.state.get_pressure(self.log_number_moles)
 

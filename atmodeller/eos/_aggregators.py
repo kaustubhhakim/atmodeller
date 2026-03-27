@@ -13,13 +13,12 @@ from collections.abc import Callable, Sequence
 import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
-from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.utils import to_native_floats
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.eos.core import IdealGas, RealGas, RealGasBase
-from atmodeller.jaxhelper import as_j64, to_hashable
+from atmodeller.jaxhelper import as_j64, to_hashable, to_native_floats
+from atmodeller.sciencehelper import GAS_CONSTANT_BAR
 from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -9,11 +9,11 @@ For every law there should be a test in the test suite.
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.jaxhelper import as_j64
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.solubility.core import Solubility
 
 

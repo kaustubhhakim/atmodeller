@@ -9,13 +9,11 @@ from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.type_aliases import Scalar
-from jaxmod.units import unit_conversion
-from jaxmod.utils import to_native_floats
 from jaxtyping import Array, ArrayLike, Bool
 
 from atmodeller import override
-from atmodeller.jaxhelper import as_j64
+from atmodeller.jaxhelper import Scalar, as_j64, to_native_floats
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.utilities import ExperimentalCalibration
 
 

@@ -4,9 +4,8 @@
 
 """Tests for the EOS models from :cite:t:`CD21`"""
 
-from jaxmod.units import unit_conversion
-
 from atmodeller.eos import RealGas
+from atmodeller.sciencehelper import unit_conversion
 
 MODEL_SUFFIX: str = "chabrier21"
 """Suffix of the :cite:t:`CD21` models"""

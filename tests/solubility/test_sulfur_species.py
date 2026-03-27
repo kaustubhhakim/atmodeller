@@ -8,11 +8,11 @@ import inspect
 import logging
 
 import numpy as np
-from jaxmod.units import unit_conversion
 from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solubility.core import Solubility
 from atmodeller.thermodata import IronWustiteBuffer

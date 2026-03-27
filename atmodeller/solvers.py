@@ -33,7 +33,7 @@ Main entry points:
 - :func:`make_batch_retry_solver_from_parameters`: Builds a batch retry solver from parameters
 - :func:`make_tau_sweep_solver`: Returns a tau sweep solver for active stability systems
 
-Most solvers return results as :class:`jaxmod.solvers.MultiAttemptSolution` or
+Most solvers return results as :class:`atmodeller.containers.MultiAttemptSolution` or
 :class:`~atmodeller.output.Output` objects, with detailed convergence and step statistics.
 """
 
@@ -46,23 +46,26 @@ import jax.numpy as jnp
 import optimistix as optx
 from equinox._enum import EnumerationItem
 from jax import lax, random
-from jaxmod.solvers import POSTCHECK_TOLERANCE, MultiAttemptSolution, expand_mask, max_norm
-from jaxmod.utils import vmap_axes_spec
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
 from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
+from atmodeller.containers import MultiAttemptSolution
 from atmodeller.engine import objective_function
 from atmodeller.initial_solution import auto_initial_guess
+from atmodeller.jaxhelper import FloatArray, expand_mask, max_norm, vmap_axes_spec
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 
 LOG_NUMBER_MOLES_VMAP_AXES: int = 0
 """Axis index for the solution array in the vmapped batch solver"""
+POSTCHECK_TOLERANCE: float = 1.0e-6
+"""Default tolerance for the objective-based convergence validation performed after each solve
+attempt"""
 
 
 def solve_single_with_auto_guess(
-    initial_guess: Float[Array, "..."], parameters: Parameters
+    initial_guess: FloatArray, parameters: Parameters
 ) -> optx.Solution:
     """Solves a single (unbatched) system via :func:`optimistix.root_find`.
 
@@ -126,7 +129,7 @@ def make_batch_solver(parameters: Parameters) -> Callable:
         parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` with ``attempts=1``
+        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` with ``attempts=1``
     """
     solver_function_vmapped: Callable = eqx.filter_vmap(
         solve_single_with_auto_guess,
@@ -145,7 +148,7 @@ def make_batch_solver(parameters: Parameters) -> Callable:
             *args: Unused; present for interface consistency with :func:`make_batch_retry_solver`
 
         Returns:
-            :class:`jaxmod.solvers.MultiAttemptSolution` with ``attempts=1`` for all batch elements
+            :class:`atmodeller.containers.MultiAttemptSolution` with ``attempts=1`` for all batch elements
         """
         del args
         sol: optx.Solution = solver_function_vmapped(solution, parameters)
@@ -168,7 +171,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
         objective_function: Callable for the objective function
 
     Returns:
-        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
+        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` object
     """
 
     # For debugging to determine if this function is jittable in isolation
@@ -209,7 +212,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
                 each solve attempt. Defaults to :obj:`POSTCHECK_TOLERANCE`.
 
         Returns:
-            :class:`jaxmod.solvers.MultiAttemptSolution` object
+            :class:`atmodeller.containers.MultiAttemptSolution` object
         """
 
         def body_fn(state: tuple[Array, Array, Array, Array, Array, Array]) -> tuple:
@@ -457,7 +460,7 @@ def make_batch_retry_solver_from_parameters(parameters: Parameters) -> Callable:
         parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
+        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` object
     """
     batch_solver: Callable = make_batch_solver(parameters)
     objective_function_vmapped: Callable = eqx.filter_vmap(
@@ -482,7 +485,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
             :func:`make_batch_retry_solver_from_parameters`
 
     Returns:
-        Callable that returns a :class:`jaxmod.solvers.MultiAttemptSolution` object
+        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` object
     """
     get_leaf: Callable = lambda t: t.solver_parameters.tau  # noqa: E731
     varying_schedule: Float[Array, " tau"] = jnp.logspace(
@@ -508,7 +511,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
             key: JAX PRNG key for reproducible random perturbations
 
         Returns:
-            :class:`~jaxmod.solvers.MultiAttemptSolution` object
+            :class:`atmodeller.containers.MultiAttemptSolution` object
         """
 
         def solve_tau_step(carry: tuple, tau: Float[Array, " ..."]) -> tuple[tuple, tuple]:
@@ -643,7 +646,7 @@ def make_solver(parameters: Parameters) -> Callable:
     def solver(
         parameters: Parameters,
         key: PRNGKeyArray,
-        base_solution_array: Float[Array, "..."] = jnp.array(jnp.nan),
+        base_solution_array: FloatArray = jnp.array(jnp.nan),
     ) -> Output:
         """JIT-compiled entry point that dispatches to the appropriate solver branch.
 

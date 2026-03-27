@@ -38,17 +38,15 @@ from typing import Self
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxmod.constants import GRAVITATIONAL_CONSTANT
-from jaxmod.type_aliases import FloatArray
-from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike, Bool, Float
 
 from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.jaxhelper import as_j64
+from atmodeller.jaxhelper import FloatArray, as_j64
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
+from atmodeller.sciencehelper import GRAVITATIONAL_CONSTANT, unit_conversion
 
 
 class BaseThermodynamicState(eqx.Module):
@@ -436,19 +434,19 @@ class ThinAtmospherePlanetPrevious(eqx.Module):
             60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
     """
 
-    planet_mass: Float[Array, "..."]
+    planet_mass: FloatArray
     """Mass of the planet in kg"""
-    core_mass_fraction: Float[Array, "..."]
+    core_mass_fraction: FloatArray
     r"""Mass fraction of the core relative to the planetary mass in kg kg\ :sup:`-1`"""
-    mantle_melt_fraction: Float[Array, "..."]
+    mantle_melt_fraction: FloatArray
     r"""Mass fraction of the molten mantle in kg kg\ :sup:`-1`"""
-    surface_radius: Float[Array, "..."]
+    surface_radius: FloatArray
     """Radius of the surface in m"""
-    temperature: Float[Array, "..."]
+    temperature: FloatArray
     """Temperature in K"""
-    pressure: Float[Array, "..."]
+    pressure: FloatArray
     """Pressure in bar"""
-    molar_mass: Float[Array, "..."]
+    molar_mass: FloatArray
     r"""Molar mass of the silicate in kg mol\ :sup:`-1`"""
 
     def __init__(
@@ -470,82 +468,82 @@ class ThinAtmospherePlanetPrevious(eqx.Module):
         self.molar_mass = as_j64(molar_mass)
 
     @property
-    def mantle_mass(self) -> Float[Array, "..."]:
+    def mantle_mass(self) -> FloatArray:
         """Mantle mass in kg"""
         return self.planet_mass * self.mantle_mass_fraction
 
     @property
-    def mantle_moles(self) -> Float[Array, "..."]:
+    def mantle_moles(self) -> FloatArray:
         """Moles of the mantle"""
         return self.mantle_mass / self.molar_mass
 
     @property
-    def mantle_mass_fraction(self) -> Float[Array, "..."]:
+    def mantle_mass_fraction(self) -> FloatArray:
         r"""Mantle mass fraction in kg kg\ :sup:`-1`"""
         return 1 - self.core_mass_fraction
 
     @property
-    def mantle_melt_mass(self) -> Float[Array, "..."]:
+    def mantle_melt_mass(self) -> FloatArray:
         """Mass of the molten mantle"""
         return self.mantle_mass * self.mantle_melt_fraction
 
     @property
-    def mantle_melt_moles(self) -> Float[Array, "..."]:
+    def mantle_melt_moles(self) -> FloatArray:
         """Moles of the molten mantle"""
         return self.mantle_melt_mass / self.molar_mass
 
     @property
-    def mantle_solid_mass(self) -> Float[Array, "..."]:
+    def mantle_solid_mass(self) -> FloatArray:
         """Mass of the solid mantle"""
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
 
     @property
-    def mantle_solid_moles(self) -> Float[Array, "..."]:
+    def mantle_solid_moles(self) -> FloatArray:
         """Moles of the solid mantle"""
         return self.mantle_solid_mass / self.molar_mass
 
     @property
-    def surface_area(self) -> Float[Array, "..."]:
+    def surface_area(self) -> FloatArray:
         """Surface area"""
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
     @property
-    def surface_gravity(self) -> Float[Array, "..."]:
+    def surface_gravity(self) -> FloatArray:
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
     # The following properties ensure compliance with ThermodynamicStateProtocol
     @property
-    def mass(self) -> Float[Array, "..."]:
+    def mass(self) -> FloatArray:
         """Mantle mass in kg (alias for :attr:`mantle_mass`)"""
         return self.mantle_mass
 
     @property
-    def melt_fraction(self) -> Float[Array, "..."]:
+    def melt_fraction(self) -> FloatArray:
         r"""Mantle melt fraction in kg kg\ :sup:`-1` (alias for :attr:`mantle_melt_fraction`)"""
         return self.mantle_melt_fraction
 
     @property
-    def melt_mass(self) -> Float[Array, "..."]:
+    def melt_mass(self) -> FloatArray:
         """Mass of the molten mantle in kg (alias for :attr:`mantle_melt_mass`)"""
         return self.mantle_melt_mass
 
     @property
-    def melt_moles(self) -> Float[Array, "..."]:
+    def melt_moles(self) -> FloatArray:
         """Moles of the molten mantle (alias for :attr:`mantle_melt_moles`)"""
         return self.mantle_melt_moles
 
     @property
-    def solid_mass(self) -> Float[Array, "..."]:
+    def solid_mass(self) -> FloatArray:
         """Mass of the solid mantle in kg (alias for :attr:`mantle_solid_mass`)"""
         return self.mantle_solid_mass
 
     @property
-    def solid_moles(self) -> Float[Array, "..."]:
+    def solid_moles(self) -> FloatArray:
         """Moles of the solid mantle (alias for :attr:`mantle_solid_moles`)"""
         return self.mantle_solid_moles
 
-    def get_pressure(self, gas_mass: Float[Array, "..."]) -> Float[Array, "..."]:
+    def get_pressure(self, gas_mass: FloatArray) -> FloatArray:
         """Gets the pressure.
 
         A pressure is used if specified, otherwise the default behaviour is to compute the
@@ -561,19 +559,17 @@ class ThinAtmospherePlanetPrevious(eqx.Module):
         """
         pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
 
-        mechanical_pressure: Float[Array, "..."] = (
+        mechanical_pressure: FloatArray = (
             gas_mass * self.surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
         )
         # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
 
-        pressure: Float[Array, "..."] = jnp.where(
-            pressure_specified, self.pressure, mechanical_pressure
-        )
+        pressure: FloatArray = jnp.where(pressure_specified, self.pressure, mechanical_pressure)
         # jax.debug.print("pressure = {out}", out=pressure)
 
         return pressure
 
-    def asdict(self, gas_mass: Float[Array, "..."]) -> dict[str, Array]:
+    def asdict(self, gas_mass: FloatArray) -> dict[str, Array]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Args:

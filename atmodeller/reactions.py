@@ -32,14 +32,22 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jaxmod.type_aliases import FloatArray, NpArray, NpBool, NpFloat, NpInt
-from jaxmod.utils import partial_rref
 from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import GAS_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
-from atmodeller.jaxhelper import masked_logsumexp, safe_exp, to_hashable
+from atmodeller.jaxhelper import (
+    FloatArray,
+    NpArray,
+    NpBool,
+    NpFloat,
+    NpInt,
+    masked_logsumexp,
+    partial_rref,
+    safe_exp,
+    to_hashable,
+)
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
 from atmodeller.utilities import get_reaction_dictionary

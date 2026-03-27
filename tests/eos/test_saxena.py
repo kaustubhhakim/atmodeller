@@ -4,10 +4,9 @@
 
 """Tests for the EOS models from :cite:t:`SF87,SF87a,SF88,SS92`"""
 
-from jaxmod.units import unit_conversion
-
 from atmodeller.eos import RealGas
 from atmodeller.eos._saxena import H2_SF87
+from atmodeller.sciencehelper import unit_conversion
 
 
 def test_Ar(check_values) -> None:

@@ -7,20 +7,15 @@
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jaxmod.constants import GAS_CONSTANT_BAR
-from jaxmod.type_aliases import OptxSolver
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.constants import STANDARD_PRESSURE
-from atmodeller.eos import (
-    ABSOLUTE_TOLERANCE,
-    RELATIVE_TOLERANCE,
-    THROW,
-    VOLUME_EPSILON,
-)
+from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
+from atmodeller.jaxhelper import OptxSolver
+from atmodeller.sciencehelper import GAS_CONSTANT_BAR
 from atmodeller.utilities import ExperimentalCalibration
 
 

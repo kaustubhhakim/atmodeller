@@ -4,10 +4,9 @@
 
 """Tests for the CORK EOS models from :cite:t:`HP91,HP98`"""
 
-from jaxmod.units import unit_conversion
-
 from atmodeller.eos import RealGas
 from atmodeller.eos._holland_powell import H2O_cork_holland91_bounded, H2O_cork_holland98_bounded
+from atmodeller.sciencehelper import unit_conversion
 
 
 def test_H2O_volume_1kbar(check_values) -> None:

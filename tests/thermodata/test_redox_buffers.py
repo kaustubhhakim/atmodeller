@@ -6,11 +6,11 @@
 
 import logging
 
-from jaxmod.units import unit_conversion
 from jaxtyping import ArrayLike
 from pytest import approx
 
 from atmodeller import debug_logger
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.thermodata._redox_buffers import (
     IronWustiteBufferHirschmann,
     IronWustiteBufferHirschmann08,

@@ -10,12 +10,12 @@ from typing import Any
 
 import jax
 import numpy as np
-from jaxmod.type_aliases import NpFloat
 from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import __version__, debug_logger
 from atmodeller.containers import ChemicalSpecies, FixedFugacityConstraint, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
+from atmodeller.jaxhelper import NpFloat
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solubility import get_solubility_models

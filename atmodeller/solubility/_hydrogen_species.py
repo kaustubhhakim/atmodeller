@@ -10,13 +10,12 @@ For every law there should be a test in the test suite.
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
-from jaxmod.type_aliases import Scalar
-from jaxmod.units import unit_conversion
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
-from atmodeller.jaxhelper import as_j64
+from atmodeller.jaxhelper import Scalar, as_j64
+from atmodeller.sciencehelper import unit_conversion
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
 
 H2_andesite_hirschmann12: Solubility = SolubilityPowerLawLog10(1.01058631, 0.60128868)

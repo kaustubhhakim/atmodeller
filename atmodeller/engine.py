@@ -26,7 +26,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Integer
 
-from atmodeller.jaxhelper import safe_exp
+from atmodeller.jaxhelper import FloatArray, safe_exp
 from atmodeller.parameters import Parameters
 
 
@@ -115,8 +115,8 @@ def get_log_activity(
         Log activity of each species
     """
     log_number_moles, _ = jnp.split(solution, 2, axis=-1)
-    temperature: Float[Array, "..."] = parameters.state.temperature
-    total_pressure: Float[Array, "..."] = parameters.state.get_pressure(log_number_moles)
+    temperature: FloatArray = parameters.state.temperature
+    total_pressure: FloatArray = parameters.state.get_pressure(log_number_moles)
 
     log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
         log_number_moles, temperature, total_pressure
@@ -147,14 +147,14 @@ def objective_function(
         Residual
     """
     # jax.debug.print("Starting new objective_function evaluation")
-    temperature: Float[Array, "..."] = parameters.state.temperature
+    temperature: FloatArray = parameters.state.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2, axis=-1)
     # jax.debug.print("log_number_moles = {out}", out=log_number_moles)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
-    total_pressure: Float[Array, "..."] = parameters.state.get_pressure(log_number_moles)
+    total_pressure: FloatArray = parameters.state.get_pressure(log_number_moles)
 
     log_activity: Float[Array, "... species"] = get_log_activity(parameters, solution)
     # jax.debug.print("log_activity = {out}", out=log_activity)
@@ -224,7 +224,7 @@ def objective_function(
     # )
 
     # Stability residual
-    log_tau: Float[Array, "..."] = jnp.log(parameters.solver_parameters.tau)
+    log_tau: FloatArray = jnp.log(parameters.solver_parameters.tau)
     # jax.debug.print("log_tau = {out}", out=log_tau)
     log_min_number_moles: Float[Array, "... species"] = (
         get_min_log_elemental_abundance_per_species(parameters) + log_tau
