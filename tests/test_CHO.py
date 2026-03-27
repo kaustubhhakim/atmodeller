@@ -8,22 +8,24 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+import jax
 import numpy as np
 import pytest
-from jaxtyping import ArrayLike
+from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import debug_logger
-from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ReservoirSpecies
+from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.phases import GasPhase, MeltPhase
+from atmodeller.output import Output
+from atmodeller.parameters import Parameters
 from atmodeller.solubility import get_solubility_models
+from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import Planet
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -34,25 +36,33 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-gas: GasPhase = GasPhase.create(("H2", "H2O", "CO", "CO2", "CH4", "O2"))
-gas_CHO_model: EquilibriumModel = EquilibriumModel(gas)
+# Gas species
+H2O_g = ChemicalSpecies.create_gas("H2O")
+H2_g = ChemicalSpecies.create_gas("H2")
+O2_g = ChemicalSpecies.create_gas("O2")
+CO_g = ChemicalSpecies.create_gas("CO")
+CO2_g = ChemicalSpecies.create_gas("CO2")
+CH4_g = ChemicalSpecies.create_gas("CH4")
+
+# Melt species
+H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+    "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
+)
+CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+    "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
+)
+
+key: PRNGKeyArray = jax.random.PRNGKey(0)
+key, subkey = jax.random.split(key)  # Split the key for use in this function
 
 
 def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
-    gas: GasPhase = GasPhase.create(("H2O", "H2", "O2", "CO", "CO2"))
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
+    melt_species = (H2O_d, CO2_d)
 
-    H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
-    )
-    CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-        "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
-    )
-    melt: MeltPhase = MeltPhase((H2O_d, CO2_d))
-
-    planet: Planet = Planet()
-    model: EquilibriumModel = EquilibriumModel(gas, melt=melt)
+    planet = Planet.create(gas_species, melt_species=melt_species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -62,9 +72,13 @@ def test_H_and_C() -> None:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     target: dict[str, Any] = {
         "gas": {
@@ -80,7 +94,7 @@ def test_H_and_C() -> None:
         }
     }
 
-    assert model.output.compare(target, rtol=TOLERANCE, atol=TOLERANCE, log=False)
+    assert output.compare(target, rtol=TOLERANCE, atol=TOLERANCE, log=False)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
@@ -90,16 +104,24 @@ def test_CHO_reduced() -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
 
-    planet: Planet = Planet(temperature=1400)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=1400)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
+
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -116,7 +138,7 @@ def test_CHO_reduced() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_IW() -> None:
@@ -125,16 +147,24 @@ def test_CHO_IW() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
 
-    planet: Planet = Planet(temperature=1400)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=1400)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
+
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -166,8 +196,8 @@ def test_CHO_IW() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
-    assert gas_CHO_model.output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
@@ -177,16 +207,24 @@ def test_CHO_oxidised() -> None:
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
 
-    planet: Planet = Planet(temperature=1400)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=1400)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
+
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 0.1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -203,7 +241,7 @@ def test_CHO_oxidised() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
@@ -213,8 +251,12 @@ def test_CHO_highly_oxidised() -> None:
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
 
-    planet: Planet = Planet(temperature=1400)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=1400)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
+
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 5 * h_kg
@@ -222,9 +264,13 @@ def test_CHO_highly_oxidised() -> None:
     # o_kg: ArrayLike = 3.25196e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -241,22 +287,30 @@ def test_CHO_highly_oxidised() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_middle_temperature() -> None:
     """Tests C-H-O system at 873 K"""
 
-    planet: Planet = Planet(temperature=873)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=873)
+
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -273,13 +327,17 @@ def test_CHO_middle_temperature() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_low_temperature() -> None:
     """Tests C-H-O system at 450 K"""
 
-    planet: Planet = Planet(temperature=450)
+    gas_species = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet = Planet.create(gas_species, temperature=450)
+
+    # TODO: to revisit this below, since currently this test recreates the solver.
     # This is a trick to keep the same argument structure and avoid JAX recompilation, even though
     # for this case we want to turn off the O2_g constraint.
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
@@ -291,9 +349,13 @@ def test_CHO_low_temperature() -> None:
     o_kg: ArrayLike = 1.02999e20
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    gas_CHO_model.solve(
-        state=planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+    parameters: Parameters = Parameters.create(
+        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
     )
+
+    solver = make_solver_with_jit(parameters)
+
+    output: Output = solver(parameters, subkey)
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -310,4 +372,4 @@ def test_CHO_low_temperature() -> None:
         }
     }
 
-    assert gas_CHO_model.output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
