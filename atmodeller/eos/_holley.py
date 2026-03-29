@@ -16,12 +16,7 @@ from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.jax_utils import OptxSolver, Scalar
-from atmodeller.sci_utils import (
-    ATMOSPHERE,
-    GAS_CONSTANT_BAR,
-    ExperimentalCalibration,
-    unit_conversion,
-)
+from atmodeller.sci_utils import GAS_CONSTANT_BAR, ExperimentalCalibration, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -36,7 +31,7 @@ def volume_conversion(x: Scalar) -> float:
 
 def A0_conversion(x: Scalar) -> float:
     """:math:`PV^2` conversion for :cite:t:`HWZ58` units"""
-    return x * ATMOSPHERE * unit_conversion.litre_to_m3**2
+    return x * unit_conversion.atmosphere_to_bar * unit_conversion.litre_to_m3**2
 
 
 def atm2bar(x: Scalar) -> float:

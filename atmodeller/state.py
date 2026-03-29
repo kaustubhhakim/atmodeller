@@ -39,6 +39,7 @@ from typing import Self
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool, Float
+from scipy.constants import gravitational_constant
 
 from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
@@ -46,7 +47,7 @@ from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
-from atmodeller.sci_utils import GRAVITATIONAL_CONSTANT, unit_conversion
+from atmodeller.sci_utils import unit_conversion
 
 
 class BaseThermodynamicState(eqx.Module):
@@ -334,7 +335,7 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         # jax.debug.print("planet_mass_squeeze = {out}", out=planet_mass_squeeze)
 
         surface_gravity: FloatArray = (
-            GRAVITATIONAL_CONSTANT * planet_mass_squeeze / jnp.square(self.surface_radius)
+            gravitational_constant * planet_mass_squeeze / jnp.square(self.surface_radius)
         )
         # jax.debug.print("surface_gravity = {out}", out=surface_gravity)
 
@@ -510,7 +511,7 @@ class ThinAtmospherePlanetPrevious(eqx.Module):
     @property
     def surface_gravity(self) -> FloatArray:
         """Surface gravity"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
+        return gravitational_constant * self.planet_mass / jnp.square(self.surface_radius)
 
     # The following properties ensure compliance with ThermodynamicStateProtocol
     @property

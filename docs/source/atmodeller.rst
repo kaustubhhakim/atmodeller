@@ -62,6 +62,14 @@ atmodeller.interfaces module
    :show-inheritance:
    :undoc-members:
 
+atmodeller.jax\_utils module
+----------------------------
+
+.. automodule:: atmodeller.jax_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 atmodeller.output module
 ------------------------
 
@@ -90,6 +98,14 @@ atmodeller.reactions module
 ---------------------------
 
 .. automodule:: atmodeller.reactions
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+atmodeller.sci\_utils module
+----------------------------
+
+.. automodule:: atmodeller.sci_utils
    :members:
    :show-inheritance:
    :undoc-members:
