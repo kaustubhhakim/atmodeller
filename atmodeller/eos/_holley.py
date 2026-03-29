@@ -4,8 +4,6 @@
 
 """Real gas EOS from :cite:`HWZ58`"""
 
-import logging
-
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
@@ -17,8 +15,6 @@ from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.jax_utils import OptxSolver, Scalar
 from atmodeller.sci_utils import GAS_CONSTANT_BAR, ExperimentalCalibration, unit_conversion
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 # Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
 # in bar). Using the original values in the paper also facilitates visual comparison and checking.

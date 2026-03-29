@@ -751,7 +751,7 @@ class RootFindParameters(eqx.Module):
         )
 
 
-class SolverParameters(RootFindParameters):
+class SolverParameters(RootFindParameters):  # pragma: no cover
     """Solver parameters
 
     Args:

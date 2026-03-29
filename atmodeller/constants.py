@@ -7,8 +7,6 @@
 This module defines reference thermodynamic conditions and numerical limits.
 """
 
-import numpy as np
-
 # Thermodynamic standard state
 TEMPERATURE_REFERENCE: float = 298.15
 """Enthalpy reference temperature in K (:math:`T_r` in the JANAF tables) :cite:p:`MZG02,Cha98`"""
@@ -36,11 +34,6 @@ INITIAL_LOG_STABILITY: float = -30.0
 
 Empirically determined
 """
-
-# Maximum x for which exp(x) is finite in 64-bit precision (to prevent overflow)
-MAX_EXP_INPUT: float = np.log(np.finfo(np.float64).max)
-# Minimum x for which exp(x) is non-zero in 64-bit precision
-MIN_EXP_INPUT: float = np.log(np.finfo(np.float64).tiny)
 
 # Lower and upper bounds on the hypercube which contains the root. These are somewhat empirically
 # calibrated to bound the expected values for typical models, but in principle could require

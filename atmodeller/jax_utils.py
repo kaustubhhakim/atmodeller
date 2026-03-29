@@ -2,9 +2,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Helpers for JAX operations"""
+"""Standalone helper functions and utilities for JAX-based scientific modeling
 
-# import logging
+This module provides type aliases, numerically stable mathematical operations, masking utilities,
+batch handling, and linear algebra helpers for use with JAX, NumPy, and related libraries. It is
+designed to be standalone and does not depend on other modules within the atmodeller package.
+"""
+
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, TypeAlias
 
@@ -18,20 +22,24 @@ from jax.scipy.special import logsumexp
 from jax.tree_util import tree_map
 from jaxtyping import Array, ArrayLike, Bool, Float, PyTree
 
-MAX_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).max)
-"""Maximum x for which exp(x) is finite in 64-bit precision to prevent overflow"""
-MIN_EXP_INPUT = jnp.log(jnp.finfo(jnp.float64).tiny)
-"""Lower bound for stable exp() before underflow to zero"""
+MAX_FLOAT64 = np.finfo(np.float64).max
+"""Largest finite value representable by float64 (approximately 1.8e308)"""
+MIN_FLOAT64 = np.finfo(np.float64).min
+"""Most negative finite value representable by float64 (approximately -1.8e308)"""
+TINY_FLOAT64 = np.finfo(np.float64).tiny
+"""Smallest positive normal value representable by float64 (approximately 2.2e-308)"""
 
 # Type aliases
+FloatArray: TypeAlias = Float[Array, "..."]
+"""Type alias for a JAX float array of any shape"""
 NpArray: TypeAlias = npt.NDArray
-"""NumPy array"""
+"""Type alias for a NumPy array"""
 NpBool: TypeAlias = npt.NDArray[np.bool_]
-"""NumPy :obj:`numpy.bool_` array"""
+"""Type alias for a :obj:`numpy.bool_` array"""
 NpFloat: TypeAlias = npt.NDArray[np.float64]
-"""NumPy :obj:`numpy.float64` array"""
+"""Type alias for a :obj:`numpy.float64` array"""
 NpInt: TypeAlias = npt.NDArray[np.int_]
-"""NumPy :obj:`numpy.int_` array"""
+"""Type alias for a :obj:`numpy.int_` array"""
 Scalar: TypeAlias = int | float
 """Scalar"""
 OptxSolver: TypeAlias = (
@@ -39,36 +47,49 @@ OptxSolver: TypeAlias = (
 )
 """Optimistix solver"""
 
-# JAX types
-FloatArray: TypeAlias = Float[Array, "..."]
-"""Float array of any shape"""
-
-# logger: logging.Logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
-
 
 def as_j64(x: ArrayLike | tuple) -> FloatArray:  # pragma: no cover
+    """Converts an array-like or tuple to a JAX array of dtype float64.
+
+    Args:
+        x: An array-like object or tuple to convert
+
+    Returns:
+        A JAX array of dtype float64 with the same shape as the input
+    """
     return jnp.asarray(x, dtype=jnp.float64)
 
 
-def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
+def power_law(
+    values: ArrayLike, constant: ArrayLike, exponent: ArrayLike
+) -> Array:  # pragma: no cover
+    """Computes a power law.
+
+    Args:
+        values: Array of input values
+        constant: Power law constant
+        exponent: Power law exponent
+
+    Returns:
+        Array of the same shape as ``values`` containing the result of the power law
+    """
     return jnp.power(values, exponent) * constant
 
 
 def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
     """Computes a numerically stable elementwise exponential with explicit handling of -inf.
 
-    This function extends ``jnp.exp`` with safeguards for common numerical issues:
+    This function extends :func:`jax.numpy.exp` with safeguards for common numerical issues:
 
     - Clips inputs to prevent overflow of ``exp(x)`` for large positive values.
     - Treats ``-inf`` inputs explicitly and returns 0 for those entries
       (i.e., preserves the identity ``exp(-inf) = 0``).
-    - Avoids NaNs by replacing invalid values before applying ``exp``.
+    - Avoids nans by replacing invalid values before applying ``exp``.
 
     Note:
         This function is intended for computations performed in log-space or masked representations
         where ``-inf`` denotes absent or zero-valued contributions. It preserves standard autodiff
-        behavior by default (no gradient suppression), unless explicitly modified.
+        behavior by default (no gradient suppression).
 
     Args:
         x: Input array-like values
@@ -78,15 +99,15 @@ def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
         with special handling of ``-inf``.
     """
     x = jnp.asarray(x)
-    is_neg_inf = jnp.isneginf(x)
+    is_neg_inf: Bool[Array, "..."] = jnp.isneginf(x)
 
     # Replace -inf with something safe before clipping
-    x_safe = jnp.where(is_neg_inf, 0.0, x)
+    x_safe: Array = jnp.where(is_neg_inf, 0.0, x)
 
     # Apply overflow clipping only to finite values
-    x_clipped = jnp.clip(x_safe, max=MAX_EXP_INPUT)
+    x_clipped: Array = jnp.clip(x_safe, max=jnp.log(MAX_FLOAT64))
 
-    y = jnp.exp(x_clipped)
+    y: Array = jnp.exp(x_clipped)
 
     # Restore semantics: exp(-inf) = 0
     y = jnp.where(is_neg_inf, 0.0, y)
@@ -102,17 +123,15 @@ def masked_logsumexp(
 ) -> FloatArray:  # pragma: no cover
     """Computes a numerically stable log-sum-exp with explicit masking of -inf values.
 
-    This function extends the standard ``logsumexp`` with support for masked inputs, where ``-inf``
-    values are treated as absent (i.e., zero contribution in linear space).
-
-    Key properties:
+    This function extends the standard :func:`jax.scipy.special.logsumexp` with support for masked
+    inputs, where ``-inf`` values are treated as absent (i.e., zero contribution in linear space).
 
     - Replaces non-finite values (e.g., ``-inf``) with a large negative finite number
       to ensure numerical stability during computation.
     - Computes the log-sum-exp in a stable manner using JAX's implementation.
     - Preserves the semantics that if all values along the reduction axis are masked,
       the result is ``-inf``.
-    - Avoids NaNs and remains compatible with automatic differentiation.
+    - Avoids nans and remains compatible with automatic differentiation.
 
     Note:
         This function is intended for use in log-domain computations (e.g., probabilities,
@@ -120,8 +139,8 @@ def masked_logsumexp(
 
     Args:
         log_x: Input array of log-values, where ``-inf`` indicates masked entries
-        axis: Axis or axes over which to compute the log-sum-exp
-        keepdims: Whether to retain reduced dimensions with length 1
+        axis: Axis or axes over which to compute the log-sum-exp. Defaults to ``-1`` (last axis).
+        keepdims: Whether to retain reduced dimensions with length 1. Defaults to ``True``.
 
     Returns:
         An array containing the log-sum-exp over the specified axis, with masked inputs properly
@@ -151,9 +170,9 @@ def to_hashable(x: Callable) -> Callable:  # pragma: no cover
     """Wraps a callable to make it hashable for JAX transformations.
 
     This wrapper is useful when passing bound methods of Equinox PyTrees (with JAX arrays as
-    attributes) to transformations like :func:`jax.jit`, :func:`jax.vmap`, or :func:`lax.scan`. It
-    wraps the callable in a lambda to forward all arguments while avoiding JAX trying to trace the
-    method itself. See discussion: https://github.com/patrick-kidger/equinox/issues/1011
+    attributes) to transformations like :func:`jax.jit`, :func:`jax.vmap`, or :func:`jax.lax.scan`.
+    It wraps the callable in a lambda to forward all arguments while avoiding JAX trying to trace
+    the method itself. See discussion: https://github.com/patrick-kidger/equinox/issues/1011
 
     Args:
         x: A callable to wrap
@@ -191,6 +210,10 @@ def get_batch_size(x: PyTree) -> int:  # pragma: no cover
 def to_native_floats(value: Any) -> Any:
     """Recursively converts any structure to nested tuples of native floats.
 
+    This is useful for converting entries that should be static (non-array) to store in a pytree
+    structure, such as when using JAX or Equinox, where static (non-traceable) values must be
+    Python floats or tuples thereof.
+
     Args:
         value: A scalar, list/tuple/array of floats, or nested thereof
 
@@ -225,10 +248,11 @@ def get_batch_axis(x: Any) -> Literal[0, None]:
     Determines whether an object should be treated as batched along axis ``0`` for
     :func:`jax.vmap`.
 
-    This function only considers JAX arrays for batching. While :func:`equinox.is_array` regards
-    both JAX and NumPy arrays as arrays for tracing, NumPy arrays are treated here as static
-    constants and are never batched. This allows fixed matrices to remain inside pytrees without
-    being inadvertently vectorised.
+    Note:
+        This function only considers JAX arrays for batching. While :func:`equinox.is_array`
+        regards both JAX and NumPy arrays as arrays for tracing, NumPy arrays are treated here as
+        static constants and are never batched. This allows fixed matrices to remain inside pytrees
+        without being inadvertently vectorised.
 
     Rules:
         - 1-D JAX arrays: Batched along axis 0
@@ -246,6 +270,8 @@ def get_batch_axis(x: Any) -> Literal[0, None]:
         # Vectorise over any 1-D array
         if x.ndim == 1:
             return 0
+        # TODO: Now MassConstraintsSet is refactored this condition might no longer be required,
+        # and instead any JAX array with leading dimension >1 should be vectorised.
         # Any 2-D array should be vectorised over the first dimension if it is not unity
         elif x.ndim == 2 and x.shape[0] > 1:
             return 0
@@ -279,7 +305,7 @@ def partial_rref(matrix: NpArray) -> NpArray:
         matrix: A 2-D NumPy array of shape (nrows, ncols).
 
     Returns:
-        A :class:`numpy.ndarray` containing the linear components.
+        A matrix containing the linear components.
     """
     nrows, ncols = matrix.shape
 
@@ -354,7 +380,7 @@ def max_norm(
         parameters: Parameters passed to the objective function
 
     Returns:
-        An array of the L-infinity norm
+        L-infinity norm
     """
     return jnp.linalg.norm(objective_function(solution, parameters), ord=jnp.inf, axis=-1)
 
@@ -365,7 +391,7 @@ def expand_mask(
     """Expands a batch mask to broadcast over trailing solution dimensions.
 
     Args:
-        mask: Boolean array indicating  entries to update
+        mask: Boolean array indicating entries to update
         target: Array with shape ``(... solution)`` that the mask will be expanded to match
 
     Returns:
