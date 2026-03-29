@@ -271,8 +271,10 @@ class BaseOutputDict(eqx.Module):
         out: dict[str, ArrayLike] = {}
 
         for nn, species_ in enumerate(self.parameters.species.species_names):
-            out[species_] = self.log_number_moles[..., nn]
-            out[f"{species_}_stability"] = self.log_stability[..., nn]
+            out[species_] = self.solution[..., nn]
+            out[f"{species_}_stability"] = self.solution[
+                ..., nn + self.parameters.species.number_species
+            ]
 
         return out
 
