@@ -50,10 +50,10 @@ from pprint import pformat
 from typing import Any, Literal, Optional, cast
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+from jax.tree_util import tree_map
 from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
@@ -124,6 +124,12 @@ def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
 def expand_jax_arrays_in_pytree_to_batch(pytree: PyTree, batch_size: int) -> PyTree:
     """Expands all arrays in a PyTree to the batch size.
 
+    Note:
+        :func:`jax.tree_util.tree_map` does not preserve the insertion order of standard Python
+        dictionaries. Dictionary keys are treated as an unordered set and are typically processed
+        in a canonical (sorted) order. If preserving key order is important, consider using
+        :class:`collections.OrderedDict`.
+
     Args:
         pytree: PyTree (nested dict, list, tuple, etc.) of arrays to expand
         batch_size: Batch size to expand to
@@ -141,11 +147,17 @@ def expand_jax_arrays_in_pytree_to_batch(pytree: PyTree, batch_size: int) -> PyT
             return x
         return x
 
-    return jax.tree_util.tree_map(expand, pytree)
+    return tree_map(expand, pytree)
 
 
 def ravel_jax_arrays_in_pytree(pytree: PyTree) -> PyTree:
     """Ravels all JAX arrays in a PyTree to 1-D arrays.
+
+    Note:
+        :func:`jax.tree_util.tree_map` does not preserve the insertion order of standard Python
+        dictionaries. Dictionary keys are treated as an unordered set and are typically processed
+        in a canonical (sorted) order. If preserving key order is important, consider using
+        :class:`collections.OrderedDict`.
 
     Args:
         pytree: PyTree (nested dict, list, tuple, etc.) of arrays to ravel
@@ -159,11 +171,17 @@ def ravel_jax_arrays_in_pytree(pytree: PyTree) -> PyTree:
             return jnp.ravel(x)
         return x
 
-    return jax.tree_util.tree_map(ravel, pytree)
+    return tree_map(ravel, pytree)
 
 
 def convert_jax_arrays_in_pytree_to_numpy(pytree: PyTree) -> PyTree:
     """Converts all JAX arrays in a PyTree to NumPy arrays.
+
+    Note:
+        :func:`jax.tree_util.tree_map` does not preserve the insertion order of standard Python
+        dictionaries. Dictionary keys are treated as an unordered set and are typically processed
+        in a canonical (sorted) order. If preserving key order is important, consider using
+        :class:`collections.OrderedDict`.
 
     Args:
         pytree: PyTree (nested dict, list, tuple, etc.) of arrays to convert
@@ -171,9 +189,7 @@ def convert_jax_arrays_in_pytree_to_numpy(pytree: PyTree) -> PyTree:
     Returns:
         PyTree with JAX arrays converted to NumPy arrays
     """
-    return jax.tree_util.tree_map(
-        lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, pytree
-    )
+    return tree_map(lambda x: np.asarray(x) if isinstance(x, jnp.ndarray) else x, pytree)
 
 
 class BaseOutputDict(eqx.Module):
@@ -245,6 +261,20 @@ class BaseOutputDict(eqx.Module):
     def solution(self) -> Float[Array, "#n_batch twice_species"]:
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
+
+    def solution_to_dict(self) -> dict[str, ArrayLike]:
+        """Returns a dictionary of solution arrays for each species.
+
+        Returns:
+            Dictionary mapping species names and their stability keys to arrays of values
+        """
+        out: dict[str, ArrayLike] = {}
+
+        for nn, species_ in enumerate(self.parameters.species.species_names):
+            out[species_] = self.log_number_moles[..., nn]
+            out[f"{species_}_stability"] = self.log_stability[..., nn]
+
+        return out
 
     @property
     def condensate_phases(self) -> tuple[PhaseOutput[PurePhase], ...]:
@@ -441,7 +471,7 @@ class OutputNaturalDict(BaseOutputDict):
             "names": self.parameters.fugacity_constraints.species.species_names,
         }
 
-        out["solution"] = self.solution
+        out["solution"] = self.solution_to_dict()
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
 
@@ -637,9 +667,7 @@ class OutputNamedArraysDict(BaseOutputDict):
             "activity",
         )
 
-        # TODO: Could split solution and label by species with stability suffix. Currently this is
-        # just the raw solution array
-        out["solution"] = self.solution
+        out["solution"] = self.solution_to_dict()
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
 
@@ -863,6 +891,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             constraints_dict: dict[str, Any] = species_dict.setdefault("constraints", {})
             constraints_dict["fugacity"] = jnp.exp(species_log_fugacity[nn])
 
+        out["solution"] = self.solution_to_dict()
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
 
@@ -979,7 +1008,7 @@ class Output(eqx.Module):
             A nested dictionary of the output, suitable for quick inspection and comparison.
         """
         out: dict[str, Any] = self.to_dict(format=format, to_numpy=True)
-        logger.info("Quick look output:\n%s", pformat(out))
+        logger.info("Quick look output:\n%s", pformat(out, sort_dicts=False))
 
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]

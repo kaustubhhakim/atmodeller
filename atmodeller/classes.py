@@ -198,7 +198,7 @@ class EquilibriumModel:
             logger.info("Initial solution = %s", initial_solution)
 
         out: Output = self._solver(parameters, subkey, initial_solution)
-        logger.debug("to_dict = \n%s", pformat(out.to_dict()))
+        logger.debug("to_dict = \n%s", pformat(out.to_dict(), sort_dicts=False))
 
         multi_sol: MultiAttemptSolution = out.multi_attempt_solution
         num_successful_models: int = jnp.count_nonzero(multi_sol.solver_success).item()

@@ -285,7 +285,7 @@ class BaseReactionBlock(eqx.Module):
         logger.info(
             "%s network = %s",
             self.__class__.__name__,
-            pprint.pformat(self.get_reaction_dictionary()),
+            pprint.pformat(self.get_reaction_dictionary(), sort_dicts=False),
         )
 
 
