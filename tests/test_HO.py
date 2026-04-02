@@ -55,7 +55,7 @@ key, subkey = jax.random.split(key)  # Split the key for use in this function
 
 def test_version() -> None:
     """Test version."""
-    assert __version__ == "0.11.0"
+    assert __version__ == "2.0.0"
 
 
 def test_H2O() -> None:
