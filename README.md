@@ -13,7 +13,7 @@
 [![Test coverage](https://img.shields.io/badge/Coverage-93%25-brightgreen)](https://github.com/ExPlanetology/atmodeller)
 
 ## About
-Atmodeller is a Python package that uses [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
+Atmodeller is a Python package for thermochemical equilibrium modeling of planetary interiors and atmospheres, built on [JAX](https://jax.readthedocs.io/en/latest/index.html). It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ## Documentation
 

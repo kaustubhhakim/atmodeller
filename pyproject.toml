@@ -1,7 +1,7 @@
 [project]
 name = "atmodeller"
 version = "2.0.0"
-description = "Volatile partitioning between a rocky interior and atmosphere"
+description = "Thermochemical equilibrium modeling for planetary interiors and atmospheres"
 readme = "README.md"
 requires-python = ">=3.11,<=4.0"
 license = "GPL-3.0-or-later"
