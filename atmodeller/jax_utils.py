@@ -82,6 +82,7 @@ def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
     This function extends :func:`jax.numpy.exp` with safeguards for common numerical issues:
 
     - Clips inputs to prevent overflow of ``exp(x)`` for large positive values.
+    - Clips inputs to prevent underflow of ``exp(x)`` for large negative values.
     - Treats ``-inf`` inputs explicitly and returns 0 for those entries
       (i.e., preserves the identity ``exp(-inf) = 0``).
     - Avoids nans by replacing invalid values before applying ``exp``.
@@ -104,8 +105,12 @@ def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
     # Replace -inf with something safe before clipping
     x_safe: Array = jnp.where(is_neg_inf, 0.0, x)
 
-    # Apply overflow clipping only to finite values
-    x_clipped: Array = jnp.clip(x_safe, max=jnp.log(MAX_FLOAT64))
+    # Define lower and upper bounds for clipping
+    min_clip = jnp.log(TINY_FLOAT64)
+    max_clip = jnp.log(MAX_FLOAT64)
+
+    # Clip to prevent both underflow and overflow (except for -inf)
+    x_clipped: Array = jnp.clip(x_safe, min_clip, max_clip)
 
     y: Array = jnp.exp(x_clipped)
 
