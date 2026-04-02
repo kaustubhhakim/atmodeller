@@ -377,7 +377,8 @@ class BaseOutputDict(eqx.Module):
             "background_number_moles": phase_output.background_number_moles,
             "background_molar_mass": phase_output.background_molar_mass,
             "mass": phase_output.phase_mass,
-            "number_moles": phase_output.phase_number_moles,
+            "species_number_moles": phase_output.phase_species_number_moles,
+            "elements_number_moles": phase_output.phase_element_number_moles,
             "molar_mass": phase_output.phase_molar_mass,
             "species_to_phase_mass_ratio": phase_output.species_to_phase_mass_ratio,
         }
@@ -851,6 +852,18 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             out[self.gas.phase.name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
             out[self.gas.phase.name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
             out[self.gas.phase.name]["phase"]["pressure"] = self.gas.pressure
+
+            # Metallicity
+            z_by_moles = 0
+            z_by_mass = 0
+            for element in self.gas.phase.species.unique_elements:
+                if element != "H" and element != "He":
+                    z_by_moles = z_by_moles + out[element][self.gas.phase.name]["number_moles"]
+                    z_by_mass = z_by_mass + out[element][self.gas.phase.name]["mass"]
+            z_by_moles = z_by_moles / out[self.gas.phase.name]["phase"]["elements_number_moles"]
+            z_by_mass = z_by_mass / out[self.gas.phase.name]["phase"]["mass"]
+            out[self.gas.phase.name]["phase"]["metallicity_by_moles"] = z_by_moles
+            out[self.gas.phase.name]["phase"]["metallicity_by_mass"] = z_by_mass
 
         if not self.melt.is_empty:
             out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.melt))

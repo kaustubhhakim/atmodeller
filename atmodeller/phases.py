@@ -577,8 +577,20 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
 
     # Phase outputs
     @property
-    def phase_number_moles(self) -> Float[Array, "#n_batch 1"]:
+    def phase_species_number_moles(self) -> Float[Array, "#n_batch 1"]:
         return jnp.exp(self.phase.get_log_phase_moles(self.log_number_moles))
+
+    @property
+    def phase_element_number_moles(self) -> Float[Array, "#n_batch 1"]:
+        """TODO: This ignores the background component, because without specifying its Hill
+        formula we cannot determine its elemental composition. This is a limitation of the current
+        design, and we may want to revisit this in the future. Currently, however, this property is
+        only used for a metallicity calculation for the gas phase, where the background is almost
+        always zero since all species are tracked."""
+        total_element_moles: Float[Array, "#n_batch 1"] = jnp.sum(
+            self.element_number_moles, axis=-1, keepdims=True
+        )
+        return total_element_moles
 
     @property
     def log_phase_mass(self) -> Float[Array, "#n_batch 1"]:
@@ -693,7 +705,9 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
     @property
     def volume(self) -> Float[Array, "#n_batch 1"]:
         r"""Volume of the gas phase in m\ :sup:`3`"""
-        return self.phase_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
+        return (
+            self.phase_species_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
+        )
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
