@@ -126,14 +126,6 @@ atmodeller.state module
    :show-inheritance:
    :undoc-members:
 
-atmodeller.utilities module
----------------------------
-
-.. automodule:: atmodeller.utilities
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 Module contents
 ---------------
 
