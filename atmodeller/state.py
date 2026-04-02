@@ -33,7 +33,6 @@ complex planetary models.
 
 from abc import abstractmethod
 from collections.abc import Iterable
-from dataclasses import asdict
 from typing import Self
 
 import equinox as eqx
@@ -298,17 +297,16 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         """Surface area"""
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
-    def get_surface_gravity(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        r"""Gets the surface gravity.
+    def get_planet_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+        """Gets the planet mass.
 
-        Computes the surface gravity from the mass of condensed phases and the radius of the
-        planet.
+        Computes the planet mass from the mass of the condensed phases and the metallic core.
 
         Args:
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Surface gravity in m s\ :sup:`-2`
+            Planet mass in kg
         """
         # Melt mass
         log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
@@ -332,6 +330,22 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
 
         planet_mass = melt_mass + solid_mass + self.metallic_core_mass[..., None]
         planet_mass_squeeze: FloatArray = jnp.squeeze(planet_mass, axis=-1)
+
+        return planet_mass_squeeze
+
+    def get_surface_gravity(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+        r"""Gets the surface gravity.
+
+        Computes the surface gravity from the mass of condensed phases and the radius of the
+        planet.
+
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
+        Returns:
+            Surface gravity in m s\ :sup:`-2`
+        """
+        planet_mass_squeeze: FloatArray = self.get_planet_mass(log_number_moles)
         # jax.debug.print("planet_mass_squeeze = {out}", out=planet_mass_squeeze)
 
         surface_gravity: FloatArray = (
@@ -399,193 +413,9 @@ class ThinAtmospherePlanet(BaseThermodynamicState):
         base_dict["metallic_core_mass"] = self.metallic_core_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
+        base_dict["planet_mass"] = self.get_planet_mass(log_number_moles)
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.get_pressure(log_number_moles)
-
-        return base_dict
-
-
-# TODO: This is the previous implementation, but retained for the time being until the outputs are
-# fully supported in the new implementation. It will be removed in the future.
-class ThinAtmospherePlanetPrevious(eqx.Module):
-    r"""A planet with a thin atmosphere.
-
-    In this context, "thin atmosphere" means that the surface gravity is determined solely by the
-    mass of the planet (i.e., the solid/liquid body), and is not compensated or significantly
-    altered by the presence of an extended or massive atmosphere above. This is appropriate for
-    cases where the atmospheric mass is much less than the planetary mass, so the gravitational
-    acceleration at the surface is set by the planet alone, not by any self-gravitating atmospheric
-    shell.
-
-    This must adhere to :class:`~atmodeller.interfaces.ThermodynamicStateProtocol`.
-
-    Default values are for a fully molten Earth.
-
-    Args:
-        planet_mass: Mass of the planet in kg. Defaults to ``5.972e24`` kg (Earth).
-        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to ``0.295334691460966`` kg kg\ :sup:`-1` (Earth).
-        mantle_melt_fraction: Mass fraction of the mantle that is molten in kg kg\ :sup:`-1`.
-            Defaults to ``1.0``.
-        surface_radius: Radius of the planetary surface in m. Defaults to ``6371000`` m (Earth).
-        temperature: Temperature in K. Defaults to ``2000`` K.
-        pressure: Pressure in bar. Defaults to ``np.nan`` to solve for the mechanical pressure
-            balance at the surface.
-        molar_mass: Molar mass of the silicate in kg mol\ :sup:`-1`. Defaults to
-            60 g mol\ :sup:`-1`, which is a typical value for silicate melts based on SiO\ :sub:`2`.
-    """
-
-    planet_mass: FloatArray
-    """Mass of the planet in kg"""
-    core_mass_fraction: FloatArray
-    r"""Mass fraction of the core relative to the planetary mass in kg kg\ :sup:`-1`"""
-    mantle_melt_fraction: FloatArray
-    r"""Mass fraction of the molten mantle in kg kg\ :sup:`-1`"""
-    surface_radius: FloatArray
-    """Radius of the surface in m"""
-    temperature: FloatArray
-    """Temperature in K"""
-    pressure: FloatArray
-    """Pressure in bar"""
-    molar_mass: FloatArray
-    r"""Molar mass of the silicate in kg mol\ :sup:`-1`"""
-
-    def __init__(
-        self,
-        planet_mass: ArrayLike = 5.972e24,
-        core_mass_fraction: ArrayLike = 0.295334691460966,
-        mantle_melt_fraction: ArrayLike = 1.0,
-        surface_radius: ArrayLike = 6371000,
-        temperature: ArrayLike = 2000,
-        pressure: ArrayLike = jnp.nan,
-        molar_mass: ArrayLike = 60e-3,
-    ):
-        self.planet_mass = as_j64(planet_mass)
-        self.core_mass_fraction = as_j64(core_mass_fraction)
-        self.mantle_melt_fraction = as_j64(mantle_melt_fraction)
-        self.surface_radius = as_j64(surface_radius)
-        self.temperature = as_j64(temperature)
-        self.pressure = as_j64(pressure)
-        self.molar_mass = as_j64(molar_mass)
-
-    @property
-    def mantle_mass(self) -> FloatArray:
-        """Mantle mass in kg"""
-        return self.planet_mass * self.mantle_mass_fraction
-
-    @property
-    def mantle_moles(self) -> FloatArray:
-        """Moles of the mantle"""
-        return self.mantle_mass / self.molar_mass
-
-    @property
-    def mantle_mass_fraction(self) -> FloatArray:
-        r"""Mantle mass fraction in kg kg\ :sup:`-1`"""
-        return 1 - self.core_mass_fraction
-
-    @property
-    def mantle_melt_mass(self) -> FloatArray:
-        """Mass of the molten mantle"""
-        return self.mantle_mass * self.mantle_melt_fraction
-
-    @property
-    def mantle_melt_moles(self) -> FloatArray:
-        """Moles of the molten mantle"""
-        return self.mantle_melt_mass / self.molar_mass
-
-    @property
-    def mantle_solid_mass(self) -> FloatArray:
-        """Mass of the solid mantle"""
-        return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
-
-    @property
-    def mantle_solid_moles(self) -> FloatArray:
-        """Moles of the solid mantle"""
-        return self.mantle_solid_mass / self.molar_mass
-
-    @property
-    def surface_area(self) -> FloatArray:
-        """Surface area"""
-        return 4.0 * jnp.pi * jnp.square(self.surface_radius)
-
-    @property
-    def surface_gravity(self) -> FloatArray:
-        """Surface gravity"""
-        return gravitational_constant * self.planet_mass / jnp.square(self.surface_radius)
-
-    # The following properties ensure compliance with ThermodynamicStateProtocol
-    @property
-    def mass(self) -> FloatArray:
-        """Mantle mass in kg (alias for :attr:`mantle_mass`)"""
-        return self.mantle_mass
-
-    @property
-    def melt_fraction(self) -> FloatArray:
-        r"""Mantle melt fraction in kg kg\ :sup:`-1` (alias for :attr:`mantle_melt_fraction`)"""
-        return self.mantle_melt_fraction
-
-    @property
-    def melt_mass(self) -> FloatArray:
-        """Mass of the molten mantle in kg (alias for :attr:`mantle_melt_mass`)"""
-        return self.mantle_melt_mass
-
-    @property
-    def melt_moles(self) -> FloatArray:
-        """Moles of the molten mantle (alias for :attr:`mantle_melt_moles`)"""
-        return self.mantle_melt_moles
-
-    @property
-    def solid_mass(self) -> FloatArray:
-        """Mass of the solid mantle in kg (alias for :attr:`mantle_solid_mass`)"""
-        return self.mantle_solid_mass
-
-    @property
-    def solid_moles(self) -> FloatArray:
-        """Moles of the solid mantle (alias for :attr:`mantle_solid_moles`)"""
-        return self.mantle_solid_moles
-
-    def get_pressure(self, gas_mass: FloatArray) -> FloatArray:
-        """Gets the pressure.
-
-        A pressure is used if specified, otherwise the default behaviour is to compute the
-        pressure from the mechanical pressure balance at the planetary surface assuming the thin
-        atmosphere approximation. That is, the surface gravity is computed from the mass of the
-        planet alone and is assumed to act on all the mass of the atmosphere.
-
-        Args:
-            gas_mass: Gas mass in kg
-
-        Returns:
-            Pressure in bar
-        """
-        pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
-
-        mechanical_pressure: FloatArray = (
-            gas_mass * self.surface_gravity / self.surface_area * unit_conversion.Pa_to_bar
-        )
-        # jax.debug.print("mechanical_pressure = {out}", out=mechanical_pressure)
-
-        pressure: FloatArray = jnp.where(pressure_specified, self.pressure, mechanical_pressure)
-        # jax.debug.print("pressure = {out}", out=pressure)
-
-        return pressure
-
-    def asdict(self, gas_mass: FloatArray) -> dict[str, Array]:
-        """Gets a dictionary of the values as NumPy arrays.
-
-        Args:
-            gas_mass: Gas mass in kg
-
-        Returns:
-            A dictionary of the values
-        """
-        base_dict: dict[str, Array] = asdict(self)
-        base_dict["pressure"] = self.get_pressure(gas_mass)
-        base_dict["mantle_mass"] = self.mantle_mass
-        base_dict["mantle_melt_mass"] = self.mantle_melt_mass
-        base_dict["mantle_solid_mass"] = self.mantle_solid_mass
-        base_dict["surface_area"] = self.surface_area
-        base_dict["surface_gravity"] = self.surface_gravity
 
         return base_dict
 
