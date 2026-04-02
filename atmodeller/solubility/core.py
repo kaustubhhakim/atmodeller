@@ -8,7 +8,6 @@ from abc import abstractmethod
 from typing import Optional
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import ArrayLike
 
