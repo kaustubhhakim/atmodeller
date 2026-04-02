@@ -8,21 +8,18 @@ from abc import abstractmethod
 from typing import Optional
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import override
 from atmodeller.interfaces import RedoxBufferProtocol
-from atmodeller.jax_utils import power_law
+from atmodeller.jax_utils import FloatArray, power_law
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 
 class Solubility(eqx.Module):
-    """Solubility interface
-
-    :meth:`~Solubility.jax_concentration` is defined in order to allow arguments to be passed by
-    position to lax.switch.
-    """
+    """Solubility interface"""
 
     @abstractmethod
     def concentration(
@@ -32,7 +29,7 @@ class Solubility(eqx.Module):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array:
+    ) -> FloatArray:
         """Concentration in ppmw
 
         Args:
@@ -47,8 +44,11 @@ class Solubility(eqx.Module):
 
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> Array:
-        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+    ) -> FloatArray:
+        """Wrapper to pass concentration arguments by position to use with :func:`jax.lax.switch`.
+
+        This is also required for gradient calculations, which require all arguments to be passed
+        by position.
 
         Args:
             fugacity: Fugacity in bar
@@ -73,13 +73,13 @@ class NoSolubility(Solubility):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array:
+    ) -> FloatArray:
         del fugacity
         del temperature
         del pressure
         del fO2
 
-        return jnp.array(0.0)  # For JAX compatibility
+        return jnp.array(0.0)  # Must be a JAX array for type compatibility
 
 
 class SolubilityPowerLaw(Solubility):
@@ -103,7 +103,7 @@ class SolubilityPowerLaw(Solubility):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array:
+    ) -> FloatArray:
         del temperature, pressure, fO2
 
         return power_law(fugacity, self.constant, self.exponent)
@@ -131,7 +131,7 @@ class SolubilityPowerLawLog10(Solubility):
         temperature: Optional[ArrayLike] = None,
         pressure: Optional[ArrayLike] = None,
         fO2: Optional[ArrayLike] = None,
-    ) -> Array:
+    ) -> FloatArray:
         del temperature, pressure, fO2
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
@@ -143,7 +143,7 @@ def fO2_temperature_correction(
     temperature: ArrayLike,
     pressure: ArrayLike,
     reference_temperature: ArrayLike,
-) -> Array:
+) -> FloatArray:
     r"""Applies a temperature correction to :math:`\log_{10} f\rm{O}_2`.
 
     Some experimentally derived solubility laws operate on absolute :math:`\log_{10} f\rm{O}_2`,
@@ -164,11 +164,11 @@ def fO2_temperature_correction(
     logiw_fugacity_at_current_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
         temperature, pressure
     )
-    fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity_at_current_temp
+    fo2_shift: FloatArray = jnp.log10(fO2) - logiw_fugacity_at_current_temp
 
     logiw_fugacity_at_reference_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
         reference_temperature, pressure
     )
-    adjusted_fo2: Array = jnp.power(10, logiw_fugacity_at_reference_temp + fo2_shift)
+    adjusted_fo2: FloatArray = jnp.power(10, logiw_fugacity_at_reference_temp + fo2_shift)
 
     return adjusted_fo2
