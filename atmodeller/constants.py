@@ -23,6 +23,14 @@ SOLID_STATE: str = "s"
 DISSOLVED_STATE: str = "d"
 """Suffix to identify dissolved species for output purposes"""
 
+# Numerical floor for dissolved-species solubility in dissolution reactions
+DISSOLUTION_PPMW_FLOOR: float = 1.0e-20
+"""Minimum dissolved concentration (ppmw) used before taking logs in dissolution reactions.
+
+This prevents ``log(0)`` while keeping the floor large enough to avoid excessive solver
+stiffness in underflow-prone regimes.
+"""
+
 # Initial solution guess
 INITIAL_LOG_NUMBER_MOLES: float = 45.0
 """Initial log number of moles

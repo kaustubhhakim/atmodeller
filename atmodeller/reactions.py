@@ -34,7 +34,7 @@ import numpy as np
 from jax import lax
 from jaxtyping import Array, ArrayLike, Float, Integer
 
-from atmodeller.constants import GAS_STATE
+from atmodeller.constants import DISSOLUTION_PPMW_FLOOR, GAS_STATE
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import (
@@ -485,6 +485,10 @@ class DissolutionNetwork(BaseReactionBlock):
     ) -> Float[Array, "... n_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
+        Solubility concentrations in ppmw are clamped to a minimum of
+        :data:`~atmodeller.constants.DISSOLUTION_PPMW_FLOOR` before taking the logarithm to
+        prevent ``log(0)`` in underflow-prone regimes.
+
         Args:
             temperature: Temperature in K
             gas_species_activity: Gas species activity regulating dissolution reactions
@@ -501,6 +505,9 @@ class DissolutionNetwork(BaseReactionBlock):
 
         species_ppmw_concentration: Float[Array, "... n_species"] = self.vmap_solubility(
             jnp.arange(self.number_reactions), gas_species_activity, temperature, pressure, fO2
+        )
+        species_ppmw_concentration = jnp.maximum(
+            species_ppmw_concentration, DISSOLUTION_PPMW_FLOOR
         )
         # jax.debug.print("solvent_molar_mass = {out}", out=jnp.exp(log_solvent_molar_mass))
 

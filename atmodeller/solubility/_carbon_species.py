@@ -138,10 +138,6 @@ class _CO2_basalt_dixon95(Solubility):
         arg: Array = safe_exp(-23 * (pressure - 1) / (83.15 * temperature)) * fugacity * 3.8e-7
         ppmw: Array = 1.0e4 * (4400 * arg) / (36.6 - 44 * arg)
 
-        # For high pressure in particular, the predicted concentration can underflow to zero. Hence
-        # we set a lower bound of 1e-12 ppmw (one part per quintillion by weight).
-        ppmw = jnp.maximum(ppmw, 1e-12)
-
         return ppmw
 
 
