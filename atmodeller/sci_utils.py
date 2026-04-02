@@ -62,7 +62,10 @@ GAS_CONSTANT_BAR: float = GAS_CONSTANT * unit_conversion.Pa_to_bar
 r"""Gas constant (:math:`\mathrm{m}^3\mathrm{bar}^{-1}\mathrm{K}^{-1}\mathrm{mol}^{-1}`)"""
 
 EARTH_MASS: float = 5.9722e24
-r"""Mass of Earth (kg)"""
+"""Mass of Earth (kg)"""
+
+EARTH_RADIUS: float = 6371000.0
+"""Radius of Earth (m)"""
 
 OCEAN_MOLES: float = 7.68894973907177e22
 r"""Moles of H\ :sub:`2` or H\ :sub:`2`\ O in present-day Earth's ocean (mol)"""
@@ -72,6 +75,9 @@ r"""Mass of H\ :sub:`2` in present-day Earth's ocean (kg)"""
 
 OCEAN_MASS_H2O: float = OCEAN_MOLES * Formula("H2O").mass * unit_conversion.g_to_kg
 r"""Mass of H\ :sub:`2`\O in present-day Earth's ocean (kg)"""
+
+SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
+r"""Molar mass of SiO\ :sub:`2` (kg mol\ :sup:`-1`)"""
 
 
 class ExperimentalCalibration(eqx.Module):
