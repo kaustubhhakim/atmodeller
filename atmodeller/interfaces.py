@@ -169,7 +169,7 @@ class SolubilityProtocol(Protocol):
     """Solubility protocol
 
     :meth:`~SolubilityProtocol.jax_concentration` is defined in order to allow arguments to be
-    passed by position to lax.switch.
+    passed by position to :func:`jax.lax.switch`.
     """
 
     def concentration(
@@ -196,7 +196,7 @@ class SolubilityProtocol(Protocol):
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> FloatArray:
-        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+        """Wrapper to pass concentration arguments by position to use with :func:`jax.lax.switch`
 
         Args:
             fugacity: Fugacity in bar
