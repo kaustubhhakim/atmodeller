@@ -416,7 +416,7 @@ class FixedFugacityConstraint(eqx.Module):
         fugacity: Fugacity in bar. Defaults to ``np.nan``.
     """
 
-    fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
+    fugacity: Array = eqx.field(converter=as_j64, default=jnp.nan)
     """Fugacity"""
 
     def active(self) -> Bool[Array, "..."]:
@@ -669,34 +669,28 @@ class MassConstraintSet(eqx.Module):
         """
         return self.abundance_mol(batch_size) * self.species.element_molar_masses
 
-    # TODO: reinstate this later
-    # def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
-    #     """Updates the abundance with new values from a dictionary
+    def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
+        """Updates the abundance with new values from a dictionary
 
-    #     Args:
-    #         new_abundances: Dictionary with new abundance values for some or all elements. The keys
-    #             should be element names and the values should be the new abundance values in the
-    #             same units as the original abundance. Original abundances that are not included in
-    #             the ``new_abundance`` dictionary will be retained.
+        Args:
+            new_abundances: Dictionary with new abundance values for some or all elements. The keys
+                should be element names and the values should be the new abundance values in moles.
+                Original abundances that are not included in the ``new_abundance`` dictionary will
+                be retained.
 
-    #     Returns:
-    #         A new MassConstraintSet with the updated abundance
-    #     """
-    #     abundance_updated: Array = self.abundance
+        Returns:
+            A new MassConstraintSet with the updated abundance
+        """
+        abundance_dict: dict[str, Array] = dict(self.abundance_dict)
 
-    #     for element, new_value in new_abundances.items():
-    #         element_index: int = self.species.get_element_index(element)
-    #         # TODO: decide if squeezing is necessary or if the input should be required to have the
-    #         # same shape as abundance
-    #         abundance_updated = abundance_updated.at[..., element_index].set(
-    #             jnp.squeeze(new_value)
-    #         )
+        for element, new_value in new_abundances.items():
+            abundance_dict[element] = as_j64(new_value)
 
-    #     mass_constaint_set_update: MassConstraintSet = eqx.tree_at(
-    #         lambda c: c.abundance, self, abundance_updated
-    #     )
+        mass_constraint_set_update: MassConstraintSet = eqx.tree_at(
+            lambda c: c.abundance_dict, self, abundance_dict
+        )
 
-    #     return mass_constaint_set_update
+        return mass_constraint_set_update
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
