@@ -2,33 +2,17 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Thermodynamic state representations for planetary modeling.
+"""Thermodynamic state and planetary state models.
 
-This module provides JAX/Equinox-compatible classes for representing the thermodynamic state of a
-system or planet, including temperature, pressure, mass, melt fraction, and molar mass. All fields
-are stored as JAX arrays for seamless use with JAX transformations (jit, grad, vmap) and to avoid
-unnecessary recompilation.
+The hierarchy is:
 
-Key features:
-
-- **JAX/Equinox compatibility:** All fields are JAX arrays, using Equinox modules and field
-  converters.
-- **Protocol adherence:** Classes are designed to comply with
-  :class:`~atmodeller.interfaces.ThermodynamicStateProtocol` for interoperability.
-- **Planetary modeling:** Includes a generic :class:`ThermodynamicState` and a
-  :class:`ThinAtmospherePlanet` model with Earth-like defaults and surface pressure calculation.
-- **Convenience methods:** Properties for melt/solid mass and moles, surface gravity, and area;
-  dictionary export for downstream use.
-
-Classes:
-
-- :class:`ThermodynamicState`: Generic thermodynamic state for any system.
-- :class:`ThinAtmospherePlanet`: Earth-like planet with a thin atmosphere and surface pressure
-  calculation.
-- :class:`Planet`: Alias for :class:`ThinAtmospherePlanet` (for future extensibility).
-
-All classes are designed for use in JAX-based scientific workflows and can be extended for more
-complex planetary models.
+- :class:`BaseThermodynamicState`: shared interface and phase-mass helpers.
+- :class:`ThermodynamicState`: generic state with fixed pressure.
+- :class:`BasePlanet`: common planetary quantities (surface area, gravity, mass).
+- :class:`ThinAtmospherePlanet`: pressure from thin-atmosphere mechanical balance when pressure is
+  not specified.
+- :class:`PressureScalingLawPlanet`: pressure from a scaling law
+  :cite:p:`Schlichting_2022{Equation 8}` when pressure is not specified.
 """
 
 from abc import abstractmethod
@@ -53,12 +37,12 @@ class BaseThermodynamicState(eqx.Module):
     reaction_system: ReactionSystem
     """Reaction system representing the thermodynamic state of the system"""
     temperature: FloatArray
-    """Temperature in K"""
+    """Temperature (K)"""
     pressure: FloatArray
-    """Pressure in bar. Should not be used directly; use :meth:`get_pressure` instead"""
+    """Pressure (bar). Should not be used directly; use :meth:`get_pressure` instead"""
 
     @abstractmethod
-    def __init__(self, *args, **kwargs) -> None: ...
+    def __init__(self, *args, **kwargs): ...
 
     @property
     def phase_system(self) -> PhaseSystem:
@@ -67,7 +51,7 @@ class BaseThermodynamicState(eqx.Module):
 
     @abstractmethod
     def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        """Pressure in bar"""
+        """Pressure (bar)"""
         ...
 
     @abstractmethod
@@ -75,24 +59,83 @@ class BaseThermodynamicState(eqx.Module):
         """Gets a dictionary representation."""
         ...
 
+    def get_solid_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+        """Gets the solid mass.
+
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
+        Returns:
+            Solid mass (kg)
+        """
+        log_number_moles_solid: Float[Array, "... solid_species"] = log_number_moles[
+            ..., self.phase_system.solid_slice
+        ]
+        solid_mass: Float[Array, "... 1"] = jnp.exp(
+            self.phase_system.solid.get_log_phase_mass(log_number_moles_solid)
+        )
+        solid_mass_squeeze: FloatArray = jnp.squeeze(solid_mass, axis=-1)
+
+        return solid_mass_squeeze
+
+    def get_melt_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+        """Gets the melt mass.
+
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
+        Returns:
+            Melt mass (kg)
+        """
+        log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
+            ..., self.phase_system.melt_slice
+        ]
+        melt_mass: Float[Array, "... 1"] = jnp.exp(
+            self.phase_system.melt.get_log_phase_mass(log_number_moles_melt)
+        )
+        melt_mass_squeeze: FloatArray = jnp.squeeze(melt_mass, axis=-1)
+
+        return melt_mass_squeeze
+
+    def get_melt_fraction(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+        """Gets the melt fraction.
+
+        .. math::
+            X_{\\rm melt} = \\frac{m_{\\rm melt}}{m_{\\rm melt} + m_{\\rm solid}}
+
+        where :math:`m_{\\rm melt}` is the melt mass and :math:`m_{\\rm solid}` is the solid mass.
+
+        Args:
+            log_number_moles: Log number of moles for all species in the system
+
+        Returns:
+            Melt fraction (between 0 and 1) (kgkg\\ :sup:`-1`)
+        """
+        melt_mass: FloatArray = self.get_melt_mass(log_number_moles)
+        solid_mass: FloatArray = self.get_solid_mass(log_number_moles)
+
+        melt_fraction: FloatArray = melt_mass / (melt_mass + solid_mass)
+
+        return melt_fraction
+
 
 class ThermodynamicState(BaseThermodynamicState):
     """A generic thermodynamic state
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the system
-        temperature: Temperature in K
-        pressure: Pressure in bar
+        temperature: Temperature (K)
+        pressure: Pressure (bar)
     """
 
     reaction_system: ReactionSystem
     """Reaction system representing the thermodynamic state of the system"""
     temperature: FloatArray
-    """Temperature in K"""
+    """Temperature (K)"""
     pressure: FloatArray
-    """Pressure in bar. Should not be used directly; use :meth:`get_pressure` instead"""
+    """Pressure (bar). Should not be used directly; use :meth:`get_pressure` instead"""
 
-    # For helpful typing information
+    # For helpful typing information since eqx.field(converter=as_j64) confuses the type checker
     @override
     def __init__(
         self, reaction_system: ReactionSystem, temperature: ArrayLike, pressure: ArrayLike
@@ -108,7 +151,7 @@ class ThermodynamicState(BaseThermodynamicState):
         pressure: ArrayLike,
         *,
         mass: ArrayLike = 1.0,
-        melt_fraction: ArrayLike = 0.0,
+        melt_fraction: ArrayLike = 1.0,
         temperature: ArrayLike = 2000,
         molar_mass: ArrayLike = SIO2_MOLAR_MASS,
         melt_species: Iterable[SpeciesProtocol] = (),
@@ -119,10 +162,10 @@ class ThermodynamicState(BaseThermodynamicState):
 
         Args:
             gas_species: Iterable of species in the gas phase
-            pressure: Pressure in bar
-            mass: Mass in kg. Defaults to ``1`` kg (i.e., reference unit mass).
+            pressure: Pressure (bar)
+            mass: Mass (kg). Defaults to ``1`` (i.e., reference unit mass).
             melt_fraction: Melt fraction. Defaults to ``1`` (i.e., fully molten).
-            temperature: Temperature in K. Defaults to ``2000``.
+            temperature: Temperature (K). Defaults to ``2000``.
             molar_mass: Molar mass. Defaults to :data:`~atmodeller.sci_utils.SIO2_MOLAR_MASS`.
             melt_species: Iterable of species in the melt phase. Defaults to an empty tuple.
             solid_species: Iterable of species in the solid phase. Defaults to an empty tuple.
@@ -148,7 +191,7 @@ class ThermodynamicState(BaseThermodynamicState):
         """Gets the pressure.
 
         Returns:
-            Pressure in bar
+            Pressure (bar)
         """
         del log_number_moles
 
@@ -164,15 +207,10 @@ class ThermodynamicState(BaseThermodynamicState):
         Returns:
             A dictionary of the values
         """
-        del log_number_moles
-
-        # FIXME: This breaks because of nested phase system
-        # base_dict: dict[str, Array] = asdict(self)
         base_dict = {}
-        # TODO: Reinstate these outputs?
-        # base_dict["mantle_mass"] = self.mantle_mass
-        # base_dict["mantle_melt_mass"] = self.mantle_melt_mass
-        # base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        base_dict["melt_mass"] = self.get_melt_mass(log_number_moles)
+        base_dict["solid_mass"] = self.get_solid_mass(log_number_moles)
+        base_dict["mass"] = base_dict["melt_mass"] + base_dict["solid_mass"]
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.pressure
 
@@ -180,17 +218,15 @@ class ThermodynamicState(BaseThermodynamicState):
 
 
 class BasePlanet(BaseThermodynamicState):
-    """A planet.
-
-    Default values are for a fully molten Earth.
+    """A planet
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the planetary body
-        surface_radius: Radius of the surface in m
-        metallic_core_mass: Metallic core mass in kg
-        temperature: Temperature in K
-        pressure: Pressure in bar
-        background_planet_mass: Planet mass in kg from only the background melt and solid mass,
+        surface_radius: Radius of the surface (m)
+        metallic_core_mass: Metallic core mass (kg)
+        temperature: Temperature (K)
+        pressure: Pressure (bar)
+        background_planet_mass: Planet mass (kg) from only the background melt and solid mass,
             plus the metallic core mass. This value will only be equal to the actual planet mass if
             ``include_in_phase_mass`` is ``False`` for all species in the melt and solid phases.
     """
@@ -198,17 +234,17 @@ class BasePlanet(BaseThermodynamicState):
     reaction_system: ReactionSystem
     """Reaction system representing the thermodynamic state of the planetary body"""
     surface_radius: FloatArray
-    """Radius of the surface in m"""
+    """Radius of the surface (m)"""
     metallic_core_mass: FloatArray
-    """Metallic core mass in kg"""
+    """Metallic core mass (kg)"""
     temperature: FloatArray
-    """Temperature in K"""
+    """Temperature (K)"""
     pressure: FloatArray
-    """Pressure in bar"""
+    """Pressure (bar)"""
     background_planet_mass: FloatArray
-    """Planet mass in kg from only the background melt and solid mass, plus the core mass"""
+    """Planet mass (kg) from only the background melt and solid mass, plus the core mass"""
 
-    # For helpful typing information
+    # For helpful typing information since eqx.field(converter=as_j64) confuses the type checker
     @override
     def __init__(
         self,
@@ -237,24 +273,26 @@ class BasePlanet(BaseThermodynamicState):
         surface_radius: ArrayLike = EARTH_RADIUS,
         temperature: ArrayLike = 2000,
         pressure: ArrayLike = jnp.nan,
-        molar_mass: ArrayLike = 60e-3,
+        molar_mass: ArrayLike = SIO2_MOLAR_MASS,
         melt_species: Iterable[SpeciesProtocol] = (),
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
-        r"""Creates a new instance.
+        """Creates a new instance.
+
+        Default values are for a fully molten Earth.
 
         Args:
             gas_species: Iterable of species in the gas phase
-            planet_mass: Mass of the planet in kg. Defaults to
+            planet_mass: Mass of the planet (kg). Defaults to
                 :data:`~atmodeller.sci_utils.EARTH_MASS`.
-            core_mass_fraction: Mass fraction of the iron core relative to the planetary mass.
-                Defaults to ``0.295334691460966`` kg kg\ :sup:`-1` (Earth).
+            core_mass_fraction: Mass fraction of the iron core relative to the planetary mass
+                (kgkg\\ :sup:`-1`). Defaults to ``0.295334691460966`` (Earth).
             mantle_melt_fraction: Mantle melt fraction. Defaults to ``1.0``.
-            surface_radius: Radius of the planetary surface in m. Defaults to
+            surface_radius: Radius of the planetary surface (m). Defaults to
                 :data:`~atmodeller.sci_utils.EARTH_RADIUS`.
-            temperature: Temperature in K. Defaults to ``2000`` K.
-            pressure: Pressure in bar. Defaults to ``NaN`` to solve for the mechanical pressure
+            temperature: Temperature (K). Defaults to ``2000``.
+            pressure: Pressure (bar). Defaults to ``NaN`` to solve for the mechanical pressure
                 balance at the surface.
             molar_mass: Molar mass. Defaults to :data:`~atmodeller.sci_utils.SIO2_MOLAR_MASS`.
             melt_species: Iterable of species in the melt phase. Defaults to an empty tuple.
@@ -282,46 +320,14 @@ class BasePlanet(BaseThermodynamicState):
 
     @property
     def surface_area(self) -> FloatArray:
-        """Surface area"""
+        """Surface area (m\\ :sup:`2`)
+
+        .. math::
+            A_{\\rm surf} = 4 \\pi R_{\\rm surf}^2
+
+        where :math:`R_{\\rm surf}` is the surface radius.
+        """
         return 4.0 * jnp.pi * jnp.square(self.surface_radius)
-
-    def get_mantle_melt_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        """Gets the mass of the molten mantle.
-
-        Args:
-            log_number_moles: Log number of moles for all species in the system
-
-        Returns:
-            Mantle melt mass in kg
-        """
-        log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
-            ..., self.phase_system.melt_slice
-        ]
-        melt_mass: Float[Array, "... 1"] = jnp.exp(
-            self.phase_system.melt.get_log_phase_mass(log_number_moles_melt)
-        )
-        melt_mass_squeeze: FloatArray = jnp.squeeze(melt_mass, axis=-1)
-
-        return melt_mass_squeeze
-
-    def get_mantle_solid_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        """Gets the mass of the solid mantle.
-
-        Args:
-            log_number_moles: Log number of moles for all species in the system
-
-        Returns:
-            Solid mantle mass in kg
-        """
-        log_number_moles_solid: Float[Array, "... solid_species"] = log_number_moles[
-            ..., self.phase_system.solid_slice
-        ]
-        solid_mass: Float[Array, "... 1"] = jnp.exp(
-            self.phase_system.solid.get_log_phase_mass(log_number_moles_solid)
-        )
-        solid_mass_squeeze: FloatArray = jnp.squeeze(solid_mass, axis=-1)
-
-        return solid_mass_squeeze
 
     def get_planet_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Gets the planet mass.
@@ -332,25 +338,28 @@ class BasePlanet(BaseThermodynamicState):
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Planet mass in kg
+            Planet mass (kg)
         """
-        mantle_melt_mass: FloatArray = self.get_mantle_melt_mass(log_number_moles)
-        mantle_solid_mass: FloatArray = self.get_mantle_solid_mass(log_number_moles)
+        mantle_melt_mass: FloatArray = self.get_melt_mass(log_number_moles)
+        mantle_solid_mass: FloatArray = self.get_solid_mass(log_number_moles)
         planet_mass = mantle_melt_mass + mantle_solid_mass + self.metallic_core_mass
 
         return planet_mass
 
     def get_surface_gravity(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        r"""Gets the surface gravity.
+        """Gets the surface gravity.
 
-        Computes the surface gravity from the mass of condensed phases and the radius of the
-        planet.
+        .. math::
+            g_{\\rm surf} = \\frac{GM_{\\rm p}}{R_{\\rm surf}^2}
+
+        where :math:`G` is the gravitational constant, :math:`M_{\\rm p}` is the planet mass, and
+        :math:`R_{\\rm surf}` is the surface radius.
 
         Args:
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Surface gravity in m s\ :sup:`-2`
+            Surface gravity (ms\\ :sup:`-2`)
         """
         planet_mass: FloatArray = self.get_planet_mass(log_number_moles)
         # jax.debug.print("planet_mass = {out}", out=planet_mass_squeeze)
@@ -373,8 +382,8 @@ class BasePlanet(BaseThermodynamicState):
             A dictionary of the values
         """
         base_dict = {}
-        base_dict["mantle_melt_mass"] = self.get_mantle_melt_mass(log_number_moles)
-        base_dict["mantle_solid_mass"] = self.get_mantle_solid_mass(log_number_moles)
+        base_dict["mantle_melt_mass"] = self.get_melt_mass(log_number_moles)
+        base_dict["mantle_solid_mass"] = self.get_solid_mass(log_number_moles)
         base_dict["mantle_mass"] = base_dict["mantle_melt_mass"] + base_dict["mantle_solid_mass"]
         base_dict["metallic_core_mass"] = self.metallic_core_mass
         base_dict["surface_area"] = self.surface_area
@@ -394,16 +403,20 @@ class ThinAtmospherePlanet(BasePlanet):
     gravity is therefore set by the planetary body (condensed phases plus metallic core), and the
     atmosphere is treated as non-self-gravitating in the pressure balance.
 
-    Default values are for a fully molten Earth.
+    .. math::
+        P_{\\rm surf} = \\frac{m_{\\rm atm} g_{\\rm surf}}{A_{\\rm surf}}
+
+    where :math:`m_{\\rm atm}` is the atmospheric mass, :math:`g_{\\rm surf}` is the surface
+    gravity, and :math:`A_{\\rm surf}` is the surface area.
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the planetary body
-        surface_radius: Radius of the surface in m
-        metallic_core_mass: Metallic core mass in kg
-        temperature: Temperature in K
-        pressure: Pressure in bar
-        background_planet_mass: Planet mass in kg from only the background melt and solid mass, plus
-            the metallic core mass. This value will only be equal to the actual planet mass if
+        surface_radius: Radius of the surface (m)
+        metallic_core_mass: Metallic core mass (kg)
+        temperature: Temperature (K)
+        pressure: Pressure (bar)
+        background_planet_mass: Planet mass (kg) from only the background melt and solid mass,
+            plus the metallic core mass. This value will only be equal to the actual planet mass if
             ``include_in_phase_mass`` is ``False`` for all species in the melt and solid phases.
     """
 
@@ -420,7 +433,7 @@ class ThinAtmospherePlanet(BasePlanet):
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Pressure in bar
+            Pressure (bar)
         """
         pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
 
@@ -449,21 +462,20 @@ class ThinAtmospherePlanet(BasePlanet):
 class PressureScalingLawPlanet(BasePlanet):
     """A planet with a scaling law for the atmospheric pressure.
 
-    A pressure is used if specified, otherwise it is computed from the scaling law:
+    A pressure is used if specified, otherwise it is computed from the scaling law
+    :cite:p:`Schlichting_2022{Equation 8}`:
 
     .. math::
-        P_{\\text{surface}} = 1 \\times 10^6 \\frac{M_{\\text{atm}}}{M_{\\text{p}}} \\left( \\frac{M_\\text{p}}{M_{\\text{Earth}}}\\right)^{2/3}
-
-    Default values are for a fully molten Earth.
+        P_{\\text{surf}} = 1 \\times 10^6 \\frac{M_{\\text{atm}}}{M_{\\text{p}}} \\left( \\frac{M_\\text{p}}{M_{\\text{Earth}}}\\right)^{2/3}
 
     Args:
         reaction_system: Reaction system representing the thermodynamic state of the planetary body
-        surface_radius: Radius of the surface in m
-        metallic_core_mass: Metallic core mass in kg
-        temperature: Temperature in K
-        pressure: Pressure in bar
-        background_planet_mass: Planet mass in kg from only the background melt and solid mass,
-            plus the metallic core mass. This value will only be equal to the actual planet mass if
+        surface_radius: Radius of the surface (m)
+        metallic_core_mass: Metallic core mass (kg)
+        temperature: Temperature (K)
+        pressure: Pressure (bar)
+        background_planet_mass: Planet mass (kg) from only the background melt and solid mass, plus
+            the metallic core mass. This value will only be equal to the actual planet mass if
             ``include_in_phase_mass`` is ``False`` for all species in the melt and solid phases.
     """
 
@@ -477,7 +489,7 @@ class PressureScalingLawPlanet(BasePlanet):
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Pressure in bar
+            Pressure (bar)
         """
         pressure_specified: Bool[Array, "..."] = ~jnp.isnan(self.pressure)
 
@@ -490,10 +502,10 @@ class PressureScalingLawPlanet(BasePlanet):
         )
         gas_mass_squeeze: FloatArray = jnp.squeeze(gas_mass, axis=-1)
 
+        planet_mass: FloatArray = self.get_planet_mass(log_number_moles)
+
         scaling_law: FloatArray = (
-            1e6
-            * (gas_mass_squeeze / self.get_planet_mass(log_number_moles))
-            * (self.get_planet_mass(log_number_moles) / EARTH_MASS) ** (2 / 3)
+            1e6 * (gas_mass_squeeze / planet_mass) * (planet_mass / EARTH_MASS) ** (2 / 3)
         )
 
         pressure: FloatArray = jnp.where(pressure_specified, self.pressure, scaling_law)
@@ -502,5 +514,5 @@ class PressureScalingLawPlanet(BasePlanet):
         return pressure
 
 
-# The only planet supported so far is one with a thin atmosphere
+# The default planet model is the thin atmosphere model
 Planet = ThinAtmospherePlanet
