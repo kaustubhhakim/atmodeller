@@ -75,9 +75,7 @@ class Parameters(eqx.Module):
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
             state.reaction_system.phase_system.species, mass_constraints
         )
-        # TODO: NOTE: fugacity_constraints and not fugacity_constraints_ here. Potentially to
-        # change during a refactor.
-        batch_size: int = get_batch_size((state, fugacity_constraints, mass_constraints_))
+        batch_size: int = get_batch_size((state, fugacity_constraints_, mass_constraints_))
         # jax.debug.print("batch_size (parameters) = {out}", out=batch_size)
 
         solver_parameters_: SolverParameters = (
@@ -106,26 +104,25 @@ class Parameters(eqx.Module):
         """Unique elements in the system"""
         return self.reaction_system.species.unique_elements
 
-    # TODO: Generalise to update other quantities on the parameters object
-    # def update_constraints(
-    #     self, new_mass_constraints: Optional[Mapping[str, ArrayLike]] = None
-    # ) -> "Parameters":
-    #     """Updates the constraints of the parameters.
+    def update_constraints(
+        self, new_mass_constraints: Optional[Mapping[str, ArrayLike]] = None
+    ) -> "Parameters":
+        """Updates the constraints of the parameters.
 
-    #     Args:
-    #         new_mass_constraints: New mass constraints. Defaults to ``None``.
+        Args:
+            new_mass_constraints: New mass constraints. Defaults to ``None``.
 
-    #     Returns:
-    #         Updated parameters.
-    #     """
-    #     parameters_updated: Parameters = self
+        Returns:
+            Updated parameters.
+        """
+        parameters_updated: Parameters = self
 
-    #     if new_mass_constraints is not None:
-    #         mass_constraints_updated: MassConstraintSet = self.mass_constraints.update_abundance(
-    #             new_mass_constraints
-    #         )
-    #         parameters_updated = eqx.tree_at(
-    #             lambda p: p.mass_constraints, self, mass_constraints_updated
-    #         )
+        if new_mass_constraints is not None:
+            mass_constraints_updated: MassConstraintSet = self.mass_constraints.update_abundance(
+                new_mass_constraints
+            )
+            parameters_updated = eqx.tree_at(
+                lambda p: p.mass_constraints, self, mass_constraints_updated
+            )
 
-    #     return parameters_updated
+        return parameters_updated
