@@ -30,7 +30,7 @@ from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
-from atmodeller.sci_utils import EARTH_MASS, EARTH_RADIUS, SIO2_MOLAR_MASS, unit_conversion
+from atmodeller.sci_utils import SIO2_MOLAR_MASS, earth, unit_conversion
 
 
 class BaseThermodynamicState(eqx.Module):
@@ -267,10 +267,10 @@ class BasePlanet(BaseThermodynamicState):
         cls,
         gas_species: Iterable[ChemicalSpecies],
         *,
-        planet_mass: ArrayLike = EARTH_MASS,
-        core_mass_fraction: ArrayLike = 0.295334691460966,
+        planet_mass: ArrayLike = earth.mass,
+        core_mass_fraction: ArrayLike = earth.core_mass_fraction,
         mantle_melt_fraction: ArrayLike = 1.0,
-        surface_radius: ArrayLike = EARTH_RADIUS,
+        surface_radius: ArrayLike = earth.radius,
         temperature: ArrayLike = 2000,
         pressure: ArrayLike = jnp.nan,
         molar_mass: ArrayLike = SIO2_MOLAR_MASS,
@@ -284,13 +284,11 @@ class BasePlanet(BaseThermodynamicState):
 
         Args:
             gas_species: Iterable of species in the gas phase
-            planet_mass: Mass of the planet (kg). Defaults to
-                :data:`~atmodeller.sci_utils.EARTH_MASS`.
+            planet_mass: Mass of the planet (kg). Defaults to Earth.
             core_mass_fraction: Mass fraction of the iron core relative to the planetary mass
-                (kgkg\\ :sup:`-1`). Defaults to ``0.295334691460966`` (Earth).
+                (kgkg\\ :sup:`-1`). Defaults to Earth.
             mantle_melt_fraction: Mantle melt fraction. Defaults to ``1.0``.
-            surface_radius: Radius of the planetary surface (m). Defaults to
-                :data:`~atmodeller.sci_utils.EARTH_RADIUS`.
+            surface_radius: Radius of the planetary surface (m). Defaults to Earth.
             temperature: Temperature (K). Defaults to ``2000``.
             pressure: Pressure (bar). Defaults to ``NaN`` to solve for the mechanical pressure
                 balance at the surface.
@@ -505,7 +503,7 @@ class PressureScalingLawPlanet(BasePlanet):
         planet_mass: FloatArray = self.get_planet_mass(log_number_moles)
 
         scaling_law: FloatArray = (
-            1e6 * (gas_mass_squeeze / planet_mass) * (planet_mass / EARTH_MASS) ** (2 / 3)
+            1e6 * (gas_mass_squeeze / planet_mass) * (planet_mass / earth.mass) ** (2 / 3)
         )
 
         pressure: FloatArray = jnp.where(pressure_specified, self.pressure, scaling_law)

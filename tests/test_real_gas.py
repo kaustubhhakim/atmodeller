@@ -24,7 +24,7 @@ from atmodeller.interfaces import (
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
-from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
+from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
@@ -75,7 +75,7 @@ def test_fO2_holley() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
@@ -107,8 +107,10 @@ def test_chabrier_earth() -> None:
     planet: Planet = Planet.create(
         gas_species_subneptune, temperature=3400, condensates=condensates_subneptune
     )
-    h_kg: ArrayLike = 0.01 * planet.default_planet_mass
-    si_kg: ArrayLike = 0.1459 * planet.default_planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
+    h_kg: ArrayLike = 0.01 * planet.background_planet_mass
+    si_kg: ArrayLike = (
+        0.1459 * planet.background_planet_mass
+    )  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
@@ -162,8 +164,10 @@ def test_chabrier_subNeptune() -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    h_kg: ArrayLike = 0.01 * planet.default_planet_mass
-    si_kg: ArrayLike = 0.1459 * planet.default_planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
+    h_kg: ArrayLike = 0.01 * planet.background_planet_mass
+    si_kg: ArrayLike = (
+        0.1459 * planet.background_planet_mass
+    )  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = 6.74717e24
 
     logger.info("h_kg = %s", h_kg)
@@ -220,8 +224,10 @@ def test_chabrier_subNeptune_batch() -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    h_kg: ArrayLike = 0.01 * planet.default_planet_mass
-    si_kg: ArrayLike = 0.1459 * planet.default_planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
+    h_kg: ArrayLike = 0.01 * planet.background_planet_mass
+    si_kg: ArrayLike = (
+        0.1459 * planet.background_planet_mass
+    )  # Si = 14.59 wt% Kargel & Lewis (1993)
     # Batch solve for three oxygen masses
     o_kg: ArrayLike = 1e24 * np.array([7.0, 7.5, 8.0])
 
@@ -353,8 +359,10 @@ def test_subNeptune_melt_phase() -> None:
 
     # The previous mass constraints are still OK, because we are not allowing the melt species to
     # contribute additionally to the planet mass. So these calculations are still exact.
-    h_kg: ArrayLike = 0.01 * planet.default_planet_mass
-    si_kg: ArrayLike = 0.1459 * planet.default_planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
+    h_kg: ArrayLike = 0.01 * planet.background_planet_mass
+    si_kg: ArrayLike = (
+        0.1459 * planet.background_planet_mass
+    )  # Si = 14.59 wt% Kargel & Lewis (1993)
     # o_kg: ArrayLike = 6.74717e24
     # Batch solve for three oxygen masses
     o_kg: ArrayLike = 1e24 * np.array([7.0, 7.5, 8.0])

@@ -18,7 +18,7 @@ from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.jax_utils import NpFloat
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
-from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
+from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
@@ -67,7 +67,7 @@ def test_H2O() -> None:
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
     oceans: ArrayLike = 2
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
@@ -93,7 +93,7 @@ def test_H_O() -> None:
     planet: BaseThermodynamicState = Planet.create(gas_species)
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     o_kg: ArrayLike = 6.25774e20
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
@@ -131,7 +131,7 @@ def test_H_fO2() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
@@ -173,7 +173,7 @@ def test_H_fO2_fH2() -> None:
     }
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
@@ -222,7 +222,7 @@ def test_H_fO2_batch_temperature() -> None:
     }
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
@@ -287,7 +287,7 @@ def test_H_fO2_batch_fO2_shift() -> None:
     }
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
@@ -347,7 +347,7 @@ def test_H_fO2_batch_H_mass() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 

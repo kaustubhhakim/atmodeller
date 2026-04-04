@@ -19,7 +19,7 @@ from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
-from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
+from atmodeller.sci_utils import earth
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
@@ -68,7 +68,7 @@ def test_graphite_stable() -> None:
     }
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 5 * h_kg
     o_kg: ArrayLike = 2.73159e19
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
@@ -117,7 +117,7 @@ def test_graphite_unstable() -> None:
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
@@ -161,7 +161,7 @@ def test_water_stable() -> None:
     )
 
     oceans: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     o_kg: float = 1.14375e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 

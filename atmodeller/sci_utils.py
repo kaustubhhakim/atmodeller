@@ -23,7 +23,7 @@ Scalar: TypeAlias = int | float
 
 
 class UnitConversion(eqx.Module):
-    """Unit conversion"""
+    """Unit conversions"""
 
     # Pressure
     atmosphere_to_bar: float = atmosphere / bar
@@ -55,26 +55,126 @@ class UnitConversion(eqx.Module):
 unit_conversion: UnitConversion = UnitConversion()
 
 
+class PlanetParameters(eqx.Module):
+    """Planet parameters"""
+
+    mass: float
+    """Mass of the planet (kg)"""
+    radius: float
+    """Radius of the planet (m)"""
+    core_mass_fraction: float
+    """Core mass fraction (dimensionless)"""
+
+    @property
+    def bulk_density(self) -> float:
+        """Calculates bulk density from mass and radius
+
+        .. math::
+                \\rho = \\frac{M}{\\frac{4}{3}\\pi R^3}
+
+        where :math:`M` is the mass of the planet and :math:`R` is the radius of the planet.
+
+        Returns:
+            Bulk density of the planet (kgm\\ :sup:`-3`)
+        """
+        return self.mass / self.volume
+
+    @property
+    def core_mass(self) -> float:
+        """Calculates core mass from mass and core mass fraction
+
+        .. math::
+                M_{core} = f_{core} M
+
+        where :math:`f_{core}` is the core mass fraction and :math:`M` is the mass of the planet.
+
+        Returns:
+            Mass of the core (kg)
+        """
+        return self.core_mass_fraction * self.mass
+
+    @property
+    def mantle_mass(self) -> float:
+        """Calculates mantle mass from mass and core mass fraction
+
+        .. math::
+                M_{mantle} = (1 - f_{core}) M
+
+        where :math:`f_{core}` is the core mass fraction and :math:`M` is the mass of the planet.
+
+        Returns:
+            Mass of the mantle (kg)
+        """
+        return (1 - self.core_mass_fraction) * self.mass
+
+    @property
+    def surface_gravity(self) -> float:
+        """Calculates surface gravity from mass and radius
+
+        .. math::
+                g = \\frac{GM}{R^2}
+
+        where :math:`G` is the gravitational constant, :math:`M` is the mass of the planet, and
+        :math:`R` is the radius of the planet.
+
+        Returns:
+            Surface gravity of the planet (ms\\ :sup:`-2`)
+        """
+        return constants.gravitational_constant * self.mass / self.radius**2
+
+    @property
+    def volume(self) -> float:
+        """Calculates volume from radius
+
+        .. math::
+                V = \\frac{4}{3}\\pi R^3
+
+        where :math:`R` is the radius of the planet.
+
+        Returns:
+            Volume of the planet (m\\ :sup:`3`)
+        """
+        return (4 / 3) * np.pi * self.radius**3
+
+
+class EarthParameters(PlanetParameters):
+    """Earth parameters"""
+
+    ocean_moles: float
+    """Moles of H\\ :sub:`2` or H\\ :sub:`2`\\ O in present-day Earth's ocean (mol)"""
+    ocean_mass_H2: float
+    """Mass of H\\ :sub:`2` in present-day Earth's ocean (kg)"""
+    ocean_mass_H2O: float
+    """Mass of H\\ :sub:`2`\\ O in present-day Earth's ocean (kg)"""
+
+    def __init__(self):
+        self.mass = 5.972e24
+        self.radius = 6371000.0
+        self.core_mass_fraction = 0.295334691460966
+        self.ocean_moles = 7.68894973907177e22
+        self.ocean_mass_H2 = self.ocean_moles * Formula("H2").mass * unit_conversion.g_to_kg
+        self.ocean_mass_H2O = self.ocean_moles * Formula("H2O").mass * unit_conversion.g_to_kg
+
+    def oceans_to_hydrogen_mass(self, number_of_earth_oceans: ArrayLike = 1) -> ArrayLike:
+        """Converts number of Earth oceans to hydrogen mass.
+
+        Args:
+            number_of_earth_oceans: Number of Earth oceans. Defaults to ``1``.
+
+        Returns:
+            Hydrogen mass in kg corresponding to the given number of Earth oceans
+        """
+        return number_of_earth_oceans * self.ocean_mass_H2
+
+
+earth: EarthParameters = EarthParameters()
+
+
 GAS_CONSTANT: float = constants.gas_constant
 r"""Gas constant (:math:`\mathrm{J}\mathrm{K}^{-1}\mathrm{mol}^{-1}`)"""
 
 GAS_CONSTANT_BAR: float = GAS_CONSTANT * unit_conversion.Pa_to_bar
 r"""Gas constant (:math:`\mathrm{m}^3\mathrm{bar}^{-1}\mathrm{K}^{-1}\mathrm{mol}^{-1}`)"""
-
-EARTH_MASS: float = 5.9722e24
-"""Mass of Earth (kg)"""
-
-EARTH_RADIUS: float = 6371000.0
-"""Radius of Earth (m)"""
-
-OCEAN_MOLES: float = 7.68894973907177e22
-r"""Moles of H\ :sub:`2` or H\ :sub:`2`\ O in present-day Earth's ocean (mol)"""
-
-OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass * unit_conversion.g_to_kg
-r"""Mass of H\ :sub:`2` in present-day Earth's ocean (kg)"""
-
-OCEAN_MASS_H2O: float = OCEAN_MOLES * Formula("H2O").mass * unit_conversion.g_to_kg
-r"""Mass of H\ :sub:`2`\O in present-day Earth's ocean (kg)"""
 
 SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
 r"""Molar mass of SiO\ :sub:`2` (kg mol\ :sup:`-1`)"""
@@ -143,15 +243,3 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
         values["mean"] = np.mean((values["min"], values["max"]))  # pyright: ignore
 
     return earth_bse
-
-
-def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> ArrayLike:
-    """Converts number of Earth oceans to hydrogen mass.
-
-    Args:
-        number_of_earth_oceans: Number of Earth oceans. Defaults to ``1``.
-
-    Returns:
-        Hydrogen mass in kg corresponding to the given number of Earth oceans
-    """
-    return number_of_earth_oceans * OCEAN_MASS_H2

@@ -18,7 +18,7 @@ from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
-from atmodeller.sci_utils import earth_oceans_to_hydrogen_mass
+from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
 from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
@@ -68,7 +68,7 @@ def test_H_and_C() -> None:
 
     oceans: float = 1
     ch_ratio: float = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
@@ -111,7 +111,7 @@ def test_CHO_reduced() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
 
     oceans: ArrayLike = 3
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
@@ -154,7 +154,7 @@ def test_CHO_IW() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
@@ -214,7 +214,7 @@ def test_CHO_oxidised() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 0.1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
@@ -258,7 +258,7 @@ def test_CHO_highly_oxidised() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 5 * h_kg
     # Mass of O that gives the same solution as applying the buffer at IW+4
     # o_kg: ArrayLike = 3.25196e21
@@ -300,7 +300,7 @@ def test_CHO_middle_temperature() -> None:
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
@@ -344,7 +344,7 @@ def test_CHO_low_temperature() -> None:
         "O2_g": IronWustiteBuffer(np.nan)
     }
     oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     o_kg: ArrayLike = 1.02999e20
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
