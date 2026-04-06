@@ -658,7 +658,7 @@ class OutputNamedArraysDict(BaseOutputDict):
                     constraint.log_fugacity(
                         jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
                     )
-                    for constraint in self.parameters.fugacity_constraints.constraints
+                    for constraint in self.parameters.fugacity_constraints.ordered_constraints
                 ],
                 axis=-1,
             )

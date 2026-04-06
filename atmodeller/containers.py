@@ -451,14 +451,26 @@ class FugacityConstraintSet(eqx.Module):
     These are applied as constraints on the gas activity.
 
     Args:
-        constraints: Fugacity constraints
+        constraints_dict: Dictionary mapping species names to fugacity constraint
         species: Species collection
     """
 
-    constraints: tuple[FugacityConstraintProtocol, ...]
-    """Fugacity constraints"""
+    constraints_dict: dict[str, FugacityConstraintProtocol]
+    """Fugacity constraints dictionary mapping species name to fugacity constraint"""
     species: SpeciesCollection
     """Species collection"""
+
+    @property
+    def ordered_constraints(self) -> tuple[FugacityConstraintProtocol, ...]:
+        """Fugacity constraints in the canonical species order.
+
+        This explicit ordering is required for stable internal JAX operations. Relying on
+        dictionary iteration for semantic species alignment is fragile across transformed code
+        paths, so constraints are always materialized in ``species.species_names`` order.
+        """
+        return tuple(
+            self.constraints_dict[species_name] for species_name in self.species.species_names
+        )
 
     @classmethod
     def create(
@@ -480,17 +492,20 @@ class FugacityConstraintSet(eqx.Module):
             fugacity_constraints if fugacity_constraints is not None else {}
         )
 
-        constraints: list[FugacityConstraintProtocol] = []
+        # Populate fugacity constraints
+        constraints_dict: dict[str, FugacityConstraintProtocol] = {}
 
         for species_name in species.species_names:
             if species_name in fugacity_constraints_:
-                constraints.append(fugacity_constraints_[species_name])
+                constraints_dict[species_name] = fugacity_constraints_[species_name]
             else:
                 # This is applied to all species, which is OK because it returns nans, meaning no
                 # imposed activity/fugacity.
-                constraints.append(FixedFugacityConstraint())
+                constraints_dict[species_name] = FixedFugacityConstraint()
 
-        return cls(tuple(constraints), species)
+        # jax.debug.print("constraints_dict = {out}", out=constraints_dict)
+
+        return cls(constraints_dict, species)
 
     def active(self) -> Bool[Array, "... species"]:
         """Active fugacity constraints
@@ -499,7 +514,8 @@ class FugacityConstraintSet(eqx.Module):
             Mask indicating whether fugacity constraints are active or not
         """
         # TODO: can remove broadcasting now using vmap?
-        mask_list: list[Array] = [constraint.active() for constraint in self.constraints]
+        mask_list: list[Array] = [constraint.active() for constraint in self.ordered_constraints]
+        # jax.debug.print("mask_list = {out}", out=mask_list)
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(*[jnp.shape(m) for m in mask_list])
 
         active_constraints: Bool[Array, "... species"] = jnp.stack(
@@ -522,7 +538,7 @@ class FugacityConstraintSet(eqx.Module):
             Log fugacity in bar
         """
         fugacity_funcs: list[Callable] = [
-            to_hashable(constraint.log_fugacity) for constraint in self.constraints
+            to_hashable(constraint.log_fugacity) for constraint in self.ordered_constraints
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
@@ -533,7 +549,7 @@ class FugacityConstraintSet(eqx.Module):
             # jax.debug.print("index = {out}", out=index)
             return lax.switch(index, fugacity_funcs, temperature, pressure)
 
-        indices: Integer[Array, " species"] = jnp.arange(len(self.constraints))
+        indices: Integer[Array, " species"] = jnp.arange(len(self.ordered_constraints))
         vmap_fugacity: Callable = eqx.filter_vmap(
             apply_fugacity, in_axes=(0, None, None), out_axes=-1
         )
