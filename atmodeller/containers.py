@@ -5,7 +5,7 @@
 """Containers"""
 
 import logging
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, Generic, Literal, Optional
 
 import equinox as eqx
@@ -13,10 +13,9 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 import optimistix as optx
-from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PyTree
 from lineax import AbstractLinearSolver
-from molmass import CompositionItem, Formula
+from molmass import Formula
 
 from atmodeller.constants import (
     DISSOLVED_STATE,
@@ -32,12 +31,11 @@ from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import (
     ActivityProtocol,
     ChemicalSpeciesData,
-    FugacityConstraintProtocol,
     SolubilityProtocol,
     SpeciesProtocol,
     TSpecies_co,
 )
-from atmodeller.jax_utils import FloatArray, NpFloat, NpInt, OptxSolver, as_j64, to_hashable
+from atmodeller.jax_utils import FloatArray, NpFloat, NpInt, OptxSolver, as_j64
 from atmodeller.sci_utils import unit_conversion
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
@@ -407,314 +405,45 @@ def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
     return formula_matrix
 
 
-class FixedFugacityConstraint(eqx.Module):
-    """A fixed fugacity constraint
+class FixedActivityConstraint(eqx.Module):
+    """A fixed activity constraint
 
-    This must adhere to FugacityConstraintProtocol
+    This must adhere to :class:`~atmodeller.interfaces.ActivityConstraintProtocol`.
 
     Args:
-        fugacity: Fugacity in bar. Defaults to ``np.nan``.
+        activity: Activity (dimensionless) or fugacity referenced to 1 bar for gaseous species.
+            Defaults to :data:`jax.numpy.nan` to indicate no constraint.
     """
 
-    fugacity: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    """Fugacity"""
+    activity: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    """Activity"""
 
     def active(self) -> Bool[Array, "..."]:
-        """Active fugacity constraint
+        """Active activity constraint
 
         Returns:
-            ``True`` if the fugacity constraint is active, otherwise ``False``
+            ``True`` if the activity constraint is active, otherwise ``False``
         """
-        return ~jnp.isnan(self.fugacity)
+        return ~jnp.isnan(self.activity)
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
-        """Log fugacity
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
+        """Log activity
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Log fugacity in bar
+            - Log activity (dimensionless)
+            - Log fugacity referenced to 1 bar for gaseous species
+            - :data:`jax.numpy.nan` if the constraint is not active
         """
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
             jnp.shape(temperature), jnp.shape(pressure)
         )
         # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
 
-        return jnp.broadcast_to(jnp.log(self.fugacity), broadcast_shape)
-
-
-class FugacityConstraintSet(eqx.Module):
-    """A set of fugacity constraints
-
-    These are applied as constraints on the gas activity.
-
-    Args:
-        constraints_dict: Dictionary mapping species names to fugacity constraint
-        species: Species collection
-    """
-
-    constraints_dict: dict[str, FugacityConstraintProtocol]
-    """Fugacity constraints dictionary mapping species name to fugacity constraint"""
-    species: SpeciesCollection
-    """Species collection"""
-
-    @property
-    def ordered_constraints(self) -> tuple[FugacityConstraintProtocol, ...]:
-        """Fugacity constraints in the canonical species order.
-
-        This explicit ordering is required for stable internal JAX operations. Relying on
-        dictionary iteration for semantic species alignment is fragile across transformed code
-        paths, so constraints are always materialized in ``species.species_names`` order.
-        """
-        return tuple(
-            self.constraints_dict[species_name] for species_name in self.species.species_names
-        )
-
-    @classmethod
-    def create(
-        cls,
-        species: SpeciesCollection,
-        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
-    ) -> "FugacityConstraintSet":
-        """Creates an instance.
-
-        Args:
-            species: Species collection
-            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
-                ``None``.
-
-        Returns:
-            An instance
-        """
-        fugacity_constraints_: Mapping[str, FugacityConstraintProtocol] = (
-            fugacity_constraints if fugacity_constraints is not None else {}
-        )
-
-        # Populate fugacity constraints
-        constraints_dict: dict[str, FugacityConstraintProtocol] = {}
-
-        for species_name in species.species_names:
-            if species_name in fugacity_constraints_:
-                constraints_dict[species_name] = fugacity_constraints_[species_name]
-            else:
-                # This is applied to all species, which is OK because it returns nans, meaning no
-                # imposed activity/fugacity.
-                constraints_dict[species_name] = FixedFugacityConstraint()
-
-        # jax.debug.print("constraints_dict = {out}", out=constraints_dict)
-
-        return cls(constraints_dict, species)
-
-    def active(self) -> Bool[Array, "... species"]:
-        """Active fugacity constraints
-
-        Returns:
-            Mask indicating whether fugacity constraints are active or not
-        """
-        # TODO: can remove broadcasting now using vmap?
-        mask_list: list[Array] = [constraint.active() for constraint in self.ordered_constraints]
-        # jax.debug.print("mask_list = {out}", out=mask_list)
-        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(*[jnp.shape(m) for m in mask_list])
-
-        active_constraints: Bool[Array, "... species"] = jnp.stack(
-            [jnp.broadcast_to(m, broadcast_shape) for m in mask_list], axis=-1
-        )
-        # jax.debug.print("active fugacity constraints = {out}", out=active_constraints)
-
-        return active_constraints
-
-    def log_fugacity(
-        self, temperature: ArrayLike, pressure: ArrayLike
-    ) -> Float[Array, "... species"]:
-        """Log fugacity
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity in bar
-        """
-        fugacity_funcs: list[Callable] = [
-            to_hashable(constraint.log_fugacity) for constraint in self.ordered_constraints
-        ]
-        # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
-
-        # Temperature must be a float array to ensure branches have have identical types
-        temperature = as_j64(temperature)
-
-        def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-            # jax.debug.print("index = {out}", out=index)
-            return lax.switch(index, fugacity_funcs, temperature, pressure)
-
-        indices: Integer[Array, " species"] = jnp.arange(len(self.ordered_constraints))
-        vmap_fugacity: Callable = eqx.filter_vmap(
-            apply_fugacity, in_axes=(0, None, None), out_axes=-1
-        )
-        log_fugacity: Float[Array, "... species"] = vmap_fugacity(indices, temperature, pressure)
-        # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
-
-        return log_fugacity
-
-
-class MassConstraintSet(eqx.Module):
-    """A set of mass constraints
-
-    Args:
-        abundance_dict: Dictionary mapping element names to abundance (in moles) arrays. Note that
-            all elements in the species collection must be included as keys in the dictionary and
-            in the same order as the unique elements in the species collection. Elements for which
-            there are no active constraints should be included with abundance values of NaN.
-        species: Species collection
-    """
-
-    abundance_dict: dict[str, Array]
-    """Abundance dictionary mapping element name to abundance array"""
-    species: SpeciesCollection
-    """Species collection"""
-
-    @classmethod
-    def create(
-        cls,
-        species: SpeciesCollection,
-        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-        units: Literal["mass", "moles"] = "mass",
-    ) -> "MassConstraintSet":
-        """Creates an instance.
-
-        Args:
-            species: Species collection
-            mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
-                ``None`` to create an empty set of mass constraints.
-            units: Units of ``mass_constraints``. Defaults to ``mass``.
-
-        Returns:
-            An instance
-        """
-        mass_constraints_: Mapping[str, ArrayLike] = (
-            mass_constraints if mass_constraints is not None else {}
-        )
-
-        # Populate mass constraints. This accommodates mass constraints given as mass or moles of
-        # species as well as elements.
-        abundance_dict: dict[str, Array] = {}
-
-        for element in species.unique_elements:
-            element_sum: ArrayLike = 0
-            for species_, value_ in mass_constraints_.items():
-                # Does the species formula contain the element? If not, skip to the next species.
-                try:
-                    element_composition: CompositionItem = Formula(species_).composition()[element]
-                except KeyError:
-                    continue
-                # Always convert to moles for storage
-                if units == "mass":
-                    # value_ is in mass units, convert to moles
-                    # To get moles: (mass of element in species) / (molar mass of element)
-                    # But here, value_ is the mass of the species, so:
-                    # moles of element = (mass of species * element_composition.fraction) /
-                    # element molar mass
-                    element_index: int = species.get_element_index(element)
-                    element_molar_mass: float = species.element_molar_masses[element_index]
-                    scale: float = element_composition.fraction / element_molar_mass
-                elif units == "moles":
-                    # element_composition.count is the atom count
-                    # value_ is in moles of species, so moles of element = count * value_
-                    scale = element_composition.count
-                element_sum += scale * value_
-
-            # All elements must be included as keys in the abundance dictionary, even if they
-            # are not present in any constraints. In the latter case, the abundance is set to
-            # NaN to indicate that the constraint is inactive.
-            if jnp.any(element_sum != 0):
-                abundance_dict[element] = as_j64(element_sum)
-            else:
-                abundance_dict[element] = as_j64(jnp.nan)
-
-        return cls(abundance_dict, species)
-
-    def abundance(self) -> Float[Array, " n_elements"]:
-        """Abundance array constructed from the abundance dictionary
-
-        .. warning::
-            This method should only be called inside a vmapped context so the abundance arrays are
-            correctly broadcast and the output array is always 1-D.
-
-        Returns:
-            Abundance array constructed from the abundance dictionary
-        """
-        arrays: list[Array] = [
-            self.abundance_dict[element] for element in self.species.unique_elements
-        ]
-        abundance_array: Float[Array, "... n_elements"] = jnp.stack(arrays, axis=-1)
-        # jax.debug.print("abundance_array = {out}", out=abundance_array)
-
-        return abundance_array
-
-    def abundance_mol(self, batch_size: int = 1) -> Float[Array, "#n_batch n_elements"]:
-        """Abundance by moles for all elements with broadcasting to a specified batch size.
-
-        Args:
-            batch_size: Batch size to broadcast the abundance arrays to. Defaults to ``1``.
-
-        Returns:
-            Abundance by moles for all elements
-        """
-        arrays: list[Array] = []
-
-        for element in self.species.unique_elements:
-            arr: Array = self.abundance_dict[element]
-            arr = jnp.broadcast_to(arr, (batch_size,) + arr.shape[1:])
-            arrays.append(arr)
-
-        abundance_array: Float[Array, "... n_elements"] = jnp.stack(arrays, axis=-1)
-        # jax.debug.print("abundance_array = {out}", out=abundance_array)
-
-        return abundance_array
-
-    def abundance_mass(self, batch_size: int = 1) -> Float[Array, "#n_batch n_elements"]:
-        """Abundance by mass for all elements with broadcasting to a specified batch size.
-
-        Args:
-            batch_size: Batch size to broadcast the abundance arrays to. Defaults to ``1``.
-
-        Returns:
-            Abundance by mass for all elements
-        """
-        return self.abundance_mol(batch_size) * self.species.element_molar_masses
-
-    def update_abundance(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
-        """Updates the abundance with new values from a dictionary
-
-        Args:
-            new_abundances: Dictionary with new abundance values for some or all elements. The keys
-                should be element names and the values should be the new abundance values in moles.
-                Original abundances that are not included in the ``new_abundance`` dictionary will
-                be retained.
-
-        Returns:
-            A new MassConstraintSet with the updated abundance
-        """
-        abundance_dict: dict[str, Array] = dict(self.abundance_dict)
-
-        for element, new_value in new_abundances.items():
-            abundance_dict[element] = as_j64(new_value)
-
-        mass_constraint_set_update: MassConstraintSet = eqx.tree_at(
-            lambda c: c.abundance_dict, self, abundance_dict
-        )
-
-        return mass_constraint_set_update
-
-    def active(self) -> Bool[Array, "... elements"]:
-        """Active mass constraints
-
-        Returns:
-            Mask indicating whether elemental mass constraints are active or not
-        """
-        return ~jnp.isnan(self.abundance())
+        return jnp.broadcast_to(jnp.log(self.activity), broadcast_shape)
 
 
 class RootFindParameters(eqx.Module):

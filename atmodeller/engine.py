@@ -9,7 +9,7 @@ calculations, equation-of-state relations, reaction masks) that operate on a sin
 without any implicit batching.
 
 These functions form the building blocks for solving the coupled system of equations governing the
-model (e.g., mass balance, fugacity constraints, phase stability), and are intended to be:
+model (e.g., mass balance, activity constraints, phase stability), and are intended to be:
 
     1. Pure: No side effects, deterministic outputs for given inputs.
     2. JAX-compatible: Written with ``jax.numpy`` and compatible with transformations such as
@@ -39,8 +39,8 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
     Returns:
         Active mask
     """
-    fugacity_mask: Bool[Array, " species"] = jnp.asarray(
-        parameters.fugacity_constraints.active(), dtype=bool
+    activity_mask: Bool[Array, " species"] = jnp.asarray(
+        parameters.activity_constraints.active(), dtype=bool
     )
     reactions_mask: Bool[Array, " reactions"] = jnp.ones(
         parameters.reaction_system.number_reactions, dtype=bool
@@ -52,13 +52,13 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
         parameters.reaction_system.species.active_stability, dtype=bool
     )
 
-    # jax.debug.print("fugacity_mask = {out}", out=fugacity_mask)
+    # jax.debug.print("activity_mask = {out}", out=activity_mask)
     # jax.debug.print("reactions_mask = {out}", out=reactions_mask)
     # jax.debug.print("mass_mask = {out}", out=mass_mask)
     # jax.debug.print("stability_mask = {out}", out=stability_mask)
 
     active_mask: Bool[Array, " dim"] = jnp.concatenate(
-        (fugacity_mask, reactions_mask, mass_mask, stability_mask), axis=-1
+        (activity_mask, reactions_mask, mass_mask, stability_mask), axis=-1
     )
     # jax.debug.print("active_mask = {out}", out=active_mask)
 
@@ -134,7 +134,7 @@ def objective_function(
     The order of the residual does make a difference to the solution process. More investigations
     are necessary, but justification for the current ordering is as follows:
 
-        1. Fugacity constraints - fixed target, well conditioned
+        1. Activity constraints - fixed target, well conditioned
         2. Reaction constraints - log-linear, physics-based coupling
         3. Mass balance constraints - stiffer
         4. Stability constraints - stiffer still
@@ -159,20 +159,20 @@ def objective_function(
     log_activity: Float[Array, "... species"] = get_log_activity(parameters, solution)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
-    # Fugacity constraints residual (dimensionless)
-    fugacity_residual: Float[Array, "... species"] = (
-        log_activity - parameters.fugacity_constraints.log_fugacity(temperature, total_pressure)
+    # Activity constraints residual (dimensionless)
+    activity_residual: Float[Array, "... species"] = (
+        log_activity - parameters.activity_constraints.log_activity(temperature, total_pressure)
     )
-    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # jax.debug.print("activity_residual = {out}", out=activity_residual)
     # jax.debug.print(
-    #     "fugacity_residual min/max: {out}/{out2}",
-    #     out=jnp.nanmin(fugacity_residual),
-    #     out2=jnp.nanmax(fugacity_residual),
+    #     "activity_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(activity_residual),
+    #     out2=jnp.nanmax(activity_residual),
     # )
     # jax.debug.print(
-    #     "fugacity_residual mean/std: {out}/{out2}",
-    #     out=jnp.nanmean(fugacity_residual),
-    #     out2=jnp.nanstd(fugacity_residual),
+    #     "activity_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(activity_residual),
+    #     out2=jnp.nanstd(activity_residual),
     # )
 
     reaction_residual: Float[Array, "... reactions"] = parameters.reaction_system.get_residual(
@@ -249,7 +249,7 @@ def objective_function(
 
     # NOTE: Order must be identical to get_active_mask()
     residual: Float[Array, "... residual"] = jnp.concatenate(
-        [fugacity_residual, reaction_residual, mass_residual, stability_residual], axis=-1
+        [activity_residual, reaction_residual, mass_residual, stability_residual], axis=-1
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 

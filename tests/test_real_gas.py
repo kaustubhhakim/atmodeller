@@ -16,8 +16,8 @@ from atmodeller import debug_logger
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
+    ActivityConstraintProtocol,
     ActivityProtocol,
-    FugacityConstraintProtocol,
     SolubilityProtocol,
     SpeciesProtocol,
 )
@@ -72,14 +72,14 @@ def test_fO2_holley() -> None:
     # Temperature is within the range of the Holley model
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1000)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -291,14 +291,14 @@ def test_pH2_fO2_real_gas() -> None:
 
     planet: Planet = Planet.create(gas_species, melt_species=melt_species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(0.072885576196744)
     }
 
     mass_constraints: dict[str, ArrayLike] = {"H": 1.47126255324872e22}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)

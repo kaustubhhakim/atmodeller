@@ -35,7 +35,7 @@ from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
 from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
 from atmodeller.containers import MultiAttemptSolution, SolverParameters
-from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
@@ -121,7 +121,7 @@ class EquilibriumModel:
         initial_log_number_moles: Optional[ArrayLike] = None,
         initial_log_stability: Optional[ArrayLike] = None,
         state: Optional[BaseThermodynamicState] = None,
-        fugacity_constraints: Optional[Mapping[str, FugacityConstraintProtocol]] = None,
+        activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         solver_parameters: Optional[SolverParameters] = None,
     ) -> Array:
@@ -141,14 +141,14 @@ class EquilibriumModel:
             initial_log_number_moles: Initial log number of moles. Defaults to ``None``.
             initial_log_stability: Initial log stability. Defaults to ``None``.
             state: Thermodynamic state. Defaults to ``None``.
-            fugacity_constraints: Fugacity constraints. Defaults to ``None``.
+            activity_constraints: Activity constraints. Defaults to ``None``.
             mass_constraints: Mass constraints. Defaults to ``None``.
             solver_parameters: Solver parameters. Defaults to ``None``.
         """
         parameters: Parameters = Parameters.from_reaction_system(
             self.reaction_system,
             state,
-            fugacity_constraints,
+            activity_constraints,
             mass_constraints,
             solver_parameters,
         )

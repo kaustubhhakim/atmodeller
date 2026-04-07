@@ -118,7 +118,7 @@ def debug_file_logger() -> logging.Logger:
 from atmodeller.classes import EquilibriumModel  # noqa: E402, F401
 from atmodeller.containers import (  # noqa: E402, F401
     ChemicalSpecies,
-    FixedFugacityConstraint,
+    FixedActivityConstraint,
     ReservoirSpecies,
     SolverParameters,
 )

@@ -15,7 +15,7 @@ from molmass import Formula
 
 from atmodeller import debug_logger
 from atmodeller.containers import ChemicalSpecies
-from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
@@ -63,7 +63,7 @@ def test_graphite_stable() -> None:
         gas_species, temperature=873, condensates=condensates
     )
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
 
@@ -74,7 +74,7 @@ def test_graphite_stable() -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -115,14 +115,14 @@ def test_graphite_unstable() -> None:
         gas_species, temperature=1400, condensates=condensates
     )
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)

@@ -13,8 +13,8 @@ import numpy as np
 from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import __version__, debug_logger
-from atmodeller.containers import ChemicalSpecies, FixedFugacityConstraint, ReservoirSpecies
-from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
+from atmodeller.containers import ChemicalSpecies, FixedActivityConstraint, ReservoirSpecies
+from atmodeller.interfaces import ActivityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.jax_utils import NpFloat
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
@@ -128,14 +128,14 @@ def test_H_fO2() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -167,8 +167,8 @@ def test_H_fO2_fH2() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": FixedFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
+        "H2_g": FixedActivityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
         "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
     }
 
@@ -177,7 +177,7 @@ def test_H_fO2_fH2() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -216,9 +216,9 @@ def test_H_fO2_batch_temperature() -> None:
 
     planet: Planet = Planet.create(gas_species, melt_species=melt_species, temperature=temperature)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(),
-        "H2_g": FixedFugacityConstraint(np.nan),
+        "H2_g": FixedActivityConstraint(np.nan),
     }
 
     oceans: float = 1
@@ -226,7 +226,7 @@ def test_H_fO2_batch_temperature() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -281,8 +281,8 @@ def test_H_fO2_batch_fO2_shift() -> None:
 
     # Set up a range of fO2 shifts
     num: int = 4
-    fO2_shifts: NpFloat = np.linspace(-10, 10, num, dtype=np.float64)
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+    fO2_shifts: NpFloat = np.linspace(-10, 10, num, dtype=float)
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(fO2_shifts),
     }
 
@@ -291,7 +291,7 @@ def test_H_fO2_batch_fO2_shift() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -344,7 +344,7 @@ def test_H_fO2_batch_H_mass() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -352,7 +352,7 @@ def test_H_fO2_batch_H_mass() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)

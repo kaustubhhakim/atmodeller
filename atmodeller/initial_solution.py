@@ -64,7 +64,7 @@ def _limiting_reagent(
 
 
 def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]:
-    r"""Generates an initial solution vector from element mass constraints and fugacity constraints.
+    r"""Generates an initial solution vector from element mass constraints and activity constraints.
 
     **Pre-screen — iterative condensate stability prediction:** Starting from a gas-only element
     distribution, the pre-screen iteratively grows the set of predicted-stable condensates using
@@ -93,7 +93,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     element budget is fully consumed by condensates fall back to
     :const:`~atmodeller.constants.INITIAL_LOG_NUMBER_MOLES`.
 
-    **Step 3 — fugacity-constrained gas species:** The total moles of mass-constrained gas species
+    **Step 3 — Fugacity-constrained gas species:** The total moles of mass-constrained gas species
     (from step 2) are used to estimate the gas volume via the ideal gas law. The pressure is
     estimated from the gas mass of those species via
     :meth:`~atmodeller.interfaces.ThermodynamicStateProtocol.get_pressure`. Fugacity-constrained
@@ -127,8 +127,8 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
         parameters.reaction_system.phase_system.gas_species_mask
     )
     # jax.debug.print("gas_mask = {out}", out=gas_mask)
-    fug_active: Bool[Array, " n_species"] = parameters.fugacity_constraints.active()
-    gas_no_fug: Bool[Array, " n_species"] = gas_mask & ~fug_active
+    act_active: Bool[Array, " n_species"] = parameters.activity_constraints.active()
+    gas_no_act: Bool[Array, " n_species"] = gas_mask & ~act_active
 
     temperature: Float[Array, ""] = parameters.state.temperature
     fallback: Float[Array, ""] = jnp.exp(jnp.array(INITIAL_LOG_NUMBER_MOLES, dtype=float))
@@ -286,14 +286,14 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
 
     # Step 3: fugacity-constrained gas species
     log_n_gas_known_total: Float[Array, ""] = logsumexp(
-        jnp.where(gas_no_fug, log_number_moles, -jnp.inf)
+        jnp.where(gas_no_act, log_number_moles, -jnp.inf)
     )
     pressure: Float[Array, ""] = parameters.state.get_pressure(log_number_moles)
-    log_fug: Float[Array, " n_species"] = parameters.fugacity_constraints.log_fugacity(
+    log_fug: Float[Array, " n_species"] = parameters.activity_constraints.log_activity(
         temperature, pressure
     )
     log_n_fug: Float[Array, " n_species"] = log_fug + log_n_gas_known_total - jnp.log(pressure)
-    log_number_moles = jnp.where(gas_mask & fug_active, log_n_fug, log_number_moles)
+    log_number_moles = jnp.where(gas_mask & act_active, log_n_fug, log_number_moles)
 
     # Log stability for predicted-stable condensates: initialise at the value that makes the
     # stability residual (log_n + log_s - (min_log_abundance + log_tau)) exactly zero given the

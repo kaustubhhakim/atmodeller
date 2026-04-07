@@ -68,11 +68,11 @@ class ActivityProtocol(Protocol):
         """Log activity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
-            Log activity, which is dimensionless
+            Log activity (dimensionless)
         """
         ...
 
@@ -111,26 +111,28 @@ TSpecies_co = TypeVar("TSpecies_co", bound=SpeciesProtocol, covariant=True)
 
 
 @runtime_checkable
-class FugacityConstraintProtocol(Protocol):
+class ActivityConstraintProtocol(Protocol):
     def active(self) -> Bool[Array, "..."]:
         """True if the constraint is active, otherwise False"""
         ...
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Log fugacity
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Log activity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
-            Log fugacity in bar
+            - Log activity (dimensionless)
+            - Log fugacity referenced to 1 bar for gaseous species
+            - :data:`jax.numpy.nan` if the constraint is not active
         """
         ...
 
 
 @runtime_checkable
-class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
+class RedoxBufferProtocol(ActivityConstraintProtocol, Protocol):
     evaluation_pressure: Optional[float]
     """Pressure at which to evaluate the buffer, or None to use the total pressure"""
 
@@ -143,8 +145,8 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
         """Log10 fugacity at the unshifted buffer
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity at the buffer
@@ -155,8 +157,8 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
         """Log10 fugacity including any shift
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity
@@ -183,10 +185,10 @@ class SolubilityProtocol(Protocol):
         r"""Concentration in ppmw
 
         Args:
-            fugacity: Fugacity in bar
-            temperature: Temperature in K. Defaults to ``None`` for not used.
-            pressure: Pressure in bar. Defaults to ``None`` for not used.
-            fO2: Oxygen fugacity in bar. Defaults to ``None`` for not used.
+            fugacity: Fugacity (bar)
+            temperature: Temperature (K). Defaults to ``None`` for not used.
+            pressure: Pressure (bar). Defaults to ``None`` for not used.
+            fO2: Oxygen fugacity (bar). Defaults to ``None`` for not used.
 
         Returns:
             Concentration in ppmw
@@ -199,10 +201,10 @@ class SolubilityProtocol(Protocol):
         """Wrapper to pass concentration arguments by position to use with :func:`jax.lax.switch`
 
         Args:
-            fugacity: Fugacity in bar
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            fO2: Oxygen fugacity in bar
+            fugacity: Fugacity (bar)
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
+            fO2: Oxygen fugacity (bar)
 
         Returns:
             Concentration in ppmw

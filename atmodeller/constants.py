@@ -9,11 +9,11 @@ This module defines reference thermodynamic conditions and numerical limits.
 
 # Thermodynamic standard state
 TEMPERATURE_REFERENCE: float = 298.15
-"""Enthalpy reference temperature in K (:math:`T_r` in the JANAF tables) :cite:p:`MZG02,Cha98`"""
+"""Enthalpy reference temperature (K) (:math:`T_r` in the JANAF tables) :cite:p:`MZG02,Cha98`"""
 STANDARD_PRESSURE: float = 1.0
-"""Standard state pressure in bar"""
+"""Standard state pressure (bar)"""
 STANDARD_FUGACITY: float = STANDARD_PRESSURE
-"""Standard fugacity for gases in bar"""
+"""Standard fugacity for gases (bar)"""
 GAS_STATE: str = "g"
 """Suffix to identify gases as per JANAF convention for the state of aggregation"""
 LIQUID_STATE: str = "l"

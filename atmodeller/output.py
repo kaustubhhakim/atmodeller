@@ -58,9 +58,9 @@ from jaxtyping import Array, ArrayLike, Float, PyTree
 from openpyxl.styles import PatternFill
 
 from atmodeller import override
-from atmodeller.containers import FugacityConstraintSet, MassConstraintSet, MultiAttemptSolution
+from atmodeller.containers import MultiAttemptSolution
 from atmodeller.jax_utils import FloatArray, NpArray
-from atmodeller.parameters import Parameters
+from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Parameters
 from atmodeller.phases import (
     GasPhaseOutput,
     MeltPhase,
@@ -467,11 +467,11 @@ class OutputNaturalDict(BaseOutputDict):
         }
         out["constraints"]["species"] = {
             "activity": jnp.exp(
-                self.parameters.fugacity_constraints.log_fugacity(
+                self.parameters.activity_constraints.log_activity(
                     jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
                 )
             ),
-            "names": self.parameters.fugacity_constraints.species.species_names,
+            "names": self.parameters.activity_constraints.species.species_names,
         }
 
         out["solution"] = self.solution_to_dict()
@@ -652,20 +652,20 @@ class OutputNamedArraysDict(BaseOutputDict):
             "number_moles",
         )
         species_out: dict = out["constraints"].setdefault("species", {})
-        evaluated_fugacity_constraints: Float[Array, "... n_species"] = jnp.exp(
+        evaluated_activity_constraints: Float[Array, "... n_species"] = jnp.exp(
             jnp.stack(
                 [
-                    constraint.log_fugacity(
+                    constraint.log_activity(
                         jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
                     )
-                    for constraint in self.parameters.fugacity_constraints.ordered_constraints
+                    for constraint in self.parameters.activity_constraints.ordered_constraints
                 ],
                 axis=-1,
             )
         )
         self._split_by_name_and_add(
-            self.parameters.fugacity_constraints.species.species_names,
-            evaluated_fugacity_constraints,
+            self.parameters.activity_constraints.species.species_names,
+            evaluated_activity_constraints,
             species_out,
             "activity",
         )
@@ -891,12 +891,12 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             constraints_dict["mass"] = element_mass[nn]
             constraints_dict["number_moles"] = element_number_moles[nn]
 
-        # Fugacity constraints
-        fugacity_constraints: FugacityConstraintSet = self.parameters.fugacity_constraints
-        unique_species: tuple[str, ...] = fugacity_constraints.species.species_names
-        species_log_fugacity: list[Array] = self._split_array_by_names(
+        # Activity constraints
+        activity_constraints: ActivityConstraintSet = self.parameters.activity_constraints
+        unique_species: tuple[str, ...] = activity_constraints.species.species_names
+        species_log_activity: list[Array] = self._split_array_by_names(
             unique_species,
-            fugacity_constraints.log_fugacity(
+            activity_constraints.log_activity(
                 jnp.squeeze(self.temperature), jnp.squeeze(self.pressure)
             ),
         )
@@ -904,7 +904,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         for nn, species in enumerate(unique_species):
             species_dict: dict[str, Any] = out.setdefault(species, {})
             constraints_dict: dict[str, Any] = species_dict.setdefault("constraints", {})
-            constraints_dict["fugacity"] = jnp.exp(species_log_fugacity[nn])
+            constraints_dict["activity"] = jnp.exp(species_log_activity[nn])
 
         out["solution"] = self.solution_to_dict()
         out["solver"] = self.solver_to_dict()

@@ -19,7 +19,7 @@ from atmodeller.sci_utils import ExperimentalCalibration, unit_conversion
 class RedoxBuffer(eqx.Module):
     """Redox buffer
 
-    This must adhere to FugacityConstraintProtocol
+    This must adhere to ActivityConstraintProtocol
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
@@ -94,8 +94,26 @@ class RedoxBuffer(eqx.Module):
         """
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
+    # TODO: Can remove or map from log_activity
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log fugacity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity
+        """
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
+            jnp.shape(temperature), jnp.shape(pressure)
+        )
+        log_fugacity = jnp.log(10) * self.log10_fugacity(temperature, pressure)
+
+        return jnp.broadcast_to(log_fugacity, broadcast_shape)
+
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Gets the log activity, which is the same as the log fugacity for a redox buffer
 
         Args:
             temperature: Temperature in K

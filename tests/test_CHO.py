@@ -15,7 +15,7 @@ from jaxtyping import ArrayLike, PRNGKeyArray
 
 from atmodeller import debug_logger
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
-from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
+from atmodeller.interfaces import ActivityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.sci_utils import earth
@@ -64,7 +64,7 @@ def test_H_and_C() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     ch_ratio: float = 1
@@ -73,7 +73,7 @@ def test_H_and_C() -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -108,7 +108,7 @@ def test_CHO_reduced() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -116,7 +116,7 @@ def test_CHO_reduced() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -151,7 +151,7 @@ def test_CHO_IW() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -159,7 +159,7 @@ def test_CHO_IW() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -211,7 +211,7 @@ def test_CHO_oxidised() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -219,7 +219,7 @@ def test_CHO_oxidised() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -255,7 +255,7 @@ def test_CHO_highly_oxidised() -> None:
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -265,7 +265,7 @@ def test_CHO_highly_oxidised() -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -297,7 +297,7 @@ def test_CHO_middle_temperature() -> None:
 
     planet = Planet.create(gas_species, temperature=873)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -305,7 +305,7 @@ def test_CHO_middle_temperature() -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
@@ -340,7 +340,7 @@ def test_CHO_low_temperature() -> None:
     # TODO: to revisit this below, since currently this test recreates the solver.
     # This is a trick to keep the same argument structure and avoid JAX recompilation, even though
     # for this case we want to turn off the O2_g constraint.
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
     oceans: ArrayLike = 1
@@ -350,7 +350,7 @@ def test_CHO_low_temperature() -> None:
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     parameters: Parameters = Parameters.create(
-        planet, fugacity_constraints=fugacity_constraints, mass_constraints=mass_constraints
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
     solver: Callable = make_solver_with_jit(parameters)
