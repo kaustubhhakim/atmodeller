@@ -6,9 +6,9 @@
 
 This module defines immutable, JAX-friendly parameter objects used by the solver:
 
-- :class:`ActivityConstraintSet`` stores per-species activity/fugacity constraints.
-- :class:`MassConstraintSet`` stores elemental abundance constraints in moles.
-- :class:`Parameters`` bundles state, constraints, and solver settings into one object.
+- :class:`ActivityConstraintSet` stores per-species activity/fugacity constraints.
+- :class:`MassConstraintSet` stores elemental abundance constraints in moles.
+- :class:`Parameters` bundles state, constraints, and solver settings into one object.
 
 Factory methods validate and normalize user inputs, while ``update`` methods return new instances
 with leaf shapes kept stable for efficient JAX transformations, also within jitted workflows.
@@ -149,7 +149,7 @@ class ActivityConstraintSet(eqx.Module):
                 will be retained.
 
         Returns:
-            A new instance of :class:`ActivityConstraintSet` with the updated constraints
+            An instance with updated constraints
         """
         constraints_dict: dict[str, ActivityConstraintProtocol] = dict(self.constraints_dict)
 
@@ -301,7 +301,7 @@ class MassConstraintSet(eqx.Module):
         """
         return self.abundance_mol(batch_size) * self.species.element_molar_masses
 
-    def update(self, new_abundances: Mapping[str, ArrayLike]) -> "MassConstraintSet":
+    def update(self, new_abundances: Mapping[str, ArrayLike]) -> Self:
         """Updates the abundance with new values from a dictionary
 
         Note:
@@ -317,7 +317,7 @@ class MassConstraintSet(eqx.Module):
                 be retained.
 
         Returns:
-            A new instance of :class:`MassConstraintSet` with the updated abundance
+            An instance with updated abundances
         """
         abundance_dict: dict[str, Array] = dict(self.abundance_dict)
 
@@ -331,7 +331,7 @@ class MassConstraintSet(eqx.Module):
             lambda c: c.abundance_dict, self, abundance_dict
         )
 
-        return mass_constraint_set_update
+        return cast(Self, mass_constraint_set_update)
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints

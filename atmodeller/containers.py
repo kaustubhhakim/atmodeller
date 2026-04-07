@@ -6,7 +6,7 @@
 
 import logging
 from collections.abc import Callable, Iterable, Iterator
-from typing import Any, Generic, Literal, Optional
+from typing import Any, Generic, Literal, Optional, Self
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -76,7 +76,7 @@ class ChemicalSpecies(eqx.Module):
         solve_for_stability: bool,
         number_solution: int,
         include_in_phase_mass: bool,
-    ) -> "ChemicalSpecies":
+    ) -> Self:
         """Creates an instance.
 
         Args:
@@ -121,7 +121,7 @@ class ChemicalSpecies(eqx.Module):
         activity: ActivityProtocol = ActivityCoefficient(),
         solve_for_stability: bool = True,
         include_in_phase_mass: bool = True,
-    ) -> "ChemicalSpecies":
+    ) -> Self:
         """Creates a condensate with some default values.
 
         Args:
@@ -154,7 +154,7 @@ class ChemicalSpecies(eqx.Module):
         activity: ActivityProtocol = IdealGas(),
         solve_for_stability: bool = False,
         include_in_phase_mass: bool = True,
-    ) -> "ChemicalSpecies":
+    ) -> Self:
         """Creates a gas species with some default values.
 
         Args:
@@ -228,7 +228,7 @@ class ReservoirSpecies(eqx.Module):
         activity: ActivityProtocol = ActivityCoefficient(),
         solubility: Optional[SolubilityProtocol] = None,
         include_in_phase_mass: bool = True,
-    ) -> "ReservoirSpecies":
+    ) -> Self:
         """Creates a dissolved species with some default values.
 
         Args:
@@ -434,8 +434,8 @@ class FixedActivityConstraint(eqx.Module):
             pressure: Pressure in bar
 
         Returns:
-            - Log activity (dimensionless)
-            - Log fugacity referenced to 1 bar for gaseous species
+            - Log activity (dimensionless) for condensed species, or
+            - Log fugacity referenced to 1 bar for gaseous species, or
             - :data:`jax.numpy.nan` if the constraint is not active
         """
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
