@@ -2,11 +2,20 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Parameters"""
+"""Parameter containers for thermodynamic calculations.
 
-import logging
+This module defines immutable, JAX-friendly parameter objects used by the solver:
+
+- :class:`ActivityConstraintSet`` stores per-species activity/fugacity constraints.
+- :class:`MassConstraintSet`` stores elemental abundance constraints in moles.
+- :class:`Parameters`` bundles state, constraints, and solver settings into one object.
+
+Factory methods validate and normalize user inputs, while ``update`` methods return new instances
+with leaf shapes kept stable for efficient JAX transformations, also within jitted workflows.
+"""
+
 from collections.abc import Callable, Mapping
-from typing import Literal, Optional
+from typing import Literal, Optional, Self, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -20,8 +29,6 @@ from atmodeller.interfaces import ActivityConstraintProtocol, SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64, get_batch_size, to_hashable
 from atmodeller.reactions import ReactionSystem
 from atmodeller.state import BaseThermodynamicState
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ActivityConstraintSet(eqx.Module):
@@ -59,7 +66,7 @@ class ActivityConstraintSet(eqx.Module):
         cls,
         species: SpeciesCollection,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
-    ) -> "ActivityConstraintSet":
+    ) -> Self:
         """Creates an instance.
 
         Args:
@@ -105,8 +112,8 @@ class ActivityConstraintSet(eqx.Module):
         """Log activity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log activity (dimensionless) or log fugacity referenced to 1 bar for gaseous species
@@ -132,9 +139,7 @@ class ActivityConstraintSet(eqx.Module):
 
         return log_activity
 
-    def update(
-        self, new_constraints: Mapping[str, ActivityConstraintProtocol]
-    ) -> "ActivityConstraintSet":
+    def update(self, new_constraints: Mapping[str, ActivityConstraintProtocol]) -> Self:
         """Updates the activity/fugacity constraints with new values from a dictionary
 
         Args:
@@ -144,7 +149,7 @@ class ActivityConstraintSet(eqx.Module):
                 will be retained.
 
         Returns:
-            A new ActivityConstraintSet with the updated activity/fugacity constraints
+            A new instance of :class:`ActivityConstraintSet` with the updated constraints
         """
         constraints_dict: dict[str, ActivityConstraintProtocol] = dict(self.constraints_dict)
 
@@ -164,15 +169,14 @@ class ActivityConstraintSet(eqx.Module):
             )
             constraints_dict[species_name] = eqx.combine(new_dynamic_stable, new_static)
 
-        activity_constraint_set_update: ActivityConstraintSet = eqx.tree_at(
-            lambda c: c.constraints_dict, self, constraints_dict
-        )
-
-        return activity_constraint_set_update
+        return cast(Self, eqx.tree_at(lambda c: c.constraints_dict, self, constraints_dict))
 
 
 class MassConstraintSet(eqx.Module):
     """A set of mass constraints
+
+    Use :meth:`create` to construct a new instance and :meth:`update` to return an updated
+    instance with modified abundance constraints.
 
     Args:
         abundance_dict: Dictionary mapping element names to abundance (in moles) arrays. All
@@ -313,7 +317,7 @@ class MassConstraintSet(eqx.Module):
                 be retained.
 
         Returns:
-            A new MassConstraintSet with the updated abundance
+            A new instance of :class:`MassConstraintSet` with the updated abundance
         """
         abundance_dict: dict[str, Array] = dict(self.abundance_dict)
 
@@ -340,6 +344,9 @@ class MassConstraintSet(eqx.Module):
 
 class Parameters(eqx.Module):
     """Parameters
+
+    Use :meth:`create` to construct a new instance and :meth:`update` to return an updated instance
+    with modified activity/fugacity and mass constraints.
 
     Args:
         state: Thermodynamic state
@@ -373,11 +380,11 @@ class Parameters(eqx.Module):
         Args:
             state: Thermodynamic state
             activity_constraints: Mapping of a species name and an activity constraint. Defaults to
-                a new instance of ``ActivityConstraints``.
+                a new instance of :class:`ActivityConstraintSet`.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
-                a new instance of ``MassConstraints``.
+                a new instance of :class:`MassConstraintSet`.
             solver_parameters: Solver parameters. Defaults to a new instance of
-                ``SolverParameters``.
+                :class:`atmodeller.containers.SolverParameters`.
 
         Returns:
             An instance
@@ -422,12 +429,12 @@ class Parameters(eqx.Module):
         *,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
-    ) -> "Parameters":
-        """Updates the mass and activity constraints of the parameters.
+    ) -> Self:
+        """Updates the mass and activity/fugacity constraints of the parameters.
 
         Args:
             mass_constraints: New mass constraints. Defaults to ``None``.
-            activity_constraints: New activity constraints. Defaults to ``None``.
+            activity_constraints: New activity/fugacity constraints. Defaults to ``None``.
 
         Returns:
             Updated parameters.
@@ -450,4 +457,4 @@ class Parameters(eqx.Module):
                 lambda p: p.activity_constraints, self, activity_constraints_updated
             )
 
-        return parameters_updated
+        return cast(Self, parameters_updated)
