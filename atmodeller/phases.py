@@ -871,4 +871,6 @@ class PurePhase(CondensedPhase[ChemicalSpecies]):
     @property
     def name(self) -> str:  # pyright: ignore - This should work as an override (see Equinox docs)
         """Name of the pure phase, given by the single species it contains."""
-        return self.species.species_names[0]
+        # Keep name string-typed even on vmapped in_axes placeholder trees (non-array leaves may be
+        # None during beartype/Equinox repr).
+        return str(self.species.species_names[0])
