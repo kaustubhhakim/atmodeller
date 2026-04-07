@@ -436,6 +436,10 @@ class Parameters(eqx.Module):
     ) -> Self:
         """Updates the mass and activity/fugacity constraints of the parameters.
 
+        New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
+        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
+        workflows.
+
         Args:
             mass_constraints: New mass constraints. Defaults to ``None``.
             activity_constraints: New activity/fugacity constraints. Defaults to ``None``.
@@ -465,6 +469,10 @@ class Parameters(eqx.Module):
 
     def update_state(self, *args, **kwargs) -> Self:
         """Updates the thermodynamic state of the parameters.
+
+        New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
+        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
+        workflows.
 
         Args:
             *args: Positional arguments to pass to the ``update`` method of the thermodynamic state

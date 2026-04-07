@@ -411,6 +411,10 @@ class BasePlanet(BaseThermodynamicState):
     ) -> Self:
         """Updates the state.
 
+        New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
+        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
+        workflows.
+
         Args:
             planet_mass: Mass of the planet (kg). Defaults to ``None``.
             core_mass_fraction: Mass fraction of the iron core relative to the planetary mass
