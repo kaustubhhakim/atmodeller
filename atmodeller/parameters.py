@@ -169,7 +169,11 @@ class ActivityConstraintSet(eqx.Module):
             )
             constraints_dict[species_name] = eqx.combine(new_dynamic_stable, new_static)
 
-        return cast(Self, eqx.tree_at(lambda c: c.constraints_dict, self, constraints_dict))
+        activity_constraint_set_updated: ActivityConstraintSet = eqx.tree_at(
+            lambda c: c.constraints_dict, self, constraints_dict
+        )
+
+        return cast(Self, activity_constraint_set_updated)
 
 
 class MassConstraintSet(eqx.Module):
@@ -197,7 +201,7 @@ class MassConstraintSet(eqx.Module):
         species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
-    ) -> "MassConstraintSet":
+    ) -> Self:
         """Creates an instance.
 
         Args:
@@ -327,11 +331,11 @@ class MassConstraintSet(eqx.Module):
             value_array: FloatArray = as_j64(new_value)
             abundance_dict[element] = jnp.broadcast_to(value_array, original_value.shape)
 
-        mass_constraint_set_update: MassConstraintSet = eqx.tree_at(
+        mass_constraint_set_updated: MassConstraintSet = eqx.tree_at(
             lambda c: c.abundance_dict, self, abundance_dict
         )
 
-        return cast(Self, mass_constraint_set_update)
+        return cast(Self, mass_constraint_set_updated)
 
     def active(self) -> Bool[Array, "... elements"]:
         """Active mass constraints
@@ -437,7 +441,7 @@ class Parameters(eqx.Module):
             activity_constraints: New activity/fugacity constraints. Defaults to ``None``.
 
         Returns:
-            Updated parameters.
+            Updated parameters
         """
         parameters_updated: Parameters = self
 
@@ -446,7 +450,7 @@ class Parameters(eqx.Module):
                 mass_constraints
             )
             parameters_updated = eqx.tree_at(
-                lambda p: p.mass_constraints, self, mass_constraints_updated
+                lambda p: p.mass_constraints, parameters_updated, mass_constraints_updated
             )
 
         if activity_constraints is not None:
@@ -454,7 +458,22 @@ class Parameters(eqx.Module):
                 activity_constraints
             )
             parameters_updated = eqx.tree_at(
-                lambda p: p.activity_constraints, self, activity_constraints_updated
+                lambda p: p.activity_constraints, parameters_updated, activity_constraints_updated
             )
+
+        return cast(Self, parameters_updated)
+
+    def update_state(self, *args, **kwargs) -> Self:
+        """Updates the thermodynamic state of the parameters.
+
+        Args:
+            *args: Positional arguments to pass to the ``update`` method of the thermodynamic state
+            **kwargs: Keyword arguments to pass to the ``update`` method of the thermodynamic state
+
+        Returns:
+            Updated parameters
+        """
+        state_updated: BaseThermodynamicState = self.state.update(*args, **kwargs)
+        parameters_updated = eqx.tree_at(lambda p: p.state, self, state_updated)
 
         return cast(Self, parameters_updated)
