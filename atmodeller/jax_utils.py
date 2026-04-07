@@ -250,20 +250,16 @@ def to_native_floats(value: Any) -> Any:
 def get_batch_axis(x: Any) -> Literal[0, None]:
     """Determines the batch axis for a JAX array.
 
-    Determines whether an object should be treated as batched along axis ``0`` for
-    :func:`jax.vmap`.
+    This function checks if the input is a JAX array and has at least one dimension. If so, it
+    returns ``0``, indicating that the array should be batched along the leading dimension for use
+    with :func:`jax.vmap`. Otherwise, it returns ``None``, indicating that the input should not be
+    treated as batched.
 
     Note:
         This function only considers JAX arrays for batching. While :func:`equinox.is_array`
         regards both JAX and NumPy arrays as arrays for tracing, NumPy arrays are treated here as
         static constants and are never batched. This allows fixed matrices to remain inside pytrees
         without being inadvertently vectorised.
-
-    Rules:
-        - 1-D JAX arrays: Batched along axis 0
-        - 2-D JAX arrays: Batched along axis 0 if ``shape[0]``>1
-        - 0-D (scalar) JAX arrays: Not batched
-        - NumPy arrays or other objects: Not batched
 
     Args:
         x: Object to check for batching
@@ -272,13 +268,7 @@ def get_batch_axis(x: Any) -> Literal[0, None]:
         ``0`` if batched along axis ``0``, otherwise ``None``
     """
     if isinstance(x, jax.Array):
-        # Vectorise over any 1-D array
-        if x.ndim == 1:
-            return 0
-        # TODO: Now MassConstraintsSet is refactored this condition might no longer be required,
-        # and instead any JAX array with leading dimension >1 should be vectorised.
-        # Any 2-D array should be vectorised over the first dimension if it is not unity
-        elif x.ndim == 2 and x.shape[0] > 1:
+        if x.ndim >= 1:
             return 0
     return None  # explicit fallback
 
