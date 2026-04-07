@@ -17,7 +17,7 @@ The hierarchy is:
 
 from abc import abstractmethod
 from collections.abc import Iterable
-from typing import Self
+from typing import Optional, Self, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -57,6 +57,11 @@ class BaseThermodynamicState(eqx.Module):
     @abstractmethod
     def asdict(self, log_number_moles: Float[Array, "... n_species"]) -> dict[str, Array]:
         """Gets a dictionary representation."""
+        ...
+
+    @abstractmethod
+    def update(self, *args, **kwargs) -> Self:
+        """Updates the state."""
         ...
 
     def get_solid_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
@@ -158,7 +163,7 @@ class ThermodynamicState(BaseThermodynamicState):
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
-        r"""Creates a new instance.
+        r"""Creates an instance.
 
         Args:
             gas_species: Iterable of species in the gas phase
@@ -210,6 +215,7 @@ class ThermodynamicState(BaseThermodynamicState):
         base_dict = {}
         base_dict["melt_mass"] = self.get_melt_mass(log_number_moles)
         base_dict["solid_mass"] = self.get_solid_mass(log_number_moles)
+        base_dict["melt_fraction"] = self.get_melt_fraction(log_number_moles)
         base_dict["mass"] = base_dict["melt_mass"] + base_dict["solid_mass"]
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.pressure
@@ -383,14 +389,86 @@ class BasePlanet(BaseThermodynamicState):
         base_dict["mantle_melt_mass"] = self.get_melt_mass(log_number_moles)
         base_dict["mantle_solid_mass"] = self.get_solid_mass(log_number_moles)
         base_dict["mantle_mass"] = base_dict["mantle_melt_mass"] + base_dict["mantle_solid_mass"]
+        base_dict["mantle_melt_fraction"] = self.get_melt_fraction(log_number_moles)
         base_dict["metallic_core_mass"] = self.metallic_core_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
+        base_dict["surface_radius"] = self.surface_radius
         base_dict["planet_mass"] = self.get_planet_mass(log_number_moles)
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.get_pressure(log_number_moles)
 
         return base_dict
+
+    def update(
+        self,
+        planet_mass: Optional[ArrayLike] = None,
+        core_mass_fraction: Optional[ArrayLike] = None,
+        mantle_melt_fraction: Optional[ArrayLike] = None,
+        surface_radius: Optional[ArrayLike] = None,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+    ) -> Self:
+        """Updates the state.
+
+        Args:
+            planet_mass: Mass of the planet (kg). Defaults to ``None``.
+            core_mass_fraction: Mass fraction of the iron core relative to the planetary mass
+                (kgkg\\ :sup:`-1`). Defaults to ``None``.
+            mantle_melt_fraction: Mantle melt fraction. Defaults to ``None``.
+            surface_radius: Radius of the planetary surface (m). Defaults to ``None``.
+            temperature: Temperature (K). Defaults to ``None``.
+            pressure: Pressure (bar). Defaults to ``None``.
+
+        Returns:
+            Updated state
+        """
+        state_updated: BasePlanet = self
+
+        if planet_mass is not None:
+            planet_mass = jnp.broadcast_to(as_j64(planet_mass), self.background_planet_mass.shape)
+            state_updated = eqx.tree_at(
+                lambda s: s.background_planet_mass, state_updated, planet_mass
+            )
+
+        if core_mass_fraction is not None:
+            core_mass_fraction = jnp.broadcast_to(
+                as_j64(core_mass_fraction), self.metallic_core_mass.shape
+            )
+            state_updated = eqx.tree_at(
+                lambda s: s.metallic_core_mass,
+                state_updated,
+                state_updated.background_planet_mass * core_mass_fraction,
+            )
+
+        if mantle_melt_fraction is not None:
+            mantle_mass: FloatArray = (
+                state_updated.background_planet_mass - state_updated.metallic_core_mass
+            )
+            state_updated = eqx.tree_at(
+                lambda s: s.reaction_system.phase_system.melt.background_mass,
+                state_updated,
+                mantle_mass * mantle_melt_fraction,
+            )
+            state_updated = eqx.tree_at(
+                lambda s: s.reaction_system.phase_system.solid.background_mass,
+                state_updated,
+                mantle_mass * (1 - mantle_melt_fraction),
+            )
+
+        if surface_radius is not None:
+            surface_radius = jnp.broadcast_to(as_j64(surface_radius), self.surface_radius.shape)
+            state_updated = eqx.tree_at(lambda s: s.surface_radius, state_updated, surface_radius)
+
+        if temperature is not None:
+            temperature = jnp.broadcast_to(as_j64(temperature), self.temperature.shape)
+            state_updated = eqx.tree_at(lambda s: s.temperature, state_updated, temperature)
+
+        if pressure is not None:
+            pressure = jnp.broadcast_to(as_j64(pressure), self.pressure.shape)
+            state_updated = eqx.tree_at(lambda s: s.pressure, state_updated, pressure)
+
+        return cast(Self, state_updated)
 
 
 class ThinAtmospherePlanet(BasePlanet):
