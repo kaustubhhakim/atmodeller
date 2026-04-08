@@ -702,6 +702,8 @@ def make_solver(parameters: Parameters) -> Callable:
     return solver
 
 
+# For testing and debugging
+# @eqx.debug.assert_max_traces(max_traces=1)
 def make_solver_with_jit(parameters: Parameters) -> Callable:
     """Gets the JIT-compiled solver function.
 

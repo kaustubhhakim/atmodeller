@@ -5,22 +5,21 @@
 """Tests for C-H-O systems with stable or unstable condensates"""
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
-import jax
+import jax.numpy as jnp
 import numpy as np
-from jaxtyping import ArrayLike, PRNGKeyArray
-from molmass import Formula
+import pytest
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
+from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
 from atmodeller.sci_utils import earth
-from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
 
@@ -49,13 +48,9 @@ H_g = ChemicalSpecies.create_gas("H")
 graphite: PurePhase = PurePhase.from_species("C", state="s")
 water: PurePhase = PurePhase.from_species("H2O", state="l")
 
-key: PRNGKeyArray = jax.random.PRNGKey(0)
-key, subkey = jax.random.split(key)  # Split the key for use in this function
 
-
-def test_graphite_stable() -> None:
-    """Tests graphite stable with around 50% condensed C mass fraction"""
-
+@pytest.fixture(scope="module")
+def graphite_model() -> EquilibriumModel:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
     condensates: tuple[PurePhase, ...] = (graphite,)
 
@@ -77,9 +72,33 @@ def test_graphite_stable() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    return model
+
+
+@pytest.fixture(scope="module")
+def water_model() -> EquilibriumModel:
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g)
+    condensates: tuple[PurePhase, ...] = (water,)
+
+    planet: BaseThermodynamicState = Planet.create(
+        gas_species, temperature=411.75, condensates=condensates
+    )
+
+    oceans: ArrayLike = 1
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
+    o_kg: ArrayLike = 1.14375e21
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
+
+    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+
+    return EquilibriumModel(parameters)
+
+
+def test_graphite_stable(graphite_model: EquilibriumModel) -> None:
+    """Tests graphite stable with around 50% condensed C mass fraction"""
+    output: Output = graphite_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -102,32 +121,24 @@ def test_graphite_stable() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_graphite_unstable() -> None:
+def test_graphite_unstable(graphite_model: EquilibriumModel) -> None:
     """Tests C-H-O system at IW+0.5 with graphite unstable
 
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-    condensates: tuple[PurePhase, ...] = (graphite,)
-
-    planet: BaseThermodynamicState = Planet.create(
-        gas_species, temperature=1400, condensates=condensates
-    )
-
+    # Update constraints of the graphite_model
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": np.nan}
 
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    graphite_model = graphite_model.update_constraints(
+        activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
+    graphite_model = graphite_model.update_state(temperature=1400)
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = graphite_model.solve(jnp.array(jnp.nan))
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -150,26 +161,9 @@ def test_graphite_unstable() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_water_stable() -> None:
+def test_water_stable(water_model: EquilibriumModel) -> None:
     """Condensed water at 10 bar"""
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
-    condensates: tuple[PurePhase, ...] = (water,)
-
-    planet: BaseThermodynamicState = Planet.create(
-        gas_species, temperature=411.75, condensates=condensates
-    )
-
-    oceans: float = 1
-    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
-    o_kg: float = 1.14375e21
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
-
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
-
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = water_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {"partial_pressure": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
@@ -200,9 +194,9 @@ def test_graphite_water_stable() -> None:
 
     parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -247,16 +241,13 @@ def test_impose_stable() -> None:
     # Define the mole fractions of input gases
     mole_fractions: dict[str, ArrayLike] = {"H2": 0.5, "N2": 0.5}
 
-    # Define the composition of the input gas mixture by mass
-    mass_constraints: dict[str, ArrayLike] = {
-        key: value * Formula(key).mass for key, value in mole_fractions.items()
-    }
+    parameters: Parameters = Parameters.create(
+        state, mass_constraints=mole_fractions, mass_units="moles"
+    )
 
-    parameters: Parameters = Parameters.create(state, mass_constraints=mass_constraints)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {

@@ -222,6 +222,35 @@ class ThermodynamicState(BaseThermodynamicState):
 
         return base_dict
 
+    @override
+    def update(
+        self, temperature: Optional[ArrayLike] = None, pressure: Optional[ArrayLike] = None
+    ) -> Self:
+        """Updates the state.
+
+        New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
+        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
+        workflows.
+
+        Args:
+            temperature: Temperature (K). Defaults to ``None``.
+            pressure: Pressure (bar). Defaults to ``None``.
+
+        Returns:
+            Updated state
+        """
+        state_updated: ThermodynamicState = self
+
+        if temperature is not None:
+            temperature = jnp.broadcast_to(as_j64(temperature), self.temperature.shape)
+            state_updated = eqx.tree_at(lambda s: s.temperature, state_updated, temperature)
+
+        if pressure is not None:
+            pressure = jnp.broadcast_to(as_j64(pressure), self.pressure.shape)
+            state_updated = eqx.tree_at(lambda s: s.pressure, state_updated, pressure)
+
+        return cast(Self, state_updated)
+
 
 class BasePlanet(BaseThermodynamicState):
     """A planet
@@ -400,6 +429,7 @@ class BasePlanet(BaseThermodynamicState):
 
         return base_dict
 
+    @override
     def update(
         self,
         planet_mass: Optional[ArrayLike] = None,

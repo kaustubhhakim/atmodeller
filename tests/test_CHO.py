@@ -5,22 +5,21 @@
 """Tests for C-H-O systems"""
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
-import jax
 import numpy as np
 import pytest
-from jaxtyping import ArrayLike, PRNGKeyArray
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
+from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
-from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 
@@ -36,30 +35,53 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-# Gas species
-H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
-H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
-CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
-CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
 
-# Melt species
-H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-    "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
-)
-CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-    "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
-)
+@pytest.fixture(scope="module")
+def CHO_reduced_model() -> EquilibriumModel:
+    """C-H-O reduced model"""
+    # Gas species
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-key: PRNGKeyArray = jax.random.PRNGKey(0)
-key, subkey = jax.random.split(key)  # Split the key for use in this function
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
+
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
+
+    oceans: ArrayLike = 3
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = 1 * h_kg
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
+
+    parameters: Parameters = Parameters.create(
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    )
+
+    return EquilibriumModel(parameters)
 
 
-def test_H_and_C() -> None:
-    """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
-
+@pytest.fixture(scope="module")
+def CH_model() -> EquilibriumModel:
+    """C-H model"""
+    # Gas species
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
+
+    # Melt species
+    H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
+    )
+    CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+        "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
+    )
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
@@ -76,9 +98,40 @@ def test_H_and_C() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    return EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+
+@pytest.fixture(scope="module")
+def CHO_temperature_model() -> EquilibriumModel:
+    """C-H-O model at 873 K"""
+    # Gas species
+    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
+    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
+
+    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=873)
+
+    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
+
+    oceans: ArrayLike = 1
+    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = 1 * h_kg
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
+
+    parameters: Parameters = Parameters.create(
+        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    )
+
+    return EquilibriumModel(parameters)
+
+
+def test_H_and_C(CH_model: EquilibriumModel) -> None:
+    """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
+    output: Output = CH_model.solve()
 
     target: dict[str, Any] = {
         "gas": {
@@ -97,31 +150,13 @@ def test_H_and_C() -> None:
     assert output.compare(target, rtol=TOLERANCE, atol=TOLERANCE, log=False)
 
 
-@pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_reduced() -> None:
+# @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
+def test_CHO_reduced(CHO_reduced_model: EquilibriumModel) -> None:
     """Tests C-H-O system at IW-2
 
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
-
-    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
-
-    oceans: ArrayLike = 3
-    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
-    c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
-
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
-    )
-
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_reduced_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -141,16 +176,12 @@ def test_CHO_reduced() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_IW() -> None:
+def test_CHO_IW(CHO_reduced_model: EquilibriumModel) -> None:
     """Tests C-H-O system at IW+0.5
 
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
-
+    # Update constraints of the reduced model
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
@@ -158,13 +189,11 @@ def test_CHO_IW() -> None:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    CHO_IW_model = CHO_reduced_model.update_constraints(
+        activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_IW_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -200,17 +229,13 @@ def test_CHO_IW() -> None:
     assert output.compare(fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-@pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_oxidised() -> None:
+# @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
+def test_CHO_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
     """Tests C-H-O system at IW+2
 
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
-
+    # Update constraints of the reduced model
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
@@ -218,13 +243,11 @@ def test_CHO_oxidised() -> None:
     c_kg: ArrayLike = 0.1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    CHO_oxidized_model = CHO_reduced_model.update_constraints(
+        activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_oxidized_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -244,17 +267,13 @@ def test_CHO_oxidised() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-@pytest.mark.skip(reason="Checks result against previous work but not different functionality")
-def test_CHO_highly_oxidised() -> None:
+# @pytest.mark.skip(reason="Checks result against previous work but not different functionality")
+def test_CHO_highly_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
     """Tests C-H-O system at IW+4
 
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
-
+    # Update constraints of the reduced model
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
@@ -264,13 +283,11 @@ def test_CHO_highly_oxidised() -> None:
     # o_kg: ArrayLike = 3.25196e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    CHO_highly_oxidized_model = CHO_reduced_model.update_constraints(
+        activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_highly_oxidized_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -290,27 +307,9 @@ def test_CHO_highly_oxidised() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_middle_temperature() -> None:
+def test_CHO_middle_temperature(CHO_temperature_model: EquilibriumModel) -> None:
     """Tests C-H-O system at 873 K"""
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet = Planet.create(gas_species, temperature=873)
-
-    activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
-
-    oceans: ArrayLike = 1
-    h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
-    c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
-
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
-    )
-
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_temperature_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -330,16 +329,10 @@ def test_CHO_middle_temperature() -> None:
     assert output.compare(factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_low_temperature() -> None:
+def test_CHO_low_temperature(CHO_temperature_model: EquilibriumModel) -> None:
     """Tests C-H-O system at 450 K"""
-
-    gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
-
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=450)
-
-    # TODO: to revisit this below, since currently this test recreates the solver.
-    # This is a trick to keep the same argument structure and avoid JAX recompilation, even though
-    # for this case we want to turn off the O2_g constraint.
+    # Update constraints of the CHO_temperature_model.
+    # Turn off the O2_g constraint.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
@@ -349,13 +342,12 @@ def test_CHO_low_temperature() -> None:
     o_kg: ArrayLike = 1.02999e20
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(
-        planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
+    CHO_low_temperature_model = CHO_temperature_model.update_constraints(
+        activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
+    CHO_low_temperature_model = CHO_low_temperature_model.update_state(temperature=450)
 
-    solver: Callable = make_solver_with_jit(parameters)
-
-    output: Output = solver(parameters, subkey)
+    output: Output = CHO_low_temperature_model.solve()
 
     factsage_result: dict[str, Any] = {
         "gas": {

@@ -305,7 +305,9 @@ class MassConstraintSet(eqx.Module):
         """
         return self.abundance_mol(batch_size) * self.species.element_molar_masses
 
-    def update(self, new_abundances: Mapping[str, ArrayLike]) -> Self:
+    def update(
+        self, new_abundances: Mapping[str, ArrayLike], units: Literal["mass", "moles"] = "mass"
+    ) -> Self:
         """Updates the abundance with new values from a dictionary
 
         Note:
@@ -319,6 +321,7 @@ class MassConstraintSet(eqx.Module):
                 should be element names and the values should be the new abundance values in moles.
                 Original abundances that are not included in the ``new_abundance`` dictionary will
                 be retained.
+            Units: Units of ``new_abundances``. Defaults to ``mass``.
 
         Returns:
             An instance with updated abundances
@@ -329,6 +332,10 @@ class MassConstraintSet(eqx.Module):
             original_value: Array = abundance_dict[element]
             # Keep leaf signatures stable to avoid unnecessary retracing under JAX transforms.
             value_array: FloatArray = as_j64(new_value)
+            if units == "mass":
+                element_index: int = self.species.get_element_index(element)
+                element_molar_mass: float = self.species.element_molar_masses[element_index]
+                value_array = value_array / element_molar_mass
             abundance_dict[element] = jnp.broadcast_to(value_array, original_value.shape)
 
         mass_constraint_set_updated: MassConstraintSet = eqx.tree_at(
@@ -377,6 +384,7 @@ class Parameters(eqx.Module):
         state: BaseThermodynamicState,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        mass_units: Literal["mass", "moles"] = "mass",
         solver_parameters: Optional[SolverParameters] = None,
     ):
         """Creates an instance from a pre-built reaction system.
@@ -389,6 +397,7 @@ class Parameters(eqx.Module):
                 a new instance of :class:`MassConstraintSet`.
             solver_parameters: Solver parameters. Defaults to a new instance of
                 :class:`atmodeller.containers.SolverParameters`.
+            mass_units: Units of ``mass_constraints``. Defaults to ``mass``.
 
         Returns:
             An instance
@@ -397,7 +406,7 @@ class Parameters(eqx.Module):
             state.reaction_system.phase_system.species, activity_constraints
         )
         mass_constraints_: MassConstraintSet = MassConstraintSet.create(
-            state.reaction_system.phase_system.species, mass_constraints
+            state.reaction_system.phase_system.species, mass_constraints, mass_units
         )
         batch_size: int = get_batch_size((state, activity_constraints_, mass_constraints_))
         # jax.debug.print("batch_size (parameters) = {out}", out=batch_size)
@@ -431,8 +440,9 @@ class Parameters(eqx.Module):
     def update_constraints(
         self,
         *,
-        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
+        mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
+        mass_units: Literal["mass", "moles"] = "mass",
     ) -> Self:
         """Updates the mass and activity/fugacity constraints of the parameters.
 
@@ -441,8 +451,9 @@ class Parameters(eqx.Module):
         workflows.
 
         Args:
-            mass_constraints: New mass constraints. Defaults to ``None``.
             activity_constraints: New activity/fugacity constraints. Defaults to ``None``.
+            mass_constraints: New mass constraints. Defaults to ``None``.
+            mass_units: Units of ``mass_constraints``. Defaults to ``mass``.
 
         Returns:
             Updated parameters
@@ -451,7 +462,7 @@ class Parameters(eqx.Module):
 
         if mass_constraints is not None:
             mass_constraints_updated: MassConstraintSet = self.mass_constraints.update(
-                mass_constraints
+                mass_constraints, units=mass_units
             )
             parameters_updated = eqx.tree_at(
                 lambda p: p.mass_constraints, parameters_updated, mass_constraints_updated
