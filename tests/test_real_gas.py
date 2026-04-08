@@ -346,8 +346,8 @@ def test_subNeptune_melt_phase() -> None:
     # must have thermodynamic data available at the specified temperature. Here, we are limited by
     # O2Si(l).
     surface_temperature = 3400  # K
-    planet_mass = 4.6 * 5.97224e24  # kg
-    surface_radius = 1.5 * 6371000  # m
+    planet_mass = 4.6 * earth.mass  # kg
+    surface_radius = 1.5 * earth.radius  # m
 
     planet: Planet = Planet.create(
         gas_species_subneptune,
@@ -383,20 +383,20 @@ def test_subNeptune_melt_phase() -> None:
         "gas": {
             "species": {
                 "partial_pressure": {
-                    "H2O_g": np.array([34153.77806762769, 34647.133760130455, 34773.46409320044]),
-                    "H2_g": np.array([1.953888592704683, 0.164931377760951, 0.026752106127028]),
-                    "O2_g": np.array([34647.573618670154, 118713.0216717798, 205315.21707732175]),
+                    "H2O_g": np.array([34154.093778660186, 34646.96658299584, 34773.24084650488]),
+                    "H2_g": np.array([1.950644666178021, 0.164768512975864, 0.026732588634311]),
+                    "O2_g": np.array([34689.06957751295, 118754.57192278373, 205353.69545182592]),
                 },
                 "activity": {
-                    "H2_g": np.array([26.950076888813005, 14.769840406710053, 11.271846271463033])
+                    "H2_g": np.array([26.934201849530517, 14.767185065795928, 11.270717825878766])
                 },
             }
         },
         "melt": {
             "species": {
                 "activity": {
-                    "H2O_d": np.array([0.398229768986479, 0.401095696396106, 0.401826268347003]),
-                    "O2Si_l": np.array([0.442325000552759, 0.442325002931253, 0.442325003495892]),
+                    "H2O_d": np.array([0.398791191345742, 0.401658333667266, 0.4023896095421]),
+                    "O2Si_l": np.array([0.442946540896139, 0.442946543278513, 0.442946543844512]),
                 }
             }
         },
