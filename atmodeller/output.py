@@ -71,7 +71,6 @@ from atmodeller.phases import (
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def flatten_dictionary(d: dict, parent_key: str = "") -> dict:
@@ -990,7 +989,7 @@ class Output(eqx.Module):
         """Compares a target dictionary to the model output.
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             d1: Target dictionary
@@ -1011,7 +1010,7 @@ class Output(eqx.Module):
         """Quick look at the output.
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             format: The format of the output dictionary. Can be ``natural`` for the natural output
@@ -1031,7 +1030,7 @@ class Output(eqx.Module):
         """Drops unsuccessful solves.
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             dataframes: Dataframes from which to drop unsuccessful models
@@ -1054,7 +1053,7 @@ class Output(eqx.Module):
         Each top-level key becomes a DataFrame, with columns formed by joining nested keys with "."
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             format: The format of the output dictionary. Can be ``natural`` for the natural output
@@ -1095,7 +1094,7 @@ class Output(eqx.Module):
         """Writes the output to an Excel file.
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             format: The format of the output dictionary. Can be ``natural`` for the natural output
@@ -1150,7 +1149,7 @@ class Output(eqx.Module):
         """Writes the output to a pickle file.
 
         .. warning::
-            Not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context)
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
             format: The format of the output dictionary. Can be ``natural`` for the natural output
@@ -1171,6 +1170,14 @@ class Output(eqx.Module):
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logger.info("Output written to %s", output_file)
+
+    def solver_stats_to_logger(self) -> None:
+        """Logs solver statistics.
+
+        .. warning::
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
+        """
+        return self.multi_attempt_solution.stats_to_logger()
 
 
 # TODO: To reinstate at some point, but needs to be adapted to new output structure and parameters

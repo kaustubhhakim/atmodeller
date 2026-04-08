@@ -6,7 +6,7 @@
 
 import logging
 from collections.abc import Callable, Iterable, Iterator
-from typing import Any, Generic, Literal, Optional, Self
+from typing import Any, Generic, Literal, Optional, Self, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -650,3 +650,42 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
             "attempts": self.attempts,
             "converged": self.converged,
         }
+
+    def stats_to_logger(self) -> None:
+        """Logs solver statistics.
+
+        .. warning::
+            Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
+        """
+        num_successful_models: int = jnp.count_nonzero(self.solver_success).item()
+        num_failed_models: int = jnp.count_nonzero(~self.solver_success).item()
+
+        logger.info(
+            "Solve complete: %d (%0.2f%%) successful model(s)",
+            num_successful_models,
+            num_successful_models * 100 / self.batch_shape[-1],
+        )
+        if num_failed_models > 0:
+            logger.warning(
+                "%d (%0.2f%%) model(s) still failed",
+                num_failed_models,
+                num_failed_models * 100 / self.batch_shape[-1],
+            )
+
+        # Count unique values and their frequencies, ignoring failed models (attempts == 0)
+        successful_attempts = self.attempts[self.attempts > 0]
+        unique_vals, counts = jnp.unique(successful_attempts, return_counts=True)
+        for val, count in zip(unique_vals.tolist(), counts.tolist()):
+            logger.info(
+                "Attempt summary (solved): %d (%0.2f%%) model(s) required %d attempt(s)",
+                count,
+                count * 100 / self.batch_shape[-1],
+                val,
+            )
+
+        # Steps of 0 indicate no solution; replace with nan and report the max over solved models
+        steps_float: Array = cast(
+            Array, jnp.where(self.num_steps == 0, jnp.nan, self.num_steps.astype(float))
+        )
+        max_steps: Array = jnp.nanmax(steps_float)
+        logger.info("Solver steps (max) = %s", int(max_steps.item()))
