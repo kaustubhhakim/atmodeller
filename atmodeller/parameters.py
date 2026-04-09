@@ -29,11 +29,52 @@ from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Composition, CompositionItem, Formula
 
-from atmodeller.containers import FixedActivityConstraint, SolverParameters, SpeciesCollection
+from atmodeller.containers import SolverParameters, SpeciesCollection
 from atmodeller.interfaces import ActivityConstraintProtocol, SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64, get_batch_size, to_hashable
 from atmodeller.reactions import ReactionSystem
 from atmodeller.state import BaseThermodynamicState
+
+
+class FixedActivityConstraint(eqx.Module):
+    """A fixed activity constraint
+
+    This must adhere to :class:`~atmodeller.interfaces.ActivityConstraintProtocol`.
+
+    Args:
+        activity: Activity (dimensionless) or fugacity referenced to 1 bar for gaseous species.
+            Defaults to :data:`jax.numpy.nan` to indicate no constraint.
+    """
+
+    activity: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    """Activity"""
+
+    def active(self) -> Bool[Array, "..."]:
+        """Active activity constraint
+
+        Returns:
+            ``True`` if the activity constraint is active, otherwise ``False``
+        """
+        return ~jnp.isnan(self.activity)
+
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
+        """Log activity
+
+        Args:
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
+
+        Returns:
+            - Log activity (dimensionless) for condensed species, or
+            - Log fugacity referenced to 1 bar for gaseous species, or
+            - :data:`jax.numpy.nan` if the constraint is not active
+        """
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
+            jnp.shape(temperature), jnp.shape(pressure)
+        )
+        # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
+
+        return jnp.broadcast_to(jnp.log(self.activity), broadcast_shape)
 
 
 class ActivityConstraintSet(eqx.Module):

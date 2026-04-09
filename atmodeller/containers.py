@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Containers"""
+"""Core container classes for species collections and solver configuration."""
 
 import logging
 from collections.abc import Callable, Iterable, Iterator
@@ -35,7 +35,7 @@ from atmodeller.interfaces import (
     SpeciesProtocol,
     TSpecies_co,
 )
-from atmodeller.jax_utils import FloatArray, NpFloat, NpInt, OptxSolver, as_j64
+from atmodeller.jax_utils import NpFloat, NpInt, OptxSolver, as_j64
 from atmodeller.sci_utils import unit_conversion
 from atmodeller.solubility.core import NoSolubility
 from atmodeller.thermodata import ActivityCoefficient, thermodynamic_data_source
@@ -122,7 +122,7 @@ class ChemicalSpecies(eqx.Module):
         solve_for_stability: bool = True,
         include_in_phase_mass: bool = True,
     ) -> Self:
-        """Creates a condensated species with some default values.
+        """Creates a condensed species with some default values.
 
         Args:
             formula: Formula
@@ -359,8 +359,11 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         return tuple(self.unique_elements_map.keys())
 
     def get_element_index(self, element: str) -> int:
-        """Get the index of an element in the unique elements map"""
-        # TODO: Returning a non-existent element with an index of -1 is a bit hacky
+        """Get the index of an element in the unique-elements map.
+
+        Returns ``-1`` when the element is not present.
+        """
+        # TODO: Returning a non-existent element with an index of -1 is a bit hacky.
         return self.unique_elements_map.get(element, -1)
 
     def __getitem__(self, index: int) -> TSpecies_co:
@@ -405,47 +408,6 @@ def get_formula_matrix(species: SpeciesCollection[SpeciesProtocol]) -> NpInt:
     return formula_matrix
 
 
-class FixedActivityConstraint(eqx.Module):
-    """A fixed activity constraint
-
-    This must adhere to :class:`~atmodeller.interfaces.ActivityConstraintProtocol`.
-
-    Args:
-        activity: Activity (dimensionless) or fugacity referenced to 1 bar for gaseous species.
-            Defaults to :data:`jax.numpy.nan` to indicate no constraint.
-    """
-
-    activity: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    """Activity"""
-
-    def active(self) -> Bool[Array, "..."]:
-        """Active activity constraint
-
-        Returns:
-            ``True`` if the activity constraint is active, otherwise ``False``
-        """
-        return ~jnp.isnan(self.activity)
-
-    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> FloatArray:
-        """Log activity
-
-        Args:
-            temperature: Temperature (K)
-            pressure: Pressure (bar)
-
-        Returns:
-            - Log activity (dimensionless) for condensed species, or
-            - Log fugacity referenced to 1 bar for gaseous species, or
-            - :data:`jax.numpy.nan` if the constraint is not active
-        """
-        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
-            jnp.shape(temperature), jnp.shape(pressure)
-        )
-        # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
-
-        return jnp.broadcast_to(jnp.log(self.activity), broadcast_shape)
-
-
 class RootFindParameters(eqx.Module):
     """Parameters for Optimistix root finding
 
@@ -453,7 +415,7 @@ class RootFindParameters(eqx.Module):
         solver: Solver. Defaults to :class:`optimistix.Newton`.
         atol: Absolute tolerance. Defaults to ``1.0e-6``.
         rtol: Relative tolerance. Defaults to ``1.0e-6``.
-        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=False)``.
+        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=None)``.
         norm: Norm. Defaults to :func:`optimistix.max_norm`.
         throw: How to report any failures. Defaults to ``False``.
         max_steps: The maximum number of steps the solver can take. Defaults to ``256``.
@@ -497,7 +459,7 @@ class SolverParameters(RootFindParameters):  # pragma: no cover
         solver: Solver. Defaults to :class:`optimistix.Newton`.
         atol: Absolute tolerance. Defaults to ``1.0e-6``.
         rtol: Relative tolerance. Defaults to ``1.0e-6``.
-        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=False)``.
+        linear_solver: Linear solver. Defaults to ``AutoLinearSolver(well_posed=None)``.
         norm: Norm. Defaults to :func:`optimistix.max_norm`.
         throw: How to report any failures. Defaults to ``False``.
         max_steps: The maximum number of steps the solver can take. Defaults to ``256``.
@@ -657,19 +619,20 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
         .. warning::
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
         """
+        total_models: int = int(self.solver_success.size)
         num_successful_models: int = jnp.count_nonzero(self.solver_success).item()
         num_failed_models: int = jnp.count_nonzero(~self.solver_success).item()
 
         logger.info(
             "Solve complete: %d (%0.2f%%) successful model(s)",
             num_successful_models,
-            num_successful_models * 100 / self.batch_shape[-1],
+            num_successful_models * 100 / total_models,
         )
         if num_failed_models > 0:
             logger.warning(
                 "%d (%0.2f%%) model(s) still failed",
                 num_failed_models,
-                num_failed_models * 100 / self.batch_shape[-1],
+                num_failed_models * 100 / total_models,
             )
 
         # Count unique values and their frequencies, ignoring failed models (attempts == 0)
@@ -679,7 +642,7 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
             logger.info(
                 "Attempt summary (solved): %d (%0.2f%%) model(s) required %d attempt(s)",
                 count,
-                count * 100 / self.batch_shape[-1],
+                count * 100 / total_models,
                 val,
             )
 
