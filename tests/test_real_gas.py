@@ -5,14 +5,14 @@
 """Tests for systems with real gases"""
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
-import jax
 import numpy as np
-from jaxtyping import ArrayLike, PRNGKeyArray
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
+from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
@@ -26,12 +26,11 @@ from atmodeller.parameters import Parameters
 from atmodeller.phases import PurePhase
 from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
-from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -54,9 +53,6 @@ gas_species_subneptune: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g, SiO_g,
 O2Si_l: PurePhase = PurePhase.from_species("O2Si", state="l")
 condensates_subneptune: tuple[PurePhase, ...] = (O2Si_l,)
 
-key: PRNGKeyArray = jax.random.PRNGKey(0)
-key, subkey = jax.random.split(key)  # Split the key for use in this function
-
 
 def test_fO2_holley() -> None:
     """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
@@ -78,13 +74,13 @@ def test_fO2_holley() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -114,11 +110,11 @@ def test_chabrier_earth() -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -176,11 +172,11 @@ def test_chabrier_subNeptune() -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -237,11 +233,11 @@ def test_chabrier_subNeptune_batch() -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -297,13 +293,13 @@ def test_pH2_fO2_real_gas() -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": 1.47126255324872e22}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -325,7 +321,7 @@ def test_pH2_fO2_real_gas() -> None:
 def test_subNeptune_melt_phase() -> None:
     """Tests a more realistic sub-Neptune with computed melt-phase activities.
 
-    This is an extension of the model setup in Hakim et al. (2026), MRNAS
+    This is an extension of the model setup in :cite:t:`Hakim2026`.
 
     The melt phase consists of a chemically-reactive component SiO2(l) and a dissolved component
     H2O(l). Here, the activities of both species in the melt phase are calculated
@@ -373,11 +369,11 @@ def test_subNeptune_melt_phase() -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -403,5 +399,8 @@ def test_subNeptune_melt_phase() -> None:
     }
 
     # output.to_excel(file_prefix="test_subNeptune_melt_phase")
+
+    # We can also dump a summary of the solver stats to the logger for debugging purposes
+    output.solver_stats_to_logger()
 
     assert output.compare(target, rtol=RTOL, atol=ATOL)
