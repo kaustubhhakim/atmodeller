@@ -25,25 +25,18 @@ Typical usage:
 """
 
 import logging
-from collections.abc import Callable, Iterable, Mapping
-from pprint import pformat
-from typing import Optional, Self, cast
+from collections.abc import Callable
+from typing import Self, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
+from jaxtyping import PRNGKeyArray
 
-from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
-from atmodeller.containers import MultiAttemptSolution, SolverParameters
-from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.jax_utils import FloatArray
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
-from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
-from atmodeller.reactions import PhaseSystem, ReactionSystem
 from atmodeller.solvers import make_solver_with_jit
-from atmodeller.state import BaseThermodynamicState
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -88,6 +81,14 @@ class EquilibriumModel(eqx.Module):
         return self._solver(self._parameters, self._key, base_solution_array)
 
     def update_constraints(self, *args, **kwargs) -> Self:
+        """Updates the model's constraints
+
+        Args:
+            *args: Positional arguments to update constraints
+            **kwargs: Keyword arguments to update constraints
+
+        Returns:
+            A new instance of :class:`EquilibriumModel` with updated constraints"""
         parameters_updated: Parameters = self._parameters.update_constraints(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
             lambda m: m._parameters, self, parameters_updated
@@ -96,6 +97,15 @@ class EquilibriumModel(eqx.Module):
         return cast(Self, model_updated)
 
     def update_state(self, *args, **kwargs) -> Self:
+        """Updates the model's state
+
+        Args:
+            *args: Positional arguments to update state
+            **kwargs: Keyword arguments to update state
+
+        Returns:
+            A new instance of :class:`EquilibriumModel` with updated state
+        """
         parameters_updated: Parameters = self._parameters.update_state(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
             lambda m: m._parameters, self, parameters_updated
