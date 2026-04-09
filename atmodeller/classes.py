@@ -2,53 +2,60 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Equilibrium model API.
+"""Equilibrium model API
 
-Provides the :class:`EquilibriumModel`, the primary entry point for constructing and solving
-thermodynamic equilibrium problems.
+Provides :class:`EquilibriumModel`, the user-facing entry point for running thermodynamic
+equilibrium calculations from a prepared :class:`~atmodeller.parameters.Parameters` object.
 
-This module coordinates:
-
-- Phase definitions (gas, melt, solid, pure condensates),
-- Reaction system construction,
-- Nonlinear solver selection and execution (basic or robust),
-- Batched solution handling via JAX,
-- Post-processed results through :class:`Output`.
-
-Helper utilities are included to broadcast and standardize initial conditions for batched solves.
+The module couples immutable model parameters to a compiled solver callable, then exposes small
+wrapper methods for solving and parameter updates while preserving Equinox tree semantics.
 
 Typical usage:
 
-    model = EquilibriumModel(gas, melt=..., solid=..., condensates=...)
-    model.solve(state=...)
-    results = model.output
+.. code-block:: python
+
+    from atmodeller.classes import EquilibriumModel
+    from atmodeller.parameters import Parameters
+
+    parameters = Parameters(...)
+    model = EquilibriumModel(parameters)
+    output = model.solve_with_default()
 """
 
 import logging
-from collections.abc import Callable
-from typing import Self, cast
+from collections.abc import Callable, Mapping
+from typing import Literal, Self, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
+from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solvers import make_solver_with_jit
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+SolverCallable = Callable[
+    [Parameters, PRNGKeyArray, Float[Array, "#n_batch twice_species"]], Output
+]
+
 
 class EquilibriumModel(eqx.Module):
-    """An equilibrium model
+    """Main user-facing API to run equilibrium calculations
 
-    This is the main class that the user interacts with to build equilibrium models, solve them,
-    and retrieve the results.
+    The model bundles immutable :class:`~atmodeller.parameters.Parameters`, a compiled solver
+    closure, and a random key used by stochastic solver routines.
+
+    Args:
+        parameters: Fully prepared model parameters, including state, constraints, and solver
+            settings.
     """
 
     parameters: Parameters
-    solver: Callable
+    solver: SolverCallable
     key: PRNGKeyArray
 
     def __init__(self, parameters: Parameters):
@@ -56,16 +63,14 @@ class EquilibriumModel(eqx.Module):
         self.solver = make_solver_with_jit(parameters)
         self.key = jax.random.PRNGKey(0)
 
-    # For testing and debugging
-    # @eqx.filter_jit
-    # @eqx.debug.assert_max_traces(max_traces=1)
     def solve(self, base_solution_array: Float[Array, "#n_batch twice_species"]) -> Output:
         """Runs the solver and returns the output state.
 
         Note:
             This method is intentionally a thin Python wrapper. The heavy numerical path is
-            compiled inside ``self._solver``
+            compiled inside ``self.solver``
             (created by :func:`~atmodeller.solvers.make_solver_with_jit`).
+            The same key is reused for repeat calls, so stochastic branches remain deterministic.
 
         Args:
             base_solution_array: Initial guess for the solver, typically a broadcasted array of
@@ -76,14 +81,12 @@ class EquilibriumModel(eqx.Module):
         """
         return self.solver(self.parameters, self.key, base_solution_array)
 
-    # For testing and debugging
-    # @eqx.filter_jit
     def solve_with_default(self) -> Output:
         """Runs the solver with a default initial guess.
 
         Note:
             Like :meth:`solve`, this method is a lightweight non-jitted wrapper around the
-            already-jitted ``self._solver`` callable.
+            already-jitted ``self.solver`` callable.
 
         Returns:
             An :class:`~atmodeller.output.Output` instance
@@ -109,37 +112,55 @@ class EquilibriumModel(eqx.Module):
         Returns:
             A new instance of :class:`EquilibriumModel` with a rebuilt solver
         """
-        solver_rebuilt: Callable = make_solver_with_jit(self.parameters)
+        solver_rebuilt: SolverCallable = make_solver_with_jit(self.parameters)
         model_rebuilt: EquilibriumModel = eqx.tree_at(lambda m: m.solver, self, solver_rebuilt)
 
         return cast(Self, model_rebuilt)
 
-    def update_constraints(self, *args, **kwargs) -> Self:
-        """Updates the model's constraints.
+    def update_constraints(
+        self,
+        *,
+        activity_constraints: Mapping[str, ActivityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        mass_units: Literal["mass", "moles"] = "mass",
+    ) -> Self:
+        """Returns a model with updated mass and activity/fugacity constraints.
+
+        This is a convenience wrapper around
+        :meth:`atmodeller.parameters.Parameters.update_constraints` that preserves the immutable
+        Equinox tree semantics of the model.
 
         Args:
-            *args: Positional arguments to update constraints
-            **kwargs: Keyword arguments to update constraints
+            activity_constraints: New activity/fugacity constraint mapping. Defaults to ``None``.
+            mass_constraints: New mass-constraint mapping. Defaults to ``None``.
+            mass_units: Units used for ``mass_constraints``. Defaults to ``"mass"``.
 
         Returns:
-            A new instance of :class:`EquilibriumModel` with updated constraints
+            A new model instance with updated parameters
         """
-        parameters_updated: Parameters = self.parameters.update_constraints(*args, **kwargs)
+        parameters_updated: Parameters = self.parameters.update_constraints(
+            activity_constraints=activity_constraints,
+            mass_constraints=mass_constraints,
+            mass_units=mass_units,
+        )
         model_updated: EquilibriumModel = eqx.tree_at(
             lambda m: m.parameters, self, parameters_updated
         )
 
         return cast(Self, model_updated)
 
-    def update_state(self, *args, **kwargs) -> Self:
-        """Updates the model's state.
+    def update_state(self, *args: object, **kwargs: object) -> Self:
+        """Returns a model with an updated thermodynamic state.
+
+        Arguments are forwarded to ``self.parameters.update_state``, which in turn forwards them
+        to the underlying thermodynamic state's ``update`` implementation.
 
         Args:
-            *args: Positional arguments to update state
-            **kwargs: Keyword arguments to update state
+            *args: Positional arguments accepted by the state ``update`` method
+            **kwargs: Keyword arguments accepted by the state ``update`` method
 
         Returns:
-            A new instance of :class:`EquilibriumModel` with updated state
+            A new model instance with updated parameters
         """
         parameters_updated: Parameters = self.parameters.update_state(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
@@ -147,31 +168,3 @@ class EquilibriumModel(eqx.Module):
         )
 
         return cast(Self, model_updated)
-
-    # TODO: To reinstate at some point, but needs to be adapted to new output structure and
-    # parameters handling
-
-    # def calculate_disequilibrium(
-    #     self, *, state: ThermodynamicStateProtocol, log_number_moles: ArrayLike
-    # ) -> None:
-    #     """Computes the Gibbs free energy disequilibrium.
-
-    #     This method calculates the Gibbs free energy difference (ΔG) for each considered reaction
-    #     relative to equilibrium, based on the current state of the system. A value of zero
-    #     indicates a reaction at equilibrium, while positive or negative values indicate departures
-    #     from equilibrium in terms of energetic favourability.
-
-    #     Args:
-    #         state: Thermodynamic state
-    #         log_number_moles: Log number of moles
-    #     """
-    #     parameters: Parameters = Parameters.from_reaction_system(self.reaction_system, state)
-    #     solution_array: Array = broadcast_initial_solution(
-    #         log_number_moles,
-    #         None,
-    #         self.reaction_system.species.number_species,
-    #         parameters.batch_size,
-    #     )
-    #     # jax.debug.print("solution_array = {out}", out=solution_array)
-
-    #     self._output = OutputDisequilibrium(parameters, solution_array)
