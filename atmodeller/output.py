@@ -945,6 +945,11 @@ class Output(eqx.Module):
     parameters: Parameters
     multi_attempt_solution: MultiAttemptSolution
 
+    @property
+    def solution(self) -> Float[Array, "#n_batch twice_species"]:
+        """Solution array for all species i.e. log number of moles and log stability"""
+        return self.multi_attempt_solution.value
+
     def to_dict(
         self,
         format: Literal["natural", "named_arrays", "elements_species"] = "named_arrays",
