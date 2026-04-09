@@ -12,6 +12,11 @@ This module defines immutable, JAX-friendly parameter objects used by the solver
 
 Factory methods validate and normalize user inputs, while ``update`` methods return new instances
 with leaf shapes kept stable for efficient JAX transformations, also within jitted workflows.
+
+Design note:
+    Construct parameter containers once outside ``jit`` (or other JAX transforms), then use
+    ``update`` methods inside transformed workflows to preserve leaf signatures and avoid
+    unnecessary retracing.
 """
 
 from collections.abc import Callable, Mapping
@@ -22,7 +27,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
-from molmass import CompositionItem, Formula
+from molmass import Composition, CompositionItem, Formula
 
 from atmodeller.containers import FixedActivityConstraint, SolverParameters, SpeciesCollection
 from atmodeller.interfaces import ActivityConstraintProtocol, SpeciesProtocol
@@ -32,51 +37,27 @@ from atmodeller.state import BaseThermodynamicState
 
 
 class ActivityConstraintSet(eqx.Module):
-    """A set of activity/fugacity constraints
+    """Activity/fugacity constraints applied to species in the system
 
-    These are applied as constraints on the species' activity.
-
-    Use :meth:`create` to construct a new instance and :meth:`update` to return an updated
-    instance with modified activity/fugacity constraints.
+    Prefer constructing this object once outside ``jit`` and applying :meth:`update` inside
+    transformed workflows.
 
     Args:
-        constraints_dict: Dictionary mapping species names to activity constraint
         species: Species collection
+        constraints_dict: Mapping of a species name and an activity constraint. Defaults to
+            ``None``.
     """
 
-    constraints_dict: dict[str, ActivityConstraintProtocol]
-    """Activity constraints dictionary mapping species name to activity constraint"""
     species: SpeciesCollection
     """Species collection"""
+    constraints_dict: dict[str, ActivityConstraintProtocol]
+    """Activity constraints dictionary mapping species name to activity constraint"""
 
-    @property
-    def ordered_constraints(self) -> tuple[ActivityConstraintProtocol, ...]:
-        """Activity constraints in the canonical species order.
-
-        This explicit ordering is required for stable internal JAX operations. Relying on
-        dictionary iteration for semantic species alignment is fragile across transformed code
-        paths, so constraints are always materialized in ``species.species_names`` order.
-        """
-        return tuple(
-            self.constraints_dict[species_name] for species_name in self.species.species_names
-        )
-
-    @classmethod
-    def create(
-        cls,
+    def __init__(
+        self,
         species: SpeciesCollection,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
-    ) -> Self:
-        """Creates an instance.
-
-        Args:
-            species: Species collection
-            activity_constraints: Mapping of a species name and an activity constraint. Defaults to
-                ``None``.
-
-        Returns:
-            An instance
-        """
+    ):
         activity_constraints_: Mapping[str, ActivityConstraintProtocol] = (
             activity_constraints if activity_constraints is not None else {}
         )
@@ -92,7 +73,20 @@ class ActivityConstraintSet(eqx.Module):
 
         # jax.debug.print("constraints_dict = {out}", out=constraints_dict)
 
-        return cls(constraints_dict, species)
+        self.species = species
+        self.constraints_dict = constraints_dict
+
+    @property
+    def ordered_constraints(self) -> tuple[ActivityConstraintProtocol, ...]:
+        """Activity constraints in the canonical species order of the species collection
+
+        This explicit ordering is required for stable internal JAX operations. Relying on
+        dictionary iteration for semantic species alignment is fragile across transformed code
+        paths, so constraints are always materialized in ``species.species_names`` order.
+        """
+        return tuple(
+            self.constraints_dict[species_name] for species_name in self.species.species_names
+        )
 
     def active(self) -> Bool[Array, "... species"]:
         """Active activity constraints
@@ -140,7 +134,15 @@ class ActivityConstraintSet(eqx.Module):
         return log_activity
 
     def update(self, new_constraints: Mapping[str, ActivityConstraintProtocol]) -> Self:
-        """Updates the activity/fugacity constraints with new values from a dictionary
+        """Updates the activity/fugacity constraints with new values from a dictionary.
+
+        Note:
+            Prefer this method over re-instantiation when reusing a compiled JAX function.
+            It enforces leaf shape/dtype stability preventing unnecessary retracing. It also
+            supports partial updates, leaving unspecified species unchanged. Previously active
+            constraints can be turned off by setting the mapping value to ``NaN`` and conversely
+            previously inactive constraints can be turned on by setting the mapping value to a
+            non-``NaN`` value.
 
         Args:
             new_constraints: Dictionary with new constraint values for some or all species. The
@@ -149,7 +151,7 @@ class ActivityConstraintSet(eqx.Module):
                 will be retained.
 
         Returns:
-            An instance with updated constraints
+            An instance with updated activity/fugacity constraints
         """
         constraints_dict: dict[str, ActivityConstraintProtocol] = dict(self.constraints_dict)
 
@@ -177,42 +179,29 @@ class ActivityConstraintSet(eqx.Module):
 
 
 class MassConstraintSet(eqx.Module):
-    """A set of mass constraints
+    """Mass/abundance constraints applied to elements in the system
 
-    Use :meth:`create` to construct a new instance and :meth:`update` to return an updated
-    instance with modified abundance constraints.
+    Prefer constructing this object once outside ``jit`` and applying :meth:`update` inside
+    transformed workflows.
 
     Args:
-        abundance_dict: Dictionary mapping element names to abundance (in moles) arrays. All
-            elements in the species collection must be included as keys in the dictionary and in
-            the same order as the unique elements in the species collection. Elements for which
-            there are no active constraints should be included with abundance values of NaN.
         species: Species collection
+        mass_constraints: Dictionary mapping element or species names to mass/abundance arrays.
+            Defaults to ``None``.
+        units: Units of ``mass_constraints``. Defaults to ``mass``.
     """
 
-    abundance_dict: dict[str, FloatArray]
-    """Abundance dictionary mapping element name to abundance array"""
     species: SpeciesCollection
     """Species collection"""
+    abundance_dict: dict[str, FloatArray]
+    """Mapping of an element name to an abundance constraint (mol)"""
 
-    @classmethod
-    def create(
-        cls,
+    def __init__(
+        self,
         species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
-    ) -> Self:
-        """Creates an instance.
-
-        Args:
-            species: Species collection
-            mass_constraints: Mapping of element name and mass constraint in ``units``. Defaults to
-                ``None`` to create an empty set of mass constraints.
-            units: Units of ``mass_constraints``. Defaults to ``mass``.
-
-        Returns:
-            An instance
-        """
+    ):
         mass_constraints_: Mapping[str, ArrayLike] = (
             mass_constraints if mass_constraints is not None else {}
         )
@@ -221,39 +210,35 @@ class MassConstraintSet(eqx.Module):
 
         for element in species.unique_elements:
             element_sum: ArrayLike = 0
-            # This accommodates mass constraints given as mass or moles of species as well as
-            # elements.
+            has_constraint: bool = False
+            # This accommodates mass constraints given as mass or moles of elements or species.
             for species_, value_ in mass_constraints_.items():
-                # Does the species formula contain the element? If not, skip to the next species.
-                try:
-                    element_composition: CompositionItem = Formula(species_).composition()[element]
-                except KeyError:
-                    continue
-                # Always convert to moles for storage
-                if units == "mass":
-                    # value_ is in mass units, convert to moles
-                    # To get moles: (mass of element in species) / (molar mass of element)
-                    # But here, value_ is the mass of the species, so:
-                    # moles of element = (mass of species * element_composition.fraction) /
-                    # element molar mass
-                    element_index: int = species.get_element_index(element)
-                    element_molar_mass: float = species.element_molar_masses[element_index]
-                    scale: float = element_composition.fraction / element_molar_mass
-                elif units == "moles":
-                    # element_composition.count is the atom count
-                    # value_ is in moles of species, so moles of element = count * value_
-                    scale = element_composition.count
-                element_sum += scale * value_
+                composition: Composition = Formula(species_).composition()
+                if element in composition:
+                    element_composition: CompositionItem = composition[element]
+                    has_constraint = True
+                    # Always convert to moles for storage
+                    if units == "mass":
+                        # To get moles: (mass of element in species) / (molar mass of element)
+                        # But here, value_ is the mass of the species, so:
+                        # moles of element = (mass of species * element_composition.fraction) /
+                        #   element molar mass
+                        element_index: int = species.get_element_index(element)
+                        element_molar_mass: float = species.element_molar_masses[element_index]
+                        scale: float = element_composition.fraction / element_molar_mass
+                    elif units == "moles":
+                        # element_composition.count is the atom count
+                        # value_ is in moles of species, so moles of element = count * value_
+                        scale = element_composition.count
+                    element_sum += scale * value_
 
             # All elements must be included as keys in the abundance dictionary, even if they
             # are not present in any constraints. In the latter case, the abundance is set to
             # NaN to indicate that the constraint is inactive.
-            if jnp.any(element_sum != 0):
-                abundance_dict[element] = as_j64(element_sum)
-            else:
-                abundance_dict[element] = as_j64(jnp.nan)
+            abundance_dict[element] = as_j64(element_sum) if has_constraint else as_j64(jnp.nan)
 
-        return cls(abundance_dict, species)
+        self.species = species
+        self.abundance_dict = abundance_dict
 
     def abundance(self) -> Float[Array, " n_elements"]:
         """Abundance array constructed from the abundance dictionary
@@ -308,23 +293,25 @@ class MassConstraintSet(eqx.Module):
     def update(
         self, new_abundances: Mapping[str, ArrayLike], units: Literal["mass", "moles"] = "mass"
     ) -> Self:
-        """Updates the abundance with new values from a dictionary
+        """Updates the abundance constraints with new values from a dictionary.
 
         Note:
-            Previously active constraints can be turned off by setting the abundance to ``NaN``
-            in the ``new_abundances`` dictionary and previously inactive constraints can be turned
-            on by setting the abundance to a non-``NaN`` value in the ``new_abundances``
-            dictionary.
+            Prefer this method over re-instantiation when reusing a compiled JAX function.
+            It enforces leaf shape/dtype stability preventing unnecessary retracing. It also
+            supports partial updates, leaving unspecified species unchanged. Previously active
+            constraints can be turned off by setting the mapping value to ``NaN`` and conversely
+            previously inactive constraints can be turned on by setting the mapping value to a
+            non-``NaN`` value.
 
         Args:
             new_abundances: Dictionary with new abundance values for some or all elements. The keys
-                should be element names and the values should be the new abundance values in moles.
-                Original abundances that are not included in the ``new_abundance`` dictionary will
-                be retained.
-            Units: Units of ``new_abundances``. Defaults to ``mass``.
+                should be element names and the values should be the new abundance values. Original
+                abundances that are not included in the ``new_abundance`` dictionary will be
+                retained.
+            units: Units of ``new_abundances``. Defaults to ``mass``.
 
         Returns:
-            An instance with updated abundances
+            An instance with updated abundance constraints
         """
         abundance_dict: dict[str, Array] = dict(self.abundance_dict)
 
@@ -356,8 +343,8 @@ class MassConstraintSet(eqx.Module):
 class Parameters(eqx.Module):
     """Parameters
 
-    Use :meth:`create` to construct a new instance and :meth:`update` to return an updated instance
-    with modified activity/fugacity and mass constraints.
+    Prefer constructing this object using :meth:`create` once outside ``jit`` and applying
+    :meth:`update` inside transformed workflows.
 
     Args:
         state: Thermodynamic state
@@ -395,17 +382,17 @@ class Parameters(eqx.Module):
                 a new instance of :class:`ActivityConstraintSet`.
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
                 a new instance of :class:`MassConstraintSet`.
-            solver_parameters: Solver parameters. Defaults to a new instance of
-                :class:`atmodeller.containers.SolverParameters`.
             mass_units: Units of ``mass_constraints``. Defaults to ``mass``.
+            solver_parameters: Solver parameters. Defaults to a new instance of
+                :class:`~atmodeller.containers.SolverParameters`.
 
         Returns:
             An instance
         """
-        activity_constraints_: ActivityConstraintSet = ActivityConstraintSet.create(
+        activity_constraints_: ActivityConstraintSet = ActivityConstraintSet(
             state.reaction_system.phase_system.species, activity_constraints
         )
-        mass_constraints_: MassConstraintSet = MassConstraintSet.create(
+        mass_constraints_: MassConstraintSet = MassConstraintSet(
             state.reaction_system.phase_system.species, mass_constraints, mass_units
         )
         batch_size: int = get_batch_size((state, activity_constraints_, mass_constraints_))
