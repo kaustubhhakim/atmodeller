@@ -35,17 +35,26 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
+# Gas species
+H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
+
+# Melt species
+H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+    "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
+)
+CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
+    "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
+)
+
 
 @pytest.fixture(scope="module")
 def CHO_reduced_model() -> EquilibriumModel:
     """C-H-O reduced model"""
-    # Gas species
-    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
-    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
-    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
-    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
@@ -67,21 +76,7 @@ def CHO_reduced_model() -> EquilibriumModel:
 @pytest.fixture(scope="module")
 def CH_model() -> EquilibriumModel:
     """C-H model"""
-    # Gas species
-    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
-    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
-    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
-
-    # Melt species
-    H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
-    )
-    CO2_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
-        "CO2", solubility=solubility_models["CO2_basalt_dixon95"], include_in_phase_mass=False
-    )
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
     planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
@@ -104,13 +99,6 @@ def CH_model() -> EquilibriumModel:
 @pytest.fixture(scope="module")
 def CHO_temperature_model() -> EquilibriumModel:
     """C-H-O model at 873 K"""
-    # Gas species
-    H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
-    H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
-    O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
-    CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
-    CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
-    CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
     planet: BaseThermodynamicState = Planet.create(gas_species, temperature=873)
