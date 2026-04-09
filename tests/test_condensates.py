@@ -68,7 +68,7 @@ def graphite_model() -> EquilibriumModel:
     o_kg: ArrayLike = 2.73159e19
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -91,7 +91,7 @@ def water_model() -> EquilibriumModel:
     o_kg: ArrayLike = 1.14375e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
     return EquilibriumModel(parameters)
 
@@ -192,7 +192,7 @@ def test_graphite_water_stable() -> None:
     o_kg: float = 2.48298883581636e21
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
     model: EquilibriumModel = EquilibriumModel(parameters)
 
@@ -241,9 +241,7 @@ def test_impose_stable() -> None:
     # Define the mole fractions of input gases
     mole_fractions: dict[str, ArrayLike] = {"H2": 0.5, "N2": 0.5}
 
-    parameters: Parameters = Parameters.create(
-        state, mass_constraints=mole_fractions, mass_units="moles"
-    )
+    parameters: Parameters = Parameters(state, mass_constraints=mole_fractions, mass_units="moles")
 
     model: EquilibriumModel = EquilibriumModel(parameters)
 

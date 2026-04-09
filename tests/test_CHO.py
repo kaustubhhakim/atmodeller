@@ -57,7 +57,7 @@ def CHO_reduced_model() -> EquilibriumModel:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -94,7 +94,7 @@ def CH_model() -> EquilibriumModel:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -122,7 +122,7 @@ def CHO_temperature_model() -> EquilibriumModel:
     c_kg: ArrayLike = 1 * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 

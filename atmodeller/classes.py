@@ -31,9 +31,8 @@ from typing import Self, cast
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import PRNGKeyArray
+from jaxtyping import Array, Float, PRNGKeyArray
 
-from atmodeller.jax_utils import FloatArray
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solvers import make_solver_with_jit
@@ -57,38 +56,74 @@ class EquilibriumModel(eqx.Module):
         self._solver = make_solver_with_jit(parameters)
         self._key = jax.random.PRNGKey(0)
 
-    @eqx.filter_jit
     # For testing and debugging
+    # @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
-    def solve(self, base_solution_array: FloatArray = jnp.array(jnp.nan)) -> Output:
-        """Runs the nonlinear solver and initialises the output state.
+    def solve(self, base_solution_array: Float[Array, "#n_batch twice_species"]) -> Output:
+        """Runs the solver and returns the output state.
 
-        This method executes the compiled equilibrium solver produced by :meth:`_make_solver` and
-        stores the resulting solution for downstream processing. It accepts updated planetary/
-        environmental constraints and initial guesses for the nonlinear system. After successful
-        convergence, an internal ``Output`` instance is created to expose number densities,
-        activities, stabilities, and post-processed diagnostic quantities.
+        Note:
+            This method is intentionally a thin Python wrapper. The heavy numerical path is
+            compiled inside ``self._solver``
+            (created by :func:`~atmodeller.solvers.make_solver_with_jit`).
 
         Args:
-            parameters: Parameters defining the equilibrium problem, including species, reactions,
-                and environmental conditions.
             base_solution_array: Initial guess for the solver, typically a broadcasted array of
                 log number moles and log stabilities.
 
         Returns:
-            An :class:`~atmodeller.output.Output` instance containing the results
+            An :class:`~atmodeller.output.Output` instance
         """
         return self._solver(self._parameters, self._key, base_solution_array)
 
+    # For testing and debugging
+    # @eqx.filter_jit
+    def solve_with_default(self) -> Output:
+        """Runs the solver with a default initial guess.
+
+        Note:
+            Like :meth:`solve`, this method is a lightweight non-jitted wrapper around the
+            already-jitted ``self._solver`` callable.
+
+        Returns:
+            An :class:`~atmodeller.output.Output` instance
+        """
+        base_solution_array: Float[Array, "#n_batch twice_species"] = jnp.full(
+            (
+                self._parameters.batch_size,
+                self._parameters.reaction_system.species.number_species * 2,
+            ),
+            jnp.nan,
+        )
+
+        return self._solver(self._parameters, self._key, base_solution_array)
+
+    def rebuild_solver(self) -> Self:
+        """Rebuilds the compiled solver from the model's current parameters.
+
+        Use this after parameter updates that may have changed array-leaf shapes or batching in a
+        way that invalidates the vmapping axes captured by the existing solver closure, or that
+        invalidates the original leaf-shape broadcasting assumptions preserved by the
+        ``update`` methods on the parameter containers.
+
+        Returns:
+            A new instance of :class:`EquilibriumModel` with a rebuilt solver
+        """
+        solver_rebuilt: Callable = make_solver_with_jit(self._parameters)
+        model_rebuilt: EquilibriumModel = eqx.tree_at(lambda m: m._solver, self, solver_rebuilt)
+
+        return cast(Self, model_rebuilt)
+
     def update_constraints(self, *args, **kwargs) -> Self:
-        """Updates the model's constraints
+        """Updates the model's constraints.
 
         Args:
             *args: Positional arguments to update constraints
             **kwargs: Keyword arguments to update constraints
 
         Returns:
-            A new instance of :class:`EquilibriumModel` with updated constraints"""
+            A new instance of :class:`EquilibriumModel` with updated constraints
+        """
         parameters_updated: Parameters = self._parameters.update_constraints(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
             lambda m: m._parameters, self, parameters_updated
@@ -97,7 +132,7 @@ class EquilibriumModel(eqx.Module):
         return cast(Self, model_updated)
 
     def update_state(self, *args, **kwargs) -> Self:
-        """Updates the model's state
+        """Updates the model's state.
 
         Args:
             *args: Positional arguments to update state
@@ -140,85 +175,3 @@ class EquilibriumModel(eqx.Module):
     #     # jax.debug.print("solution_array = {out}", out=solution_array)
 
     #     self._output = OutputDisequilibrium(parameters, solution_array)
-
-    # def solve(
-    #     self,
-    #     *,
-    #     initial_log_number_moles: Optional[ArrayLike] = None,
-    #     initial_log_stability: Optional[ArrayLike] = None,
-    #     state: Optional[BaseThermodynamicState] = None,
-    #     activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
-    #     mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
-    #     solver_parameters: Optional[SolverParameters] = None,
-    # ) -> Array:
-    #     """Runs the nonlinear solver and initialises the output state.
-
-    #     This method executes the compiled equilibrium solver produced by :meth:`set_solver` and
-    #     stores the resulting solution for downstream processing. It optionally accepts updated
-    #     planetary/environmental constraints and initial guesses for the nonlinear system. After
-    #     successful convergence, an internal ``Output`` instance is created to expose number
-    #     densities, activities, stabilities, and post-processed diagnostic quantities.
-
-    #     If :meth:`set_solver` has not been called, a suitable solver will be constructed and
-    #     JIT-compiled automatically. Repeated calls to :meth:`solve` with compatible shapes will be
-    #     fast and will reuse cached compilation artifacts.
-
-    #     Args:
-    #         initial_log_number_moles: Initial log number of moles. Defaults to ``None``.
-    #         initial_log_stability: Initial log stability. Defaults to ``None``.
-    #         state: Thermodynamic state. Defaults to ``None``.
-    #         activity_constraints: Activity constraints. Defaults to ``None``.
-    #         mass_constraints: Mass constraints. Defaults to ``None``.
-    #         solver_parameters: Solver parameters. Defaults to ``None``.
-    #     """
-    #     parameters: Parameters = Parameters.from_reaction_system(
-    #         self.reaction_system,
-    #         state,
-    #         activity_constraints,
-    #         mass_constraints,
-    #         solver_parameters,
-    #     )
-
-    #     key: PRNGKeyArray = jax.random.PRNGKey(0)
-    #     key, subkey = jax.random.split(key)  # Split the key for use in this function
-
-    #     # Rebuild the solver only when the shape of any array leaf changes; this covers both
-    #     # batch_size changes and structural changes (e.g. a scalar buffer becoming batched)
-    #     # that affect vmap_axes_spec. filter_jit handles value-only changes automatically.
-    #     solver_shapes: tuple = tuple(
-    #         leaf.shape for leaf in jax.tree_util.tree_leaves(parameters) if hasattr(leaf, "shape")
-    #     )
-    #     if self._solver is None or self._solver_shapes != solver_shapes:
-    #         self._solver = make_solver_with_jit(parameters)
-    #         self._solver_shapes = solver_shapes
-
-    #     # Allow the user to provide initial guesses for the solver, but if they are not provided,
-    #     # apply a default auto guess (nan) that will trigger the solver's internal heuristic to
-    #     # generate an initial guess. This is often more robust than a fixed initial guess, which
-    #     # may be far from the solution for some models and lead to solver failure.
-    #     if initial_log_number_moles is None and initial_log_stability is None:
-    #         logger.info("Applying auto initial guess")
-    #         # Any NaN value will trigger the solver's internal heuristic to generate an initial
-    #         # guess.
-    #         initial_solution: Float[Array, "n_batch twice_species"] = jnp.broadcast_to(
-    #             jnp.nan, (parameters.batch_size, self.reaction_system.species.number_species * 2)
-    #         )
-    #     else:
-    #         if initial_log_number_moles is None:
-    #             initial_log_number_moles = INITIAL_LOG_NUMBER_MOLES
-    #         initial_log_number_moles = jnp.broadcast_to(
-    #             initial_log_number_moles,
-    #             (parameters.batch_size, self.reaction_system.species.number_species),
-    #         )
-    #         logger.debug("initial_log_number_moles = %s", initial_log_number_moles)
-    #         if initial_log_stability is None:
-    #             initial_log_stability = INITIAL_LOG_STABILITY
-    #         initial_log_stability = jnp.broadcast_to(
-    #             initial_log_stability,
-    #             (parameters.batch_size, self.reaction_system.species.number_species),
-    #         )
-    #         logger.debug("initial_log_stability = %s", initial_log_stability)
-    #         initial_solution = jnp.concatenate(
-    #             (initial_log_number_moles, initial_log_stability), axis=-1
-    #         )
-    #         logger.info("Initial solution = %s", initial_solution)

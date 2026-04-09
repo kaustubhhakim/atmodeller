@@ -70,7 +70,7 @@ def test_H2O() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
     solver: Callable = make_solver_with_jit(parameters)
 
@@ -97,7 +97,7 @@ def test_H_O() -> None:
     o_kg: ArrayLike = 6.25774e20
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
-    parameters: Parameters = Parameters.create(planet, mass_constraints=mass_constraints)
+    parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
     solver: Callable = make_solver_with_jit(parameters)
 
@@ -134,7 +134,7 @@ def test_H_fO2() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -176,7 +176,7 @@ def test_H_fO2_fH2() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -225,7 +225,7 @@ def test_H_fO2_batch_temperature() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -290,7 +290,7 @@ def test_H_fO2_batch_fO2_shift() -> None:
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
@@ -351,7 +351,7 @@ def test_H_fO2_batch_H_mass() -> None:
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
-    parameters: Parameters = Parameters.create(
+    parameters: Parameters = Parameters(
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 

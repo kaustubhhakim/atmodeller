@@ -646,7 +646,7 @@ def make_solver(parameters: Parameters) -> Callable:
     def solver(
         parameters: Parameters,
         key: PRNGKeyArray,
-        base_solution_array: FloatArray = jnp.array(jnp.nan),
+        base_solution_array: Float[Array, "#n_batch twice_species"],
     ) -> Output:
         """JIT-compiled entry point that dispatches to the appropriate solver branch.
 
@@ -658,7 +658,7 @@ def make_solver(parameters: Parameters) -> Callable:
         Args:
             parameters: Parameters; array leaves are traced, non-array leaves are static
             key: JAX PRNG key
-            base_solution_array: Initial guess
+            base_solution_array: Initial guess with shape ``(batch_size, 2 * n_species)``
 
         Returns:
             :class:`~atmodeller.output.Output` object
@@ -667,24 +667,16 @@ def make_solver(parameters: Parameters) -> Callable:
         condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
         # jax.debug.print("condition (active stability) = {out}", out=condition)
 
-        base_solution_array_broadcast: Float[Array, "#n_batch twice_species"] = jnp.broadcast_to(
-            base_solution_array,
-            (
-                parameters.batch_size,
-                parameters.reaction_system.species.number_species * 2,
-            ),
-        )
-
         def solve_with_stability_multistart(key):
             """Routes to the tau sweep solver for systems with active stability species."""
             _, subkey = jax.random.split(key)
-            return tau_sweep_solver(base_solution_array_broadcast, parameters, subkey)
+            return tau_sweep_solver(base_solution_array, parameters, subkey)
 
         def solve_with_generic_multistart(key):
             """Routes to the generic multistart retry solver for systems without stability."""
             _, subkey = jax.random.split(key)
             return batch_retry_solver(
-                base_solution_array_broadcast,
+                base_solution_array,
                 parameters,
                 subkey,
                 parameters.solver_parameters.retry_perturbation,

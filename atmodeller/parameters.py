@@ -44,7 +44,7 @@ class ActivityConstraintSet(eqx.Module):
 
     Args:
         species: Species collection
-        constraints_dict: Mapping of a species name and an activity constraint. Defaults to
+        activity_constraints: Mapping of a species name and an activity constraint. Defaults to
             ``None``.
     """
 
@@ -139,10 +139,11 @@ class ActivityConstraintSet(eqx.Module):
         Note:
             Prefer this method over re-instantiation when reusing a compiled JAX function.
             It enforces leaf shape/dtype stability preventing unnecessary retracing. It also
-            supports partial updates, leaving unspecified species unchanged. Previously active
-            constraints can be turned off by setting the mapping value to ``NaN`` and conversely
-            previously inactive constraints can be turned on by setting the mapping value to a
-            non-``NaN`` value.
+            supports partial updates, leaving unspecified species unchanged. Constraint activation
+            and deactivation are determined by the concrete
+            :class:`~atmodeller.interfaces.ActivityConstraintProtocol` implementation. For
+            example, implementations such as :class:`~atmodeller.containers.FixedActivityConstraint`
+            treat internal ``NaN`` values as inactive.
 
         Args:
             new_constraints: Dictionary with new constraint values for some or all species. The
@@ -164,7 +165,7 @@ class ActivityConstraintSet(eqx.Module):
             # Keep leaf signatures stable to avoid unnecessary retracing under JAX transformations.
             new_dynamic_stable = jtu.tree_map(
                 lambda new_leaf, original_leaf: jnp.broadcast_to(
-                    as_j64(new_leaf), original_leaf.shape
+                    jnp.asarray(new_leaf, dtype=original_leaf.dtype), original_leaf.shape
                 ),
                 new_dynamic,
                 original_dynamic,
@@ -298,7 +299,7 @@ class MassConstraintSet(eqx.Module):
         Note:
             Prefer this method over re-instantiation when reusing a compiled JAX function.
             It enforces leaf shape/dtype stability preventing unnecessary retracing. It also
-            supports partial updates, leaving unspecified species unchanged. Previously active
+            supports partial updates, leaving unspecified elements unchanged. Previously active
             constraints can be turned off by setting the mapping value to ``NaN`` and conversely
             previously inactive constraints can be turned on by setting the mapping value to a
             non-``NaN`` value.
@@ -318,11 +319,13 @@ class MassConstraintSet(eqx.Module):
         for element, new_value in new_abundances.items():
             original_value: Array = abundance_dict[element]
             # Keep leaf signatures stable to avoid unnecessary retracing under JAX transforms.
-            value_array: FloatArray = as_j64(new_value)
+            value_array: FloatArray = jnp.asarray(new_value)
             if units == "mass":
                 element_index: int = self.species.get_element_index(element)
                 element_molar_mass: float = self.species.element_molar_masses[element_index]
                 value_array = value_array / element_molar_mass
+            # Cast once at the end to ensure we match the original_value dtype after any arithmetic
+            value_array = jnp.asarray(value_array, dtype=original_value.dtype)
             abundance_dict[element] = jnp.broadcast_to(value_array, original_value.shape)
 
         mass_constraint_set_updated: MassConstraintSet = eqx.tree_at(
@@ -343,15 +346,18 @@ class MassConstraintSet(eqx.Module):
 class Parameters(eqx.Module):
     """Parameters
 
-    Prefer constructing this object using :meth:`create` once outside ``jit`` and applying
-    :meth:`update` inside transformed workflows.
+    Prefer constructing this object once outside ``jit`` and applying :meth:`update_constraints`
+    and :meth:`update_state` inside transformed workflows.
 
     Args:
         state: Thermodynamic state
-        activity_constraints: Activity constraints
-        mass_constraints: Mass constraints
-        solver_parameters: Solver parameters
-        batch_size: Batch size. Defaults to ``1``.
+        activity_constraints: Mapping of a species name and an activity constraint. Defaults to a
+            new instance of :class:`ActivityConstraintSet`.
+        mass_constraints: Mapping of element name and mass/abundance constraint. Defaults to a
+            new instance of :class:`MassConstraintSet`.
+        mass_units: Units of ``mass_constraints``. Defaults to ``mass``.
+        solver_parameters: Solver parameters. Defaults to a new instance of
+            :class:`~atmodeller.containers.SolverParameters`.
     """
 
     state: BaseThermodynamicState
@@ -365,44 +371,32 @@ class Parameters(eqx.Module):
     batch_size: int = 1
     """Batch size"""
 
-    @classmethod
-    def create(
-        cls,
+    def __init__(
+        self,
         state: BaseThermodynamicState,
         activity_constraints: Optional[Mapping[str, ActivityConstraintProtocol]] = None,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         mass_units: Literal["mass", "moles"] = "mass",
         solver_parameters: Optional[SolverParameters] = None,
     ):
-        """Creates an instance from a pre-built reaction system.
-
-        Args:
-            state: Thermodynamic state
-            activity_constraints: Mapping of a species name and an activity constraint. Defaults to
-                a new instance of :class:`ActivityConstraintSet`.
-            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to
-                a new instance of :class:`MassConstraintSet`.
-            mass_units: Units of ``mass_constraints``. Defaults to ``mass``.
-            solver_parameters: Solver parameters. Defaults to a new instance of
-                :class:`~atmodeller.containers.SolverParameters`.
-
-        Returns:
-            An instance
-        """
-        activity_constraints_: ActivityConstraintSet = ActivityConstraintSet(
+        activity_constraint_set: ActivityConstraintSet = ActivityConstraintSet(
             state.reaction_system.phase_system.species, activity_constraints
         )
-        mass_constraints_: MassConstraintSet = MassConstraintSet(
+        mass_constraints_set: MassConstraintSet = MassConstraintSet(
             state.reaction_system.phase_system.species, mass_constraints, mass_units
         )
-        batch_size: int = get_batch_size((state, activity_constraints_, mass_constraints_))
+        batch_size: int = get_batch_size((state, activity_constraint_set, mass_constraints_set))
         # jax.debug.print("batch_size (parameters) = {out}", out=batch_size)
 
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
 
-        return cls(state, activity_constraints_, mass_constraints_, solver_parameters_, batch_size)
+        self.state = state
+        self.activity_constraints = activity_constraint_set
+        self.mass_constraints = mass_constraints_set
+        self.solver_parameters = solver_parameters_
+        self.batch_size = batch_size
 
     @property
     def reaction_system(self) -> ReactionSystem:
@@ -434,8 +428,7 @@ class Parameters(eqx.Module):
         """Updates the mass and activity/fugacity constraints of the parameters.
 
         New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
-        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
-        workflows.
+        leaf shapes stable helps avoid unnecessary JAX recompilation.
 
         Args:
             activity_constraints: New activity/fugacity constraints. Defaults to ``None``.
@@ -448,19 +441,21 @@ class Parameters(eqx.Module):
         parameters_updated: Parameters = self
 
         if mass_constraints is not None:
-            mass_constraints_updated: MassConstraintSet = self.mass_constraints.update(
+            mass_constraints_set_updated: MassConstraintSet = self.mass_constraints.update(
                 mass_constraints, units=mass_units
             )
             parameters_updated = eqx.tree_at(
-                lambda p: p.mass_constraints, parameters_updated, mass_constraints_updated
+                lambda p: p.mass_constraints, parameters_updated, mass_constraints_set_updated
             )
 
         if activity_constraints is not None:
-            activity_constraints_updated: ActivityConstraintSet = self.activity_constraints.update(
-                activity_constraints
+            activity_constraints_set_updated: ActivityConstraintSet = (
+                self.activity_constraints.update(activity_constraints)
             )
             parameters_updated = eqx.tree_at(
-                lambda p: p.activity_constraints, parameters_updated, activity_constraints_updated
+                lambda p: p.activity_constraints,
+                parameters_updated,
+                activity_constraints_set_updated,
             )
 
         return cast(Self, parameters_updated)
@@ -469,8 +464,7 @@ class Parameters(eqx.Module):
         """Updates the thermodynamic state of the parameters.
 
         New values are assumed to be broadcastable to the shapes of the existing fields. Keeping
-        leaf shapes stable helps avoid unnecessary JAX recompilation, including in jitted
-        workflows.
+        leaf shapes stable helps avoid unnecessary JAX recompilation.
 
         Args:
             *args: Positional arguments to pass to the ``update`` method of the thermodynamic state
