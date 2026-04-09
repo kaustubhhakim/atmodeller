@@ -122,7 +122,7 @@ class ChemicalSpecies(eqx.Module):
         solve_for_stability: bool = True,
         include_in_phase_mass: bool = True,
     ) -> Self:
-        """Creates a condensate with some default values.
+        """Creates a condensated species with some default values.
 
         Args:
             formula: Formula
@@ -187,7 +187,7 @@ class ChemicalSpecies(eqx.Module):
         """Gets Gibbs energy over RT
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
 
         Returns:
             Gibbs energy over RT
@@ -430,8 +430,8 @@ class FixedActivityConstraint(eqx.Module):
         """Log activity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             - Log activity (dimensionless) for condensed species, or
@@ -504,7 +504,7 @@ class SolverParameters(RootFindParameters):  # pragma: no cover
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either ``fwd`` or ``bwd``. Defaults to ``fwd``.
         max_starts: Maximum number of starts. Defaults to ``10``.
-        retry_perturbation: Perturbation for retry. Defaults to ``30``.
+        retry_perturbation: Perturbation for retry. Defaults to ``20``.
         tau: Tau factor for species stability. Defaults to :const:`~atmodeller.constants.TAU`.
     """
 

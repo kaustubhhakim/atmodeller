@@ -4,15 +4,12 @@
 
 """Tests for C-H-O systems with stable or unstable condensates"""
 
-import logging
 from typing import Any
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from jaxtyping import ArrayLike
 
-from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol
@@ -23,26 +20,19 @@ from atmodeller.sci_utils import earth
 from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
 
-logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
-
-RTOL: float = 1.0e-8
-"""Relative tolerance"""
-ATOL: float = 1.0e-8
-"""Absolute tolerance"""
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
 
 # Gas species
-H2O_g = ChemicalSpecies.create_gas("H2O")
-H2_g = ChemicalSpecies.create_gas("H2")
-O2_g = ChemicalSpecies.create_gas("O2")
-CO_g = ChemicalSpecies.create_gas("CO")
-CO2_g = ChemicalSpecies.create_gas("CO2")
-CH4_g = ChemicalSpecies.create_gas("CH4")
-N2_g = ChemicalSpecies.create_gas("N2")
-CHN_g = ChemicalSpecies.create_gas("CHN")
-H_g = ChemicalSpecies.create_gas("H")
+H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
+N2_g: ChemicalSpecies = ChemicalSpecies.create_gas("N2")
+CHN_g: ChemicalSpecies = ChemicalSpecies.create_gas("CHN")
+H_g: ChemicalSpecies = ChemicalSpecies.create_gas("H")
 
 # Condensates
 graphite: PurePhase = PurePhase.from_species("C", state="s")
@@ -58,6 +48,8 @@ def graphite_model() -> EquilibriumModel:
         gas_species, temperature=873, condensates=condensates
     )
 
+    # Set as a placeholder so that other tests can impose an fO2 relative to IW without requiring
+    # recompilation of the solver.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
     }
@@ -98,7 +90,7 @@ def water_model() -> EquilibriumModel:
 
 def test_graphite_stable(graphite_model: EquilibriumModel) -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
-    output: Output = graphite_model.solve()
+    output: Output = graphite_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -127,10 +119,12 @@ def test_graphite_unstable(graphite_model: EquilibriumModel) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
     # Update constraints of the graphite_model
+    # Since we initialized the model with IronWustiteBuffer(np.nan) as a placeholder, we can update
+    # the fO2 constraint without requiring recompilation of the solver.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
-    c_kg: ArrayLike = 1 * h_kg
+    c_kg: ArrayLike = h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": np.nan}
 
     graphite_model = graphite_model.update_constraints(
@@ -138,7 +132,7 @@ def test_graphite_unstable(graphite_model: EquilibriumModel) -> None:
     )
     graphite_model = graphite_model.update_state(temperature=1400)
 
-    output: Output = graphite_model.solve(jnp.array(jnp.nan))
+    output: Output = graphite_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -163,7 +157,7 @@ def test_graphite_unstable(graphite_model: EquilibriumModel) -> None:
 
 def test_water_stable(water_model: EquilibriumModel) -> None:
     """Condensed water at 10 bar"""
-    output: Output = water_model.solve()
+    output: Output = water_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {"partial_pressure": {"H2O_g": 3.3596, "H2_g": 6.5604, "O2_g": 5.6433e-58}},
@@ -196,7 +190,7 @@ def test_graphite_water_stable() -> None:
 
     model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = model.solve()
+    output: Output = model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -245,7 +239,7 @@ def test_impose_stable() -> None:
 
     model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = model.solve()
+    output: Output = model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {

@@ -100,7 +100,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     gas species (e.g. O2 set by a redox buffer) are then assigned mole counts via
     :math:`n_i = f_i \cdot n_\mathrm{gas,known} / P`.
 
-    Log stability is initialised to a strongly negative value (``-60``) for predicted-stable
+    Log stability is initialized to a strongly negative value (``-60``) for predicted-stable
     condensates and to :const:`~atmodeller.constants.INITIAL_LOG_STABILITY` for all other species.
 
     Intended to be called inside a vmapped context (one batch element at a time).
@@ -237,7 +237,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
         return condensate_stable_known | new_predictions
 
     # Iterate until the predicted-stable set stops growing
-    # Initialise with no condensates known stable; the first body call is the gas-only pre-screen.
+    # Initialize with no condensates known stable; the first body call is the gas-only pre-screen.
     # The monotone union in _one_stability_pass guarantees termination.
     init_stable: Bool[Array, " n_species"] = jnp.zeros_like(condensate_mask)
     # jax.debug.print("init_stable = {out}", out=init_stable)
@@ -295,7 +295,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     log_n_fug: Float[Array, " n_species"] = log_fug + log_n_gas_known_total - jnp.log(pressure)
     log_number_moles = jnp.where(gas_mask & act_active, log_n_fug, log_number_moles)
 
-    # Log stability for predicted-stable condensates: initialise at the value that makes the
+    # Log stability for predicted-stable condensates: initialize at the value that makes the
     # stability residual (log_n + log_s - (min_log_abundance + log_tau)) exactly zero given the
     # current mole estimate. This automatically scales with tau so no magic constant is needed.
     # Falls back to INITIAL_LOG_STABILITY where the expression is non-finite (e.g. zero-budget

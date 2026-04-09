@@ -1252,7 +1252,7 @@ class Output(eqx.Module):
 #             limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
 #             # logger.debug("limiting (full_like) = %s", limiting)
 
-#             # Initialise with None placeholders for every row
+#             # Initialize with None placeholders for every row
 #             limiting_species_names: list[Optional[str]] = [None] * residual.shape[0]
 #             limiting_species_type: list[Optional[str]] = [None] * residual.shape[0]
 

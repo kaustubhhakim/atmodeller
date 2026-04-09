@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Package level variables and initialises the package logger"""
+"""Package level variables and initializes the package logger"""
 
 __version__: str = "2.0.0"
 
