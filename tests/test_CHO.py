@@ -131,7 +131,7 @@ def CHO_temperature_model() -> EquilibriumModel:
 
 def test_H_and_C(CH_model: EquilibriumModel) -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
-    output: Output = CH_model.solve()
+    output: Output = CH_model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -156,7 +156,7 @@ def test_CHO_reduced(CHO_reduced_model: EquilibriumModel) -> None:
 
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
-    output: Output = CHO_reduced_model.solve()
+    output: Output = CHO_reduced_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -181,7 +181,7 @@ def test_CHO_IW(CHO_reduced_model: EquilibriumModel) -> None:
 
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
-    # Update constraints of the reduced model
+    # Update constraints of the reduced model to avoid recompilation.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
@@ -193,7 +193,7 @@ def test_CHO_IW(CHO_reduced_model: EquilibriumModel) -> None:
         activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    output: Output = CHO_IW_model.solve()
+    output: Output = CHO_IW_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -235,7 +235,7 @@ def test_CHO_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
 
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
-    # Update constraints of the reduced model
+    # Update constraints of the reduced model to avoid recompilation.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
@@ -247,7 +247,7 @@ def test_CHO_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
         activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    output: Output = CHO_oxidized_model.solve()
+    output: Output = CHO_oxidized_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -273,7 +273,7 @@ def test_CHO_highly_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
 
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
-    # Update constraints of the reduced model
+    # Update constraints of the reduced model to avoid recompilation.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
@@ -287,7 +287,7 @@ def test_CHO_highly_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
         activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    output: Output = CHO_highly_oxidized_model.solve()
+    output: Output = CHO_highly_oxidized_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -309,7 +309,7 @@ def test_CHO_highly_oxidized(CHO_reduced_model: EquilibriumModel) -> None:
 
 def test_CHO_middle_temperature(CHO_temperature_model: EquilibriumModel) -> None:
     """Tests C-H-O system at 873 K"""
-    output: Output = CHO_temperature_model.solve()
+    output: Output = CHO_temperature_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {
@@ -331,7 +331,7 @@ def test_CHO_middle_temperature(CHO_temperature_model: EquilibriumModel) -> None
 
 def test_CHO_low_temperature(CHO_temperature_model: EquilibriumModel) -> None:
     """Tests C-H-O system at 450 K"""
-    # Update constraints of the CHO_temperature_model.
+    # Update constraints of the CHO_temperature_model to avoid recompilation.
     # Turn off the O2_g constraint.
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(np.nan)
@@ -347,7 +347,7 @@ def test_CHO_low_temperature(CHO_temperature_model: EquilibriumModel) -> None:
     )
     CHO_low_temperature_model = CHO_low_temperature_model.update_state(temperature=450)
 
-    output: Output = CHO_low_temperature_model.solve()
+    output: Output = CHO_low_temperature_model.solve_with_default()
 
     factsage_result: dict[str, Any] = {
         "gas": {

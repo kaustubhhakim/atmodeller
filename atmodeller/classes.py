@@ -47,14 +47,14 @@ class EquilibriumModel(eqx.Module):
     and retrieve the results.
     """
 
-    _parameters: Parameters
-    _solver: Callable
-    _key: PRNGKeyArray
+    parameters: Parameters
+    solver: Callable
+    key: PRNGKeyArray
 
     def __init__(self, parameters: Parameters):
-        self._parameters = parameters
-        self._solver = make_solver_with_jit(parameters)
-        self._key = jax.random.PRNGKey(0)
+        self.parameters = parameters
+        self.solver = make_solver_with_jit(parameters)
+        self.key = jax.random.PRNGKey(0)
 
     # For testing and debugging
     # @eqx.filter_jit
@@ -74,7 +74,7 @@ class EquilibriumModel(eqx.Module):
         Returns:
             An :class:`~atmodeller.output.Output` instance
         """
-        return self._solver(self._parameters, self._key, base_solution_array)
+        return self.solver(self.parameters, self.key, base_solution_array)
 
     # For testing and debugging
     # @eqx.filter_jit
@@ -90,13 +90,13 @@ class EquilibriumModel(eqx.Module):
         """
         base_solution_array: Float[Array, "#n_batch twice_species"] = jnp.full(
             (
-                self._parameters.batch_size,
-                self._parameters.reaction_system.species.number_species * 2,
+                self.parameters.batch_size,
+                self.parameters.reaction_system.species.number_species * 2,
             ),
             jnp.nan,
         )
 
-        return self._solver(self._parameters, self._key, base_solution_array)
+        return self.solver(self.parameters, self.key, base_solution_array)
 
     def rebuild_solver(self) -> Self:
         """Rebuilds the compiled solver from the model's current parameters.
@@ -109,8 +109,8 @@ class EquilibriumModel(eqx.Module):
         Returns:
             A new instance of :class:`EquilibriumModel` with a rebuilt solver
         """
-        solver_rebuilt: Callable = make_solver_with_jit(self._parameters)
-        model_rebuilt: EquilibriumModel = eqx.tree_at(lambda m: m._solver, self, solver_rebuilt)
+        solver_rebuilt: Callable = make_solver_with_jit(self.parameters)
+        model_rebuilt: EquilibriumModel = eqx.tree_at(lambda m: m.solver, self, solver_rebuilt)
 
         return cast(Self, model_rebuilt)
 
@@ -124,9 +124,9 @@ class EquilibriumModel(eqx.Module):
         Returns:
             A new instance of :class:`EquilibriumModel` with updated constraints
         """
-        parameters_updated: Parameters = self._parameters.update_constraints(*args, **kwargs)
+        parameters_updated: Parameters = self.parameters.update_constraints(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
-            lambda m: m._parameters, self, parameters_updated
+            lambda m: m.parameters, self, parameters_updated
         )
 
         return cast(Self, model_updated)
@@ -141,9 +141,9 @@ class EquilibriumModel(eqx.Module):
         Returns:
             A new instance of :class:`EquilibriumModel` with updated state
         """
-        parameters_updated: Parameters = self._parameters.update_state(*args, **kwargs)
+        parameters_updated: Parameters = self.parameters.update_state(*args, **kwargs)
         model_updated: EquilibriumModel = eqx.tree_at(
-            lambda m: m._parameters, self, parameters_updated
+            lambda m: m.parameters, self, parameters_updated
         )
 
         return cast(Self, model_updated)
