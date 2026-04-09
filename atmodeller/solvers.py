@@ -2,12 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""JAX-compatible non-linear solvers for chemical equilibrium and parameterized systems.
-
-This module provides a suite of solver utilities for efficiently handling both single-system and
-batched systems of non-linear equations, with a focus on chemical equilibrium modeling. All solvers
-are designed for seamless integration with JAX transformations (:func:`jax.jit`,
-:func:`jax.vmap`) and support Equinox-based pytrees for flexible parameter handling.
+"""JAX-compatible non-linear solvers for chemical equilibrium.
 
 Key features:
 
@@ -28,10 +23,20 @@ Key features:
 
 Main entry points:
 
-- :func:`make_solver_with_jit`: Returns a fully JIT-compiled solver for production use
+- :func:`make_solver_with_jit`: Returns a JIT-compiled solver (default: single-path)
+- :func:`make_solver_with_jit_single_path`: Returns a JIT-compiled solver (single path only)
+- :func:`make_solver_with_jit_dual_path`: Returns a JIT-compiled solver (both branches for maximum flexibility)
+- :func:`make_solver_with_jit_batch_only`: Returns a JIT-compiled solver (batch solver only, fastest compilation)
 - :func:`make_solver`: Returns a non-JIT solver (can be wrapped with JIT externally)
 - :func:`make_batch_retry_solver_from_parameters`: Builds a batch retry solver from parameters
 - :func:`make_tau_sweep_solver`: Returns a tau sweep solver for active stability systems
+
+Quick guide:
+
+- ``dual_path``: Most flexible, highest compilation cost
+- ``single_path``: Faster compilation while retaining retry and stability support
+- ``batch_only``: Fastest compilation; can still solve active-stability systems, but skips retry
+    and tau-sweep robustness logic
 
 Most solvers return results as :class:`atmodeller.containers.MultiAttemptSolution` or
 :class:`~atmodeller.output.Output` objects, with detailed convergence and step statistics.
@@ -74,7 +79,7 @@ def solve_single_with_auto_guess(
     ``parameters.solver_parameters``.
 
     Args:
-        initial_guess_in: Initial guess for the solution vector. If any element is ``NaN``,
+        initial_guess: Initial guess for the solution vector. If any element is ``NaN``,
             the initial guess is replaced by the auto-generated guess from
             :func:`~atmodeller.initial_solution.auto_initial_guess`.
         parameters: Parameters providing the solver instance, step limit, and options
@@ -136,7 +141,9 @@ def make_batch_solver(parameters: Parameters) -> Callable:
         in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters)),
     )
 
-    def solver(solution: Array, parameters: Parameters, *args) -> MultiAttemptSolution:
+    def batch_single_pass_solver(
+        solution: Array, parameters: Parameters, *args
+    ) -> MultiAttemptSolution:
         """Runs the vmapped single-pass batch solve.
 
         ``_attempts`` is set to ``1`` unconditionally; objective-based per-element convergence
@@ -155,20 +162,20 @@ def make_batch_solver(parameters: Parameters) -> Callable:
 
         return MultiAttemptSolution(sol, _attempts=1)
 
-    return solver
+    return batch_single_pass_solver
 
 
-def make_batch_retry_solver(solver_function: Callable, objective_function: Callable) -> Callable:
+def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -> Callable:
     """Makes a batch retry solver.
 
-    ``solver_function`` and ``objective_function`` must be pure JAX-callable functions compatible
+    ``solver_function`` and ``objective_fn`` must be pure JAX-callable functions compatible
     with :func:`equinox.filter_jit`. They must not close over non-JAX state or produce Python side
     effects.
 
     Args:
         solver_function: Callable that performs a single solve. Must accept arguments of an initial
             guess and a pytree of parameters.
-        objective_function: Callable for the objective function
+        objective_fn: Callable for the objective function
 
     Returns:
         Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` object
@@ -299,7 +306,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
             # If the solver result is broadcast from a scalar we can't use it to decide which
             # individual models failed. Instead we must perform a per-system check.
             new_successful: Bool[Array, "..."] = (
-                max_norm(objective_function, new_solution, parameters) < 1e-60  # tolerance
+                max_norm(objective_fn, new_solution, parameters) < tolerance
             )
             # jax.debug.print("new_successful = {out}", out=new_successful)
 
@@ -383,7 +390,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_function: Calla
 
         # Perform a per-system check
         first_converged: Bool[Array, "..."] = (
-            max_norm(objective_function, first_solution, parameters) < tolerance
+            max_norm(objective_fn, first_solution, parameters) < tolerance
         )
         # jax.debug.print("first_converged = {out}", out=first_converged)
 
@@ -643,7 +650,7 @@ def make_solver(parameters: Parameters) -> Callable:
     # For debugging to determine if this function is jittable in isolation
     # @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
-    def solver(
+    def dispatch_solver(
         parameters: Parameters,
         key: PRNGKeyArray,
         base_solution_array: Float[Array, "#n_batch twice_species"],
@@ -667,12 +674,12 @@ def make_solver(parameters: Parameters) -> Callable:
         condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
         # jax.debug.print("condition (active stability) = {out}", out=condition)
 
-        def solve_with_stability_multistart(key):
+        def solve_with_stability(key):
             """Routes to the tau sweep solver for systems with active stability species."""
             _, subkey = jax.random.split(key)
             return tau_sweep_solver(base_solution_array, parameters, subkey)
 
-        def solve_with_generic_multistart(key):
+        def solve_without_stability(key):
             """Routes to the generic multistart retry solver for systems without stability."""
             _, subkey = jax.random.split(key)
             return batch_retry_solver(
@@ -684,24 +691,25 @@ def make_solver(parameters: Parameters) -> Callable:
                 parameters.solver_parameters.atol,
             )
 
-        multi_sol = lax.cond(
-            condition, solve_with_stability_multistart, solve_with_generic_multistart, operand=key
-        )
+        multi_sol = lax.cond(condition, solve_with_stability, solve_without_stability, operand=key)
         output: Output = Output(parameters, multi_sol)
 
         return output
 
-    return solver
+    return dispatch_solver
 
 
 # For testing and debugging
 # @eqx.debug.assert_max_traces(max_traces=1)
-def make_solver_with_jit(parameters: Parameters) -> Callable:
-    """Gets the JIT-compiled solver function.
+def make_solver_with_jit_dual_path(parameters: Parameters) -> Callable:
+    """Gets a JIT-compiled solver with both runtime branches compiled.
 
     A convenience wrapper around :func:`make_solver` that applies :func:`equinox.filter_jit` to
-    the returned solver function. Use this in preference to calling :func:`make_solver` directly
-    when JIT compilation is desired.
+    the returned solver function. This version compiles both the tau sweep and batch retry paths
+    at trace time, dispatching at runtime via :func:`jax.lax.cond`.
+
+    Use this when the model structure may change dynamically between solver construction and
+    runtime, or when runtime flexibility is more important than compilation speed.
 
     Args:
         parameters: Parameters used to derive the vmapping axes and build the sub-solvers at
@@ -710,6 +718,104 @@ def make_solver_with_jit(parameters: Parameters) -> Callable:
     Returns:
         Callable that returns a :class:`~atmodeller.output.Output` object
     """
-    solver: Callable = make_solver(parameters)
+    dual_path_solver: Callable = make_solver(parameters)
 
-    return eqx.filter_jit(solver)
+    return eqx.filter_jit(dual_path_solver)
+
+
+def make_solver_with_jit_single_path(parameters: Parameters) -> Callable:
+    """Gets a JIT-compiled solver with optimized compilation by eliminating unused branches.
+
+    This function inspects ``active_stability`` at construction time (Python-level) to determine
+    which solver path to use, then compiles only that path. This results in faster JIT
+    compilation, but requires that the active stability structure remain fixed for the lifetime
+    of the solver. If the active stability structure changes, a new solver must be constructed.
+
+    Args:
+        parameters: Parameters used to derive the vmapping axes and build the sub-solvers at
+            construction time. The ``active_stability`` structure is inspected to choose the
+            solver path.
+
+    Returns:
+        JIT-compiled callable that returns a :class:`~atmodeller.output.Output` object
+    """
+    batch_retry_solver: Callable = make_batch_retry_solver_from_parameters(parameters)
+    tau_sweep_solver: Callable = make_tau_sweep_solver(batch_retry_solver)
+
+    # Determine the solver path at construction time (Python-level evaluation).
+    has_active_stability: bool = bool(
+        jnp.any(parameters.reaction_system.species.active_stability).item()
+    )
+
+    @eqx.filter_jit
+    def solver_with_stability(
+        parameters: Parameters,
+        key: PRNGKeyArray,
+        base_solution_array: Float[Array, "#n_batch twice_species"],
+    ) -> Output:
+        """Tau sweep solver path for systems with active stability species."""
+        _, subkey = jax.random.split(key)
+        multi_sol = tau_sweep_solver(base_solution_array, parameters, subkey)
+        return Output(parameters, multi_sol)
+
+    @eqx.filter_jit
+    def solver_without_stability(
+        parameters: Parameters,
+        key: PRNGKeyArray,
+        base_solution_array: Float[Array, "#n_batch twice_species"],
+    ) -> Output:
+        """Generic batch retry solver path for systems without active stability."""
+        _, subkey = jax.random.split(key)
+        multi_sol = batch_retry_solver(
+            base_solution_array,
+            parameters,
+            subkey,
+            parameters.solver_parameters.retry_perturbation,
+            parameters.solver_parameters.max_starts - 1,
+            parameters.solver_parameters.atol,
+        )
+        return Output(parameters, multi_sol)
+
+    # Return the appropriate pre-compiled solver based on the construction-time check.
+    return solver_with_stability if has_active_stability else solver_without_stability
+
+
+def make_solver_with_jit_batch_only(parameters: Parameters) -> Callable:
+    """Gets a JIT-compiled solver with minimal compilation overhead.
+
+    This is the fastest compilation option: it uses only :func:`make_batch_solver` without
+    retry logic or stability sweep. It can still be used for systems with active stability, but
+    it bypasses the tau-sweep path that is designed to improve robustness for those systems.
+
+    This is suitable for:
+    - Systems where direct batch solves are usually sufficient
+    - Cases where robust convergence retry is not needed
+    - Rapid iteration during development
+
+    Args:
+        parameters: Parameters used to derive the vmapping axes at construction time
+
+    Returns:
+        JIT-compiled callable that returns a :class:`~atmodeller.output.Output` object
+    """
+    batch_solver: Callable = make_batch_solver(parameters)
+
+    @eqx.filter_jit
+    def batch_only_solver(
+        parameters: Parameters,
+        key: PRNGKeyArray,
+        base_solution_array: Float[Array, "#n_batch twice_species"],
+    ) -> Output:
+        """Basic batch solver path without retry or tau-sweep enhancements."""
+        # Note: key is unused in basic batch solver, but included for interface compatibility
+        del key
+        multi_sol = batch_solver(base_solution_array, parameters)
+        return Output(parameters, multi_sol)
+
+    return batch_only_solver
+
+
+# Select the default JIT solver factory here for development and benchmarking.
+make_solver_with_jit: Callable = make_solver_with_jit_single_path
+# make_solver_with_jit: Callable = make_solver_with_jit_dual_path
+# make_solver_with_jit: Callable = make_solver_with_jit_batch_only
