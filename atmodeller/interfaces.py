@@ -8,9 +8,9 @@ This module defines formal protocol classes (via :class:`typing.Protocol`) that 
 expected interfaces for different thermodynamic components.
 
 It also contains :class:`ChemicalSpeciesData`, a concrete :class:`equinox.Module` that holds
-per-species formula and composition data. It lives here rather than in
-:mod:`atmodeller.containers.py`` because :mod:`containers.py` imports from this module — moving it
-there would create a circular import.
+per-species formula and composition data. It lives here rather than in :mod:`atmodeller.containers`
+because :mod:`atmodeller.containers` imports from this module. Moving it there would create a
+circular import.
 """
 
 from typing import Optional, Protocol, TypeVar, runtime_checkable
@@ -186,9 +186,9 @@ class SolubilityProtocol(Protocol):
 
         Args:
             fugacity: Fugacity (bar)
-            temperature: Temperature (K). Defaults to ``None`` for not used.
-            pressure: Pressure (bar). Defaults to ``None`` for not used.
-            fO2: Oxygen fugacity (bar). Defaults to ``None`` for not used.
+            temperature: Temperature (K). Defaults to ``None`` if unused.
+            pressure: Pressure (bar). Defaults to ``None`` if unused.
+            fO2: Oxygen fugacity (bar). Defaults to ``None`` if unused.
 
         Returns:
             Concentration in ppmw
@@ -198,7 +198,7 @@ class SolubilityProtocol(Protocol):
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> FloatArray:
-        """Wrapper to pass concentration arguments by position to use with :func:`jax.lax.switch`
+        """Wrapper to pass concentration arguments by position for :func:`jax.lax.switch`
 
         Args:
             fugacity: Fugacity (bar)
