@@ -565,7 +565,8 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
         return jnp.broadcast_to(self._attempts, self.batch_shape)
 
     @property
-    def aux(self):
+    def aux(self) -> Any:
+        """Auxiliary payload returned by the underlying solver"""
         return self.solution.aux
 
     @property
@@ -585,6 +586,7 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
 
     @property
     def result(self) -> optx.RESULTS:
+        """Raw Optimistix solver result code"""
         return self.solution.result
 
     @property
@@ -598,10 +600,12 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
 
     @property
     def state(self) -> Any:
+        """Internal solver state from the underlying Optimistix solution"""
         return self.solution.state
 
     @property
     def stats(self) -> dict[str, PyTree[ArrayLike]]:
+        """Solver statistics from the underlying Optimistix solution"""
         return self.solution.stats
 
     def asdict(self) -> dict[str, ArrayLike]:
