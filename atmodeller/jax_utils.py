@@ -100,14 +100,18 @@ def safe_exp(x: ArrayLike) -> Array:  # pragma: no cover
         with special handling of ``-inf``.
     """
     x = jnp.asarray(x)
+    if not jnp.issubdtype(x.dtype, jnp.inexact):
+        x = x.astype(jnp.float64)
+
     is_neg_inf: Bool[Array, "..."] = jnp.isneginf(x)
 
     # Replace -inf with something safe before clipping
     x_safe: Array = jnp.where(is_neg_inf, 0.0, x)
 
-    # Define lower and upper bounds for clipping
-    min_clip = jnp.log(TINY_FLOAT64)
-    max_clip = jnp.log(MAX_FLOAT64)
+    # Define lower and upper bounds for clipping from the active dtype.
+    finfo = jnp.finfo(x.dtype)
+    min_clip = jnp.log(finfo.tiny)
+    max_clip = jnp.log(finfo.max)
 
     # Clip to prevent both underflow and overflow (except for -inf)
     x_clipped: Array = jnp.clip(x_safe, min_clip, max_clip)
@@ -131,8 +135,9 @@ def masked_logsumexp(
     This function extends the standard :func:`jax.scipy.special.logsumexp` with support for masked
     inputs, where ``-inf`` values are treated as absent (i.e., zero contribution in linear space).
 
-    - Replaces non-finite values (e.g., ``-inf``) with a large negative finite number
-      to ensure numerical stability during computation.
+    - Replaces ``-inf`` values with a large negative finite number to ensure numerical stability
+      during computation while preserving masking semantics.
+    - Allows ``+inf`` values to propagate through :func:`jax.scipy.special.logsumexp`.
     - Computes the log-sum-exp in a stable manner using JAX's implementation.
     - Preserves the semantics that if all values along the reduction axis are masked,
       the result is ``-inf``.
@@ -154,15 +159,15 @@ def masked_logsumexp(
     dtype = log_x.dtype
     neg_large = jnp.finfo(dtype).min
 
-    is_finite: Bool[Array, "..."] = jnp.isfinite(log_x)
+    is_neg_inf: Bool[Array, "..."] = jnp.isneginf(log_x)
 
     # Replace -inf with large negative number (safe for autodiff)
-    safe_log_x: FloatArray = jnp.where(is_finite, log_x, neg_large)
+    safe_log_x: FloatArray = jnp.where(is_neg_inf, neg_large, log_x)
 
     out: FloatArray = logsumexp(safe_log_x, axis=axis, keepdims=keepdims)
 
     # If everything was masked -> return -inf (strict logic)
-    all_invalid: Bool[Array, "..."] = ~jnp.any(is_finite, axis=axis, keepdims=keepdims)
+    all_invalid: Bool[Array, "..."] = jnp.all(is_neg_inf, axis=axis, keepdims=keepdims)
     out: FloatArray = jnp.where(all_invalid, -jnp.inf, out)
 
     # Kill gradients if nothing exists
@@ -382,7 +387,7 @@ def max_norm(
 
 def expand_mask(
     mask: Bool[Array, "..."], target: Float[Array, "... solution"]
-) -> Bool[Array, "... 1"]:
+) -> Bool[Array, "..."]:
     """Expands a batch mask to broadcast over trailing solution dimensions.
 
     Args:
@@ -390,6 +395,6 @@ def expand_mask(
         target: Array with shape ``(... solution)`` that the mask will be expanded to match
 
     Returns:
-        Boolean array with shape ``(... 1)`` that can be broadcast to the shape of ``target``
+        Boolean array broadcastable to the shape of ``target``
     """
     return jnp.reshape(mask, mask.shape + (1,) * (target.ndim - mask.ndim))
