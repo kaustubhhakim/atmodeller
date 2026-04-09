@@ -27,15 +27,16 @@ DISSOLVED_STATE: str = "d"
 DISSOLUTION_PPMW_FLOOR: float = 1.0e-20
 """Minimum dissolved concentration (ppmw) used before taking logs in dissolution reactions.
 
-This prevents ``log(0)`` while keeping the floor large enough to avoid excessive solver
-stiffness in underflow-prone regimes.
+Numerical floor for dissolved-species solubility in dissolution reactions. This prevents ``log(0)``
+while keeping the floor large enough to avoid excessive solver stiffness in underflow-prone 
+regimes.
 """
 
 # Initial solution guess
 INITIAL_LOG_NUMBER_MOLES: float = 45.0
 """Initial log number of moles
 
-Empiricially determined. This value is mid-range for Earth-like planets.
+Empirically determined. This value is mid-range for Earth-like planets.
 """
 INITIAL_LOG_STABILITY: float = -30.0
 """Initial log stability
@@ -50,7 +51,7 @@ LOG_NUMBER_MOLES_LOWER: float = -200.0
 """Lower log number of moles for a species"""
 LOG_NUMBER_MOLES_UPPER: float = 80.0
 """Upper log number of moles for a species"""
-LOG_STABILITY_LOWER: float = -700.0  # basically the same as MIN_EXP_INPUT
+LOG_STABILITY_LOWER: float = -700.0
 """Lower stability for a species
 
 Derived to ensure that the exponential function exp(x) does not underflow to zero
@@ -63,17 +64,16 @@ Empirically determined.
 TAU_MAX: float = 1.0e-3
 """Maximum tau scaling factor for species stability when using the tau cascade solver"""
 TAU: float = 1.0e-25
-"""Desired (i.e. final/minimium) tau scaling factor for species stability :cite:p:`LKK16`.
+"""Desired (i.e. final/minimum) tau scaling factor for species stability :cite:p:`LKK16`.
 
 Tau effectively controls the minimum non-zero number of moles of unstable species. Formally, it
 defines the number of moles of an unstable pure condensate with an activity of ``1/e``, which
 corresponds to a log stability of zero.
 """
 TAU_NUM: int = 2
-"""Number of tau values to solve between :const:`TAU_MAX` and :const:`TAU` (inclusive) for the tau 
-cascade solver
+"""Number of tau values solved between :const:`TAU_MAX` and :const:`TAU` (inclusive).
 
-Empirically determined. Basically, once a solution has been found for :const:`TAU_MAX` the solver 
-can immediately proceed to :const:`TAU`. This usually solves within a few steps on the first 
-attempt.
+Used by the tau-cascade solver. Empirically, once a solution has been found for
+:const:`TAU_MAX`, the solver can typically proceed directly to :const:`TAU` and converge within a
+few steps on the first attempt.
 """
