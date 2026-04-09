@@ -5,14 +5,14 @@
 """Tests for H-O systems"""
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
-import jax
 import numpy as np
-from jaxtyping import ArrayLike, PRNGKeyArray
+from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
+from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies, FixedActivityConstraint, ReservoirSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.jax_utils import NpFloat
@@ -20,7 +20,6 @@ from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
-from atmodeller.solvers import make_solver_with_jit
 from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 
@@ -37,20 +36,17 @@ TOLERANCE: float = 5.0e-2
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
 # Gas species
-H2O_g = ChemicalSpecies.create_gas("H2O")
-H2_g = ChemicalSpecies.create_gas("H2")
-O2_g = ChemicalSpecies.create_gas("O2")
-CO_g = ChemicalSpecies.create_gas("CO")
-CO2_g = ChemicalSpecies.create_gas("CO2")
-CH4_g = ChemicalSpecies.create_gas("CH4")
+H2O_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2O")
+H2_g: ChemicalSpecies = ChemicalSpecies.create_gas("H2")
+O2_g: ChemicalSpecies = ChemicalSpecies.create_gas("O2")
+CO_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO")
+CO2_g: ChemicalSpecies = ChemicalSpecies.create_gas("CO2")
+CH4_g: ChemicalSpecies = ChemicalSpecies.create_gas("CH4")
 
 # Melt species
 H2O_d: ReservoirSpecies = ReservoirSpecies.create_dissolved(
     "H2O", solubility=solubility_models["H2O_peridotite_sossi23"], include_in_phase_mass=False
 )
-
-key: PRNGKeyArray = jax.random.PRNGKey(0)
-key, subkey = jax.random.split(key)  # Split the key for use in this function
 
 
 def test_version() -> None:
@@ -60,7 +56,6 @@ def test_version() -> None:
 
 def test_H2O() -> None:
     """Tests a single species (H2O)."""
-
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g,)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
@@ -72,9 +67,9 @@ def test_H2O() -> None:
 
     parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {"species": {"partial_pressure": {"H2O_g": 1.0312913336898137}}}
@@ -87,7 +82,6 @@ def test_H2O() -> None:
 
 def test_H_O() -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
-
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
 
     planet: BaseThermodynamicState = Planet.create(gas_species)
@@ -99,9 +93,9 @@ def test_H_O() -> None:
 
     parameters: Parameters = Parameters(planet, mass_constraints=mass_constraints)
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     fastchem_result: dict[str, Any] = {
         "gas": {
@@ -122,7 +116,6 @@ def test_H_O() -> None:
 
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility."""
-
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
@@ -138,9 +131,9 @@ def test_H_fO2() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -161,7 +154,6 @@ def test_H_fO2() -> None:
 
 def test_H_fO2_fH2() -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility and mixed fugacity constraints."""
-
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
@@ -180,9 +172,9 @@ def test_H_fO2_fH2() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -229,9 +221,9 @@ def test_H_fO2_batch_temperature() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -294,9 +286,9 @@ def test_H_fO2_batch_fO2_shift() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
@@ -355,9 +347,9 @@ def test_H_fO2_batch_H_mass() -> None:
         planet, activity_constraints=activity_constraints, mass_constraints=mass_constraints
     )
 
-    solver: Callable = make_solver_with_jit(parameters)
+    model: EquilibriumModel = EquilibriumModel(parameters)
 
-    output: Output = solver(parameters, subkey)
+    output: Output = model.solve_with_default()
 
     target: dict[str, Any] = {
         "gas": {
