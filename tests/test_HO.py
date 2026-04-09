@@ -13,11 +13,11 @@ from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import EquilibriumModel
-from atmodeller.containers import ChemicalSpecies, FixedActivityConstraint, ReservoirSpecies
+from atmodeller.containers import ChemicalSpecies, ReservoirSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol, SolubilityProtocol, SpeciesProtocol
 from atmodeller.jax_utils import NpFloat
 from atmodeller.output import Output
-from atmodeller.parameters import Parameters
+from atmodeller.parameters import FixedActivityConstraint, Parameters
 from atmodeller.sci_utils import earth
 from atmodeller.solubility import get_solubility_models
 from atmodeller.state import BaseThermodynamicState, Planet
