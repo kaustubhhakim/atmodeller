@@ -4,9 +4,9 @@
 
 """JAX-based model functions for atmospheric and chemical equilibrium calculations.
 
-This module defines the core set of single-instance model functions (e.g., thermodynamic property
-calculations, equation-of-state relations, reaction masks) that operate on a single set of inputs,
-without any implicit batching.
+This module defines the core single-instance model functions used by the equilibrium solver
+(e.g., activity/mass/stability residual construction and active-constraint masking). Functions
+operate on one input instance at a time, with no implicit batching.
 
 These functions form the building blocks for solving the coupled system of equations governing the
 model (e.g., mass balance, activity constraints, phase stability), and are intended to be:
@@ -20,6 +20,10 @@ model (e.g., mass balance, activity constraints, phase stability), and are inten
 In practice, these functions are rarely called directly in production code. Instead, they are
 wrapped with :func:`equinox.filter_vmap` to enable efficient batched evaluation over multiple
 scenarios or parameter sets.
+
+Note:
+    The residual concatenation order in :func:`objective_function` must remain identical to the
+    mask concatenation order in :func:`get_active_mask`.
 """
 
 import equinox as eqx
@@ -69,6 +73,11 @@ def get_min_log_elemental_abundance_per_species(
     parameters: Parameters,
 ) -> Float[Array, "... species"]:
     """Gets the elemental mass constraint with the lowest abundance for each species.
+
+    Note:
+        This function assumes each species has at least one element present in the formula matrix.
+        If a species had no elemental entries, its masked column would be all ``NaN`` and
+        :func:`jax.numpy.nanmin` would return ``NaN`` for that species.
 
     Args:
         parameters: Parameters
@@ -127,8 +136,8 @@ def get_log_activity(
 
 @eqx.filter_jit
 def objective_function(
-    solution: Float[Array, "... solution"], parameters: Parameters
-) -> Float[Array, " ... residual"]:
+    solution: Float[Array, "... twice_species"], parameters: Parameters
+) -> Float[Array, "... residual"]:
     """Objective function
 
     The order of the residual does make a difference to the solution process. More investigations
@@ -144,7 +153,7 @@ def objective_function(
         parameters: Parameters
 
     Returns:
-        Residual
+        Residual vector over active constraints.
     """
     # jax.debug.print("Starting new objective_function evaluation")
     temperature: FloatArray = parameters.state.temperature
