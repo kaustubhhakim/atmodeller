@@ -66,7 +66,7 @@ def test_fO2_holley() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
 
     # Temperature is within the range of the Holley model
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1000)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, temperature=1000)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -100,7 +100,7 @@ def test_fO2_holley() -> None:
 def test_chabrier_earth() -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    planet: Planet = Planet.create(
+    planet: Planet = Planet.from_species(
         gas_species_subneptune, temperature=3400, condensates=condensates_subneptune
     )
     h_kg: ArrayLike = 0.01 * planet.background_planet_mass
@@ -153,7 +153,7 @@ def test_chabrier_subNeptune() -> None:
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
-    planet: Planet = Planet.create(
+    planet: Planet = Planet.from_species(
         gas_species_subneptune,
         condensates=condensates_subneptune,
         temperature=surface_temperature,
@@ -213,7 +213,7 @@ def test_chabrier_subNeptune_batch() -> None:
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
-    planet: Planet = Planet.create(
+    planet: Planet = Planet.from_species(
         gas_species_subneptune,
         condensates=condensates_subneptune,
         temperature=surface_temperature,
@@ -285,7 +285,7 @@ def test_pH2_fO2_real_gas() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g)
     melt_species: tuple[ReservoirSpecies, ...] = (H2O_d,)
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species)
+    planet: Planet = Planet.from_species(gas_species, melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(0.072885576196744)
@@ -345,7 +345,7 @@ def test_subNeptune_melt_phase() -> None:
     planet_mass = 4.6 * earth.mass  # kg
     surface_radius = 1.5 * earth.radius  # m
 
-    planet: Planet = Planet.create(
+    planet: Planet = Planet.from_species(
         gas_species_subneptune,
         melt_species=melt_species,
         temperature=surface_temperature,

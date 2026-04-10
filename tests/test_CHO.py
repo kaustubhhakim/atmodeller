@@ -57,7 +57,7 @@ def CHO_reduced_model() -> EquilibriumModel:
     """C-H-O reduced model"""
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=1400)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, temperature=1400)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
 
@@ -79,7 +79,7 @@ def CH_model() -> EquilibriumModel:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -101,7 +101,7 @@ def CHO_temperature_model() -> EquilibriumModel:
     """C-H-O model at 873 K"""
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, temperature=873)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, temperature=873)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 

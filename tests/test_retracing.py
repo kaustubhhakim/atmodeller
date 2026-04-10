@@ -67,7 +67,7 @@ def equilibrium_model() -> EquilibriumModel:
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
     # Thermodynamic state
-    planet: Planet = Planet.create(gas_species=gas_species, melt_species=melt_species)
+    planet: Planet = Planet.from_species(gas_species=gas_species, melt_species=melt_species)
 
     # Activity constraints
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
