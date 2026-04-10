@@ -978,8 +978,8 @@ class Output(eqx.Module):
 
     .. warning::
         Some methods (such as ``to_dict(to_numpy=True)``, ``compare``, and export methods) are
-        **not compatible** with JAX-compiled workflows (e.g., inside a ``jax.jit`` context), as
-        they may use operations or objects that are not supported by JAX transformations.
+        not compatible with JAX-compiled workflows (e.g., inside a ``jax.jit`` context), as they
+        may use operations or objects that are not supported by JAX transformations.
 
     Args:
         parameters: Parameters
