@@ -17,6 +17,7 @@ Typical usage:
     from atmodeller.classes import EquilibriumModel
     from atmodeller.parameters import Parameters
 
+    # Create Parameters object (not shown)
     parameters = Parameters(...)
     model = EquilibriumModel(parameters)
     output = model.solve_with_default()

@@ -6,17 +6,16 @@
 
 This module defines immutable, JAX-friendly parameter objects used by the solver:
 
-- :class:`ActivityConstraintSet` stores per-species activity/fugacity constraints.
-- :class:`MassConstraintSet` stores elemental abundance constraints in moles.
-- :class:`Parameters` bundles state, constraints, and solver settings into one object.
+- :class:`ActivityConstraintSet`: stores per-species activity/fugacity constraints.
+- :class:`MassConstraintSet`: stores elemental abundance constraints in moles.
+- :class:`Parameters`: bundles state, constraints, and solver settings into one object.
 
 Factory methods validate and normalize user inputs, while ``update`` methods return new instances
 with leaf shapes kept stable for efficient JAX transformations, also within jitted workflows.
 
 Note:
     Construct parameter containers once outside ``jit`` (or other JAX transforms), then use
-    ``update`` methods inside transformed workflows to preserve leaf signatures and avoid
-    unnecessary retracing.
+    ``update`` methods to preserve leaf signatures and avoid unnecessary retracing.
 """
 
 from collections.abc import Callable, Mapping
@@ -81,7 +80,7 @@ class ActivityConstraintSet(eqx.Module):
     """Activity/fugacity constraints applied to species in the system
 
     Prefer constructing this object once outside ``jit`` and applying :meth:`update` inside
-    transformed workflows.
+    workflows.
 
     Args:
         species: Species collection
@@ -224,7 +223,7 @@ class MassConstraintSet(eqx.Module):
     """Mass/abundance constraints applied to elements in the system
 
     Prefer constructing this object once outside ``jit`` and applying :meth:`update` inside
-    transformed workflows.
+    workflows.
 
     Args:
         species: Species collection
@@ -388,7 +387,7 @@ class Parameters(eqx.Module):
     """Parameters
 
     Prefer constructing this object once outside ``jit`` and applying :meth:`update_constraints`
-    and :meth:`update_state` inside transformed workflows.
+    and :meth:`update_state` inside workflows.
 
     Args:
         state: Thermodynamic state

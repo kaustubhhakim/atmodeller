@@ -78,6 +78,14 @@ atmodeller.output module
    :show-inheritance:
    :undoc-members:
 
+atmodeller.output\_base module
+------------------------------
+
+.. automodule:: atmodeller.output_base
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 atmodeller.parameters module
 ----------------------------
 
