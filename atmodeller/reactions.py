@@ -365,7 +365,7 @@ class ReactionNetwork(BaseReactionBlock):
         """Gets log of the equilibrium constant of each reaction.
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
 
         Returns:
             Log of the equilibrium constant of each reaction
@@ -490,11 +490,11 @@ class DissolutionNetwork(BaseReactionBlock):
         prevent ``log(0)`` in underflow-prone regimes.
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
             gas_species_activity: Gas species activity regulating dissolution reactions
-            pressure: Pressure in bar
-            fO2: Oxygen fugacity in bar
-            log_solvent_molar_mass: Log of the molar mass of the solvent in kg/mol
+            pressure: Pressure (bar)
+            fO2: Oxygen fugacity (bar)
+            log_solvent_molar_mass: Log of solvent molar mass (kg mol\\ :sup:`-1`)
 
         Returns:
             Log of the equilibrium constant of each reaction
@@ -602,8 +602,8 @@ class ReactionSystem(BaseReactionBlock):
 
         Args:
             log_number_moles: Log number of moles of each species
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log activity of each species
@@ -658,8 +658,8 @@ class ReactionSystem(BaseReactionBlock):
         Args:
             log_number_moles: Log number of moles of each species
             log_activity: Log activity of each species
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log of the equilibrium constant of each reaction
@@ -739,7 +739,7 @@ class ReactionSystem(BaseReactionBlock):
         residual: Float[Array, "... num_reactions"],
         log_stability: Float[Array, "... num_species"],
     ) -> Float[Array, "... num_reactions"]:
-        """Subtract stability contribution from residual.
+        """Subtracts the stability contribution from residual.
 
         Args:
             residual: Residual of the reaction network before applying stability
@@ -766,8 +766,8 @@ class ReactionSystem(BaseReactionBlock):
             log_number_moles: Log number of moles of each species
             log_activity: Log activity of each species
             log_stability: Log stability of each species
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Residual of the reaction network
