@@ -59,7 +59,7 @@ def test_H2O() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g,)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -84,7 +84,7 @@ def test_H_O() -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth.oceans_to_hydrogen_mass(oceans)
@@ -119,7 +119,7 @@ def test_H_fO2() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
@@ -157,7 +157,7 @@ def test_H_fO2_fH2() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "H2_g": FixedActivityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
@@ -206,7 +206,9 @@ def test_H_fO2_batch_temperature() -> None:
     # Number of surface temperatures is different to number of species to test array shapes work.
     temperature = np.array([1500, 2000, 2500, 3000])
 
-    planet: Planet = Planet.create(gas_species, melt_species=melt_species, temperature=temperature)
+    planet: Planet = Planet.from_species(
+        gas_species, melt_species=melt_species, temperature=temperature
+    )
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(),
@@ -269,7 +271,7 @@ def test_H_fO2_batch_fO2_shift() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     # Set up a range of fO2 shifts
     num: int = 4
@@ -334,7 +336,7 @@ def test_H_fO2_batch_H_mass() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2_g, H2O_g, O2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d,)
 
-    planet: BaseThermodynamicState = Planet.create(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 

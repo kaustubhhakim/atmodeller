@@ -150,7 +150,7 @@ class ThermodynamicState(BaseThermodynamicState):
         self.pressure = as_j64(pressure)
 
     @classmethod
-    def create(
+    def from_species(
         cls,
         gas_species: Iterable[ChemicalSpecies],
         pressure: ArrayLike,
@@ -163,7 +163,7 @@ class ThermodynamicState(BaseThermodynamicState):
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
-        """Creates an instance.
+        """Builds an instance from phase-species inputs.
 
         Args:
             gas_species: Iterable of species in the gas phase
@@ -298,7 +298,7 @@ class BasePlanet(BaseThermodynamicState):
         self.background_planet_mass = as_j64(background_planet_mass)
 
     @classmethod
-    def create(
+    def from_species(
         cls,
         gas_species: Iterable[ChemicalSpecies],
         *,
@@ -313,7 +313,7 @@ class BasePlanet(BaseThermodynamicState):
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
-        """Creates a new instance.
+        """Builds a new instance from phase-species inputs.
 
         Default values are for a fully molten Earth.
 

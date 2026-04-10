@@ -32,10 +32,12 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray
 
+from atmodeller.containers import SolverParameters
 from atmodeller.interfaces import ActivityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 from atmodeller.solvers import make_solver_with_jit
+from atmodeller.state import BaseThermodynamicState
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -63,6 +65,42 @@ class EquilibriumModel(eqx.Module):
         self.parameters = parameters
         self.solver = make_solver_with_jit(parameters)
         self.key = jax.random.PRNGKey(0)
+
+    @classmethod
+    def from_state(
+        cls,
+        state: BaseThermodynamicState,
+        *,
+        activity_constraints: Mapping[str, ActivityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        mass_units: Literal["mass", "moles"] = "mass",
+        solver_parameters: SolverParameters | None = None,
+    ) -> Self:
+        """Builds a model by constructing :class:`~atmodeller.parameters.Parameters` internally.
+
+        This is a convenience constructor equivalent to creating ``Parameters(...)`` first and
+        then passing that object to :class:`EquilibriumModel`.
+
+        Args:
+            state: Thermodynamic state
+            activity_constraints: Optional activity/fugacity constraint mapping. Defaults to
+                ``None``.
+            mass_constraints: Optional mass-constraint mapping. Defaults to ``None``.
+            mass_units: Units used for ``mass_constraints``. Defaults to ``"mass"``.
+            solver_parameters: Optional solver parameter object. Defaults to ``None``.
+
+        Returns:
+            A new :class:`EquilibriumModel` instance
+        """
+        parameters: Parameters = Parameters(
+            state=state,
+            activity_constraints=activity_constraints,
+            mass_constraints=mass_constraints,
+            mass_units=mass_units,
+            solver_parameters=solver_parameters,
+        )
+
+        return cls(parameters)
 
     def solve(self, base_solution_array: Float[Array, "#n_batch twice_species"]) -> Output:
         """Runs the solver and returns the output state.

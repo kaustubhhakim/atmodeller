@@ -53,8 +53,8 @@ class ActivityCoefficient(eqx.Module):
         """Log of the activity coefficient (dimensionless).
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log activity coefficient

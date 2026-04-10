@@ -33,6 +33,7 @@ import pandas as pd
 from jaxtyping import Array, Float
 from openpyxl.styles import PatternFill
 
+from atmodeller import __version__
 from atmodeller.containers import MultiAttemptSolution
 from atmodeller.jax_utils import NpArray
 from atmodeller.output_base import (
@@ -215,9 +216,10 @@ class Output(eqx.Module):
 
     def to_excel(
         self,
-        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         file_prefix: Path | str = "atmodeller_out",
+        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         drop_unsuccessful_solves: bool = False,
+        append_version: bool = True,
     ) -> None:
         """Writes the output to an Excel file.
 
@@ -225,23 +227,30 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
+            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
+                Defaults to atmodeller_out.
             output_format: The format of the output dictionary. Can be ``natural`` for the natural
                 output format based on the arrays used internally, ``named_arrays`` for an
                 alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
-            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
-                Defaults to atmodeller_out.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
+            append_version: Whether to append ``_v<package_version>`` to the output filename.
+                Defaults to ``True``.
         """
         logger.info("Writing output to excel")
         out: dict[str, pd.DataFrame] = self.to_dataframes(
             output_format=output_format, drop_unsuccessful_solves=drop_unsuccessful_solves
         )
         output_path: Path = Path(file_prefix)
-        output_file: Path = (
-            output_path if output_path.suffix == ".xlsx" else output_path.with_suffix(".xlsx")
-        )
+        base_name: str = output_path.name
+        if base_name.endswith(".xlsx"):
+            base_name = base_name[: -len(".xlsx")]
+        if append_version:
+            version_tag: str = f"_v{__version__}"
+            if not base_name.endswith(version_tag):
+                base_name = f"{base_name}{version_tag}"
+        output_file: Path = output_path.with_name(f"{base_name}.xlsx")
 
         # Convenient to highlight rows where the solver failed to find a solution for follow-up
         # analysis. Define a fill colour for highlighting rows (e.g., yellow)
@@ -269,9 +278,10 @@ class Output(eqx.Module):
 
     def to_pickle(
         self,
-        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         file_prefix: Path | str = "atmodeller_out",
+        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         drop_unsuccessful_solves: bool = False,
+        append_version: bool = True,
     ) -> None:
         """Writes the output to a pickle file.
 
@@ -279,23 +289,30 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
+            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
+                Defaults to atmodeller_out.
             output_format: The format of the output dictionary. Can be ``natural`` for the natural
                 output format based on the arrays used internally, ``named_arrays`` for an
                 alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
-            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
-                Defaults to atmodeller_out.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
+            append_version: Whether to append ``_v<package_version>`` to the output filename.
+                Defaults to ``True``.
         """
         logger.info("Writing output to pickle")
         out: dict[str, pd.DataFrame] = self.to_dataframes(
             output_format=output_format, drop_unsuccessful_solves=drop_unsuccessful_solves
         )
         output_path: Path = Path(file_prefix)
-        output_file: Path = (
-            output_path if output_path.suffix == ".pkl" else output_path.with_suffix(".pkl")
-        )
+        base_name: str = output_path.name
+        if base_name.endswith(".pkl"):
+            base_name = base_name[: -len(".pkl")]
+        if append_version:
+            version_tag: str = f"_v{__version__}"
+            if not base_name.endswith(version_tag):
+                base_name = f"{base_name}{version_tag}"
+        output_file: Path = output_path.with_name(f"{base_name}.pkl")
 
         with open(output_file, "wb") as handle:
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)

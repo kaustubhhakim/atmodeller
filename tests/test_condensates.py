@@ -44,7 +44,7 @@ def graphite_model() -> EquilibriumModel:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
     condensates: tuple[PurePhase, ...] = (graphite,)
 
-    planet: BaseThermodynamicState = Planet.create(
+    planet: BaseThermodynamicState = Planet.from_species(
         gas_species, temperature=873, condensates=condensates
     )
 
@@ -74,7 +74,7 @@ def water_model() -> EquilibriumModel:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g)
     condensates: tuple[PurePhase, ...] = (water,)
 
-    planet: BaseThermodynamicState = Planet.create(
+    planet: BaseThermodynamicState = Planet.from_species(
         gas_species, temperature=411.75, condensates=condensates
     )
 
@@ -177,7 +177,7 @@ def test_graphite_water_stable() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g)
     condensates: tuple[PurePhase, ...] = (water, graphite)
 
-    planet: BaseThermodynamicState = Planet.create(
+    planet: BaseThermodynamicState = Planet.from_species(
         gas_species, temperature=430, condensates=condensates
     )
 
@@ -228,7 +228,7 @@ def test_impose_stable() -> None:
     condensates: tuple[PurePhase, ...] = (graphite,)
 
     # Set the temperature and pressure
-    state: ThermodynamicState = ThermodynamicState.create(
+    state: ThermodynamicState = ThermodynamicState.from_species(
         gas_species, pressure=1, temperature=1773.15, condensates=condensates
     )
 

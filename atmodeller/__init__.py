@@ -124,7 +124,11 @@ from atmodeller.containers import (  # noqa: E402, F401
 from atmodeller.output import Output  # noqa: E402, F401
 from atmodeller.parameters import FixedActivityConstraint, Parameters  # noqa: E402, F401
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase  # noqa: E402, F401
-from atmodeller.sci_utils import bulk_silicate_earth_abundances, earth  # noqa: E402, F401
+from atmodeller.sci_utils import (  # noqa: E402, F401
+    bulk_silicate_earth_abundances,
+    earth,
+    unit_conversion,
+)
 from atmodeller.solvers import (  # noqa: E402, F401
     make_solver,
     make_solver_with_jit,  # Alias for the default solver
