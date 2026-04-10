@@ -9,7 +9,7 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Bool, Float
 
-from atmodeller.constants import INITIAL_LOG_NUMBER_MOLES, INITIAL_LOG_STABILITY
+from atmodeller.constants import INITIAL_LOG_STABILITY
 from atmodeller.engine import get_min_log_elemental_abundance_per_species
 from atmodeller.parameters import Parameters
 
@@ -90,8 +90,8 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
 
     **Step 2 — gas species:** Each element's *remaining* budget (after condensate consumption) is
     distributed across non-condensate species by the same limiting-reagent logic. Species whose
-    element budget is fully consumed by condensates fall back to
-    :const:`~atmodeller.constants.INITIAL_LOG_NUMBER_MOLES`.
+    element budget is fully consumed by condensates fall back to the geometric mean of all
+    finite species estimates in the system.
 
     **Step 3 — Fugacity-constrained gas species:** The total moles of mass-constrained gas species
     (from step 2) are used to estimate the gas volume via the ideal gas law. The pressure is
@@ -131,7 +131,6 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     gas_no_act: Bool[Array, " n_species"] = gas_mask & ~act_active
 
     temperature: Float[Array, ""] = parameters.state.temperature
-    fallback: Float[Array, ""] = jnp.exp(jnp.array(INITIAL_LOG_NUMBER_MOLES, dtype=float))
 
     # Pre-compute reaction matrices and log Kp (composition-independent).
     # The order of the species is gas, melt, solid, condensates (pure phases)
@@ -192,11 +191,17 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
 
         # Distribute remaining budget to non-condensate species (limiting-reagent).
         # Exhausted elements (remaining_b = 0) are excluded; species unconstrained by any
-        # available element fall back to INITIAL_LOG_NUMBER_MOLES.
+        # available element fall back to the geometric mean of the finite estimates (mean in
+        # log-space), keeping the magnitude of missing species comparable to known ones.
         n_other: Float[Array, " n_species"] = _limiting_reagent(
             formula_matrix, remaining_b, other_mask, require_positive_budget=True
         )
-        n_other = jnp.where(jnp.isinf(n_other), fallback, n_other)
+        _valid: Bool[Array, " n_species"] = jnp.isfinite(n_other) & (n_other > 0)
+        _n_valid: Float[Array, ""] = jnp.sum(_valid).astype(float)
+        _log_fb: Float[Array, ""] = jnp.sum(
+            jnp.where(_valid, jnp.log(n_other), 0.0)
+        ) / jnp.maximum(_n_valid, 1)
+        n_other = jnp.where(jnp.isinf(n_other), jnp.exp(_log_fb), n_other)
         # jax.debug.print("n_other = {out}", out=n_other)
 
         pressure: Float[Array, ""] = parameters.state.get_pressure(jnp.log(n_other))
@@ -276,11 +281,17 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, " twice_species"]
     )
 
     # Combine: predicted-stable condensates use their budget estimate; all others use the
-    # non-condensate remainder. Fallback for species not covered by any constrained element.
+    # non-condensate remainder. Fallback for species not covered by any constrained element:
+    # geometric mean of finite estimates keeps missing species at a comparable magnitude.
     n_estimate: Float[Array, " n_species"] = jnp.where(
         condensate_stable_predicted, n_condensate, n_other
     )
-    n_estimate = jnp.where(jnp.isinf(n_estimate), fallback, n_estimate)
+    _valid: Bool[Array, " n_species"] = jnp.isfinite(n_estimate) & (n_estimate > 0)
+    _n_valid: Float[Array, ""] = jnp.sum(_valid).astype(float)
+    _log_fb: Float[Array, ""] = jnp.sum(jnp.where(_valid, jnp.log(n_estimate), 0.0)) / jnp.maximum(
+        _n_valid, 1
+    )
+    n_estimate = jnp.where(jnp.isinf(n_estimate), jnp.exp(_log_fb), n_estimate)
 
     log_number_moles: Float[Array, " n_species"] = jnp.log(n_estimate)
 
