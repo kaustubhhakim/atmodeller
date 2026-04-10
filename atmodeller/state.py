@@ -2,17 +2,17 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Thermodynamic state and planetary state models.
+"""Thermodynamic state and planetary state models
 
 The hierarchy is:
 
-- :class:`BaseThermodynamicState`: shared interface and phase-mass helpers.
-- :class:`ThermodynamicState`: generic state with fixed pressure.
-- :class:`BasePlanet`: common planetary quantities (surface area, gravity, mass).
+- :class:`BaseThermodynamicState`: shared interface and phase-mass helpers
+- :class:`ThermodynamicState`: generic state with fixed pressure
+- :class:`BasePlanet`: common planetary quantities (surface area, gravity, mass)
 - :class:`ThinAtmospherePlanet`: pressure from thin-atmosphere mechanical balance when pressure is
-  not specified.
+  not specified
 - :class:`PressureScalingLawPlanet`: pressure from a scaling law
-  :cite:p:`Schlichting_2022{Equation 8}` when pressure is not specified.
+  :cite:p:`Schlichting_2022{Equation 8}` when pressure is not specified
 """
 
 from abc import abstractmethod
@@ -163,7 +163,7 @@ class ThermodynamicState(BaseThermodynamicState):
         solid_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
-        r"""Creates an instance.
+        """Creates an instance.
 
         Args:
             gas_species: Iterable of species in the gas phase
@@ -321,8 +321,8 @@ class BasePlanet(BaseThermodynamicState):
             gas_species: Iterable of species in the gas phase
             planet_mass: Mass of the planet (kg). Defaults to Earth.
             core_mass_fraction: Mass fraction of the iron core relative to the planetary mass
-                (kgkg\\ :sup:`-1`). Defaults to Earth.
-            mantle_melt_fraction: Mantle melt fraction. Defaults to ``1.0``.
+                (kg kg\\ :sup:`-1`). Defaults to Earth.
+            mantle_melt_fraction: Mantle melt fraction (kg kg\\ :sup:`-1`). Defaults to ``1.0``.
             surface_radius: Radius of the planetary surface (m). Defaults to Earth.
             temperature: Temperature (K). Defaults to ``2000``.
             pressure: Pressure (bar). Defaults to ``NaN`` to solve for the mechanical pressure
@@ -506,7 +506,7 @@ class BasePlanet(BaseThermodynamicState):
 
 
 class ThinAtmospherePlanet(BasePlanet):
-    """A planet with a thin atmosphere.
+    """A planet with a thin atmosphere
 
     In this context, "thin atmosphere" means the atmosphere is shallow compared with the planetary
     radius, so gravity is approximated as constant throughout the atmospheric column. Surface
@@ -570,7 +570,7 @@ class ThinAtmospherePlanet(BasePlanet):
 
 
 class PressureScalingLawPlanet(BasePlanet):
-    """A planet with a scaling law for the atmospheric pressure.
+    """A planet with a scaling law for the atmospheric pressure
 
     A pressure is used if specified, otherwise it is computed from the scaling law
     :cite:p:`Schlichting_2022{Equation 8}`:
