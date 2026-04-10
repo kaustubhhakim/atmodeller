@@ -389,7 +389,7 @@ class OutputNaturalDict(BaseOutputDict):
             "mass_fraction": phase_output.species_mass_fraction,
             "number_moles": phase_output.species_number_moles,
             "mole_fraction": phase_output.species_mole_fraction,
-            "include_in_phase_mass": phase_output.include_in_mass_phase,
+            "include_in_phase_mass": phase_output.include_in_phase_mass,
         }
 
         return out
@@ -546,7 +546,7 @@ class OutputNamedArraysDict(BaseOutputDict):
             phase_output, phase_output.species_mole_fraction, species_out, "mole_fraction"
         )
         self._split_by_species_and_add(
-            phase_output, phase_output.include_in_mass_phase, species_out, "include_in_phase_mass"
+            phase_output, phase_output.include_in_phase_mass, species_out, "include_in_phase_mass"
         )
 
         return out
@@ -793,7 +793,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             species_names, phase_output.species_mole_fraction
         )
         include_in_mass_phase: list[Array] = self._split_array_by_names(
-            species_names, phase_output.include_in_mass_phase
+            species_names, phase_output.include_in_phase_mass
         )
 
         for nn, species in enumerate(species_names):

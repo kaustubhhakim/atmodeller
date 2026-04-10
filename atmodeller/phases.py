@@ -70,17 +70,17 @@ else:
 DEFAULT_BACKGROUND_MASS: float = 0.0
 """Default background mass in kg (i.e., no background mass)"""
 DUMMY_MOLAR_MASS: float = 1.0
-r"""Default molar mass of the background component in kg mol\ :sup:`-1` (only meaningful when
+"""Default molar mass of the background component (kg mol\\ :sup:`-1`) (only meaningful when
 background mass is non-zero)"""
 SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
-r"""Molar mass of SiO\ :sub:`2` in kg mol\ :sup:`-1`, used as the default background molar mass for
-condensed phases"""
+"""Molar mass of SiO\\ :sub:`2` (kg mol\\ :sup:`-1`), used as the default background molar mass
+for condensed phases"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class BasePhase(eqx.Module, Generic[TSpecies_co]):
-    r"""Base class for all phases
+    """Base class for all phases
 
     This class defines the physical and model state of a phase, including its species, background
     properties, and core logic for thermodynamic calculations. It is intentionally kept separate
@@ -98,10 +98,10 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
     Args:
         species: An iterable of species in the phase
-        background_mass: Mass of the background component in kg. Should be a scalar or a 1-D array
+        background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
             matching the batch dimension if batching is used. Defaults to zero (i.e., no background
             mass).
-        background_molar_mass: Molar mass of the background component in kg mol\ :sup:`-1`. Should
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
             to ``1.0``; only meaningful when ``background_mass`` is not zero.
     """
@@ -132,7 +132,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         self.background_molar_mass = as_j64(background_molar_mass)
 
         log_activity_funcs: list[Callable] = [
-            to_hashable(species_.activity.log_activity) for species_ in species
+            to_hashable(species_.activity.log_activity) for species_ in self.species
         ]
 
         def apply_log_activity(
@@ -162,10 +162,10 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         Args:
             species: A single species name or an iterable of names
-            background_mass: Mass of the background component in kg. Should be a scalar or a 1-D
+            background_mass: Mass of the background component (kg). Should be a scalar or a 1-D
                 array matching the batch dimension if batching is used. Defaults to zero (i.e., no
                 background mass).
-            background_molar_mass: Molar mass of the background component in kg mol\ :sup:`-1`.
+            background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`).
                 Should be a scalar or a 1-D array matching the batch dimension if batching is used.
                 Defaults to ``1.0``; only meaningful when ``background_mass`` is not zero.
             **kwargs: Arbitrary keyword arguments to pass to the factory class when constructing
@@ -201,17 +201,17 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
     @property
     def log_background_mass(self) -> FloatArray:
-        """Log mass of the background component in kg"""
+        """Log mass of the background component (kg)"""
         return jnp.log(self.background_mass)
 
     @property
     def log_background_moles(self) -> FloatArray:
-        """Log moles of the background component in mol"""
+        """Log moles of the background component (mol)"""
         return self.log_background_mass - self.log_background_molar_mass
 
     @property
     def log_background_molar_mass(self) -> FloatArray:
-        r"""Log molar mass of the background component in kg mol\ :sup:`-1`"""
+        r"""Log molar mass of the background component (kg mol\ :sup:`-1`)"""
         return jnp.log(self.background_molar_mass)
 
     @property
@@ -229,8 +229,8 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
 
         Args:
             log_number_moles: Log number of moles of each species in the phase
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log activity of each species in the phase
@@ -263,8 +263,8 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         Args:
             log_number_moles: Log number of moles of each species in the phase
             log_stability: Log stability of each species in the phase
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log activity of each species in the phase, with unstable species set to negative
@@ -311,7 +311,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log mass of each species in the phase in kg
+            Log mass of each species in the phase (kg)
         """
         log_mass: Float[Array, "... n_species"] = log_number_moles + jnp.log(
             self.species.molar_masses
@@ -328,7 +328,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log mass of the phase in kg
+            Log mass of the phase (kg)
         """
         log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
         log_mass = self.apply_phase_mass_mask(log_mass)
@@ -353,7 +353,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log mass fraction of each species in the phase
+            Log mass fraction of each species in the phase (kg kg\\ :sup:`-1`)
         """
         log_mass: Float[Array, "... n_species"] = self.get_log_mass(log_number_moles)
         log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(log_number_moles)
@@ -371,7 +371,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log moles of the phase in mol
+            Log moles of the phase (mol)
         """
         log_number_moles = self.apply_phase_mass_mask(log_number_moles)
 
@@ -395,7 +395,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log mole fraction of each species in the phase
+            Log mole fraction of each species in the phase (mol mol\\ :sup:`-1`)
         """
         log_phase_moles: Float[Array, "... 1"] = self.get_log_phase_moles(log_number_moles)
         log_mole_fraction: Float[Array, "... n_species"] = log_number_moles - log_phase_moles
@@ -411,7 +411,7 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
             log_number_moles: Log number of moles of each species in the phase
 
         Returns:
-            Log molar mass of the phase in kg mol\ :sup:`-1`
+            Log molar mass of the phase (kg mol\ :sup:`-1`)
         """
         log_phase_mass: Float[Array, "... 1"] = self.get_log_phase_mass(log_number_moles)
         log_number_total: Float[Array, "... 1"] = self.get_log_phase_moles(log_number_moles)
@@ -428,10 +428,10 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         r"""Constructs an output helper object for phase-level and species-level properties.
 
         Args:
-            log_number_moles: Log number of moles of each species in the phase
+            log_number_moles: Log number of moles of each species in the phase (mol)
             log_stability: Log stability of each species in the phase
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             An output helper object for accessing and manipulating output quantities
@@ -478,10 +478,10 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         phase: The phase instance associated with this output
         log_number_moles: Log number of moles for each species in the phase
         log_stability: Log stability for each species in the phase
-        temperature: Temperature in K
-        pressure: Pressure in bar
-        background_mass: Log mass of the background component in kg
-        background_molar_mass: Log molar mass of the background component in kg mol\ :sup:`-1`
+        temperature: Temperature (K)
+        pressure: Pressure (bar)
+        background_mass: Mass of the background component (kg)
+        background_molar_mass: Molar mass of the background component (kg mol\ :sup:`-1`)
     """
 
     phase: TPhase_co
@@ -494,7 +494,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
 
     @property
     def batch_size(self) -> int:
-        return self._log_number_moles.shape[0]
+        return self.log_number_moles.shape[0]
 
     @property
     def log_number_moles(self) -> Float[Array, "#n_batch n_species"]:
@@ -542,7 +542,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         return self.phase.is_empty
 
     @property
-    def include_in_mass_phase(self) -> Bool[Array, "1 n_species"]:
+    def include_in_phase_mass(self) -> Bool[Array, "1 n_species"]:
         """Boolean mask indicating which species to include in phase-level mass and derived
         aggregations."""
         return jnp.atleast_2d(self.phase.species.phase_mass_mask)
@@ -578,6 +578,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     # Phase outputs
     @property
     def phase_species_number_moles(self) -> Float[Array, "#n_batch 1"]:
+        """Total phase moles from all constituent species and inert background"""
         return jnp.exp(self.phase.get_log_phase_moles(self.log_number_moles))
 
     @property
@@ -619,7 +620,7 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
         log_phase_mass: Float[Array, "#n_batch 1"] = self.phase.get_log_phase_mass(
             self.log_number_moles
         )
-        log_species_to_phase_mass_ratio: Float[Array, "#batch 1"] = (
+        log_species_to_phase_mass_ratio: Float[Array, "#n_batch 1"] = (
             log_species_mass_sum - log_phase_mass
         )
         return jnp.exp(log_species_to_phase_mass_ratio)
@@ -699,29 +700,29 @@ class GasPhaseOutput(PhaseOutput["GasPhase"]):
 
     @property
     def species_partial_pressure(self) -> Float[Array, "#n_batch n_species"]:
-        """Partial pressure of each species in bar"""
+        """Partial pressure of each species (bar)"""
         return self.pressure * self.species_mole_fraction
 
     @property
     def volume(self) -> Float[Array, "#n_batch 1"]:
-        r"""Volume of the gas phase in m\ :sup:`3`"""
+        r"""Volume of the gas phase (m\ :sup:`3`)"""
         return (
             self.phase_species_number_moles * GAS_CONSTANT_BAR * self.temperature / self.pressure
         )
 
 
 class GasPhase(BasePhase[ChemicalSpecies]):
-    r"""Multicomponent gas mixture
+    """Multicomponent gas mixture
 
     Models gas species as an ideal mixture of (potentially) non-ideal pure gases, where each pure
     species contributes an activity based on its own (potentially real gas) equation of state.
 
     Args:
         species: An iterable of species in the phase
-        background_mass: Mass of the background component in kg. Should be a scalar or a 1-D array
+        background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
             matching the batch dimension if batching is used. Defaults to zero (i.e., no background
             mass).
-        background_molar_mass: Molar mass of the background component in kg mol\ :sup:`-1`. Should
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
             to ``1.0``; only meaningful when ``background_mass`` is not zero.
     """
@@ -763,7 +764,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
 
 class CondensedPhase(BasePhase[TSpecies_co]):
-    r"""Multicomponent condensed phase (e.g., silicate melt or solid)
+    """Multicomponent condensed phase (e.g., silicate melt or solid)
 
     A condensed phase can optionally treat dissolved and/or condensed species as additional to the
     solvent (the bulk melt mass that species dissolve into). When enabled, these species are
@@ -777,17 +778,17 @@ class CondensedPhase(BasePhase[TSpecies_co]):
 
     Args:
         species: An iterable of species in the phase
-        background_mass: Mass of the background component in kg. Should be a scalar or a 1-D array
+        background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
             matching the batch dimension if batching is used. Defaults to zero (i.e., no background
             mass).
-        background_molar_mass: Molar mass of the background component in kg mol\ :sup:`-1`.  Should
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`).  Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``0.06`` (i.e., SiO\ :sub:`2`); only meaningful when ``background_mass`` is not
+            to ``0.06`` (i.e., SiO\\ :sub:`2`); only meaningful when ``background_mass`` is not
             zero.
     """
 
     name: str = "condensed"
-    "Phase name"
+    """Phase name"""
     factory_class: ClassVar[Callable] = ChemicalSpecies.create_condensed
     """Factory class for constructing species from Hill formulas"""
     output_class: ClassVar[type["PhaseOutput"]] = PhaseOutput[Self]
@@ -870,7 +871,7 @@ class PurePhase(CondensedPhase[ChemicalSpecies]):
 
     @property
     def name(self) -> str:  # pyright: ignore - This should work as an override (see Equinox docs)
-        """Name of the pure phase, given by the single species it contains."""
+        """Name of the pure phase, given by the single species it contains"""
         # Keep name string-typed even on vmapped in_axes placeholder trees (non-array leaves may be
         # None during beartype/Equinox repr).
         return str(self.species.species_names[0])
