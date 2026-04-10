@@ -18,6 +18,7 @@ from molmass import Formula
 from scipy import constants
 from scipy.constants import atmosphere, bar, kilo, mega
 
+# Module should be standalone, so avoid importing from the jax_utils module
 Scalar: TypeAlias = int | float
 """Scalar"""
 
@@ -229,7 +230,7 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
     from :cite:t:`KHK17`.
 
     Returns:
-        Dictionary of Earth BSE element masses in kg, with keys for each element
+        Dictionary mapping element symbols to dicts with 'min', 'max', and 'mean' masses (kg)
     """
     earth_bse: dict[str, dict[str, float]] = {
         "H": {"min": 1.852e20, "max": 1.894e21},
