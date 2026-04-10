@@ -352,6 +352,15 @@ class BasePlanet(BaseThermodynamicState):
         )
 
     @property
+    def background_mantle_mass(self) -> FloatArray:
+        """Mass of the mantle from only the background melt and solid mass (kg)
+
+        This value will only be equal to the actual mantle mass if ``include_in_phase_mass`` is
+        ``False`` for all species in the melt and solid phases.
+        """
+        return self.background_planet_mass - self.metallic_core_mass
+
+    @property
     def surface_area(self) -> FloatArray:
         """Surface area (m\\ :sup:`2`)
 
