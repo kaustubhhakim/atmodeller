@@ -34,6 +34,25 @@ from atmodeller.jax_utils import FloatArray, as_j64, get_batch_size, to_hashable
 from atmodeller.reactions import ReactionSystem
 from atmodeller.state import BaseThermodynamicState
 
+VALID_MASS_UNITS: tuple[str, str] = ("mass", "moles")
+
+
+def _validate_mass_units(units: str) -> Literal["mass", "moles"]:
+    """Validates and returns supported mass constraint units.
+
+    Args:
+        units: Units of mass constraints, either "mass" or "moles".
+
+    Returns:
+        Validated units
+
+    Raises:
+        ValueError: If the provided units are not supported.
+    """
+    if units not in VALID_MASS_UNITS:
+        raise ValueError(f"Invalid units '{units}'. Expected one of {VALID_MASS_UNITS}.")
+    return cast(Literal["mass", "moles"], units)
+
 
 class FixedActivityConstraint(eqx.Module):
     """A fixed activity constraint
@@ -157,7 +176,7 @@ class ActivityConstraintSet(eqx.Module):
         ]
         # jax.debug.print("activity_funcs = {out}", out=activity_funcs)
 
-        # Temperature must be a float array to ensure branches have have identical types
+        # Temperature must be a float array to ensure branches have identical types
         temperature = as_j64(temperature)
 
         def apply_activity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -182,14 +201,14 @@ class ActivityConstraintSet(eqx.Module):
             supports partial updates, leaving unspecified species unchanged. Constraint activation
             and deactivation are determined by the concrete
             :class:`~atmodeller.interfaces.ActivityConstraintProtocol` implementation. For
-            example, implementations such as :class:`~atmodeller.containers.FixedActivityConstraint`
+            example, implementations such as :class:`~atmodeller.parameters.FixedActivityConstraint`
             treat internal ``NaN`` values as inactive.
 
         Args:
             new_constraints: Dictionary with new constraint values for some or all species. The
                 keys should be species names and the values should be the new constraint values.
                 Original constraints that are not included in the ``new_constraints`` dictionary
-                will be retained.
+                will be retained. Unknown species keys are ignored.
 
         Returns:
             An instance with updated activity/fugacity constraints
@@ -197,6 +216,9 @@ class ActivityConstraintSet(eqx.Module):
         constraints_dict: dict[str, ActivityConstraintProtocol] = dict(self.constraints_dict)
 
         for species_name, new_value in new_constraints.items():
+            if species_name not in constraints_dict:
+                continue
+
             original_value: ActivityConstraintProtocol = constraints_dict[species_name]
 
             original_dynamic, _ = eqx.partition(original_value, eqx.is_array)
@@ -243,6 +265,8 @@ class MassConstraintSet(eqx.Module):
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
     ):
+        units = _validate_mass_units(units)
+
         mass_constraints_: Mapping[str, ArrayLike] = (
             mass_constraints if mass_constraints is not None else {}
         )
@@ -267,7 +291,7 @@ class MassConstraintSet(eqx.Module):
                         element_index: int = species.get_element_index(element)
                         element_molar_mass: float = species.element_molar_masses[element_index]
                         scale: float = element_composition.fraction / element_molar_mass
-                    elif units == "moles":
+                    else:
                         # element_composition.count is the atom count
                         # value_ is in moles of species, so moles of element = count * value_
                         scale = element_composition.count
@@ -348,15 +372,20 @@ class MassConstraintSet(eqx.Module):
             new_abundances: Dictionary with new abundance values for some or all elements. The keys
                 should be element names and the values should be the new abundance values. Original
                 abundances that are not included in the ``new_abundance`` dictionary will be
-                retained.
+                retained. Unknown element keys are ignored.
             units: Units of ``new_abundances``. Defaults to ``mass``.
 
         Returns:
             An instance with updated abundance constraints
         """
+        units = _validate_mass_units(units)
+
         abundance_dict: dict[str, Array] = dict(self.abundance_dict)
 
         for element, new_value in new_abundances.items():
+            if element not in abundance_dict:
+                continue
+
             original_value: Array = abundance_dict[element]
             # Keep leaf signatures stable to avoid unnecessary retracing under JAX transforms.
             value_array: FloatArray = jnp.asarray(new_value)
