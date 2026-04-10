@@ -496,13 +496,19 @@ class PhaseOutput(eqx.Module, Generic[TPhase_co]):
     def batch_size(self) -> int:
         return self.log_number_moles.shape[0]
 
+    def _reshape_to_batched_species(
+        self, x: Float[Array, "... n_species"]
+    ) -> Float[Array, "#n_batch n_species"]:
+        """Normalizes phase arrays to shape ``(n_batch, n_species)`` with a generic reshape."""
+        return jnp.reshape(x, (-1, self.phase.species.number_species))
+
     @property
     def log_number_moles(self) -> Float[Array, "#n_batch n_species"]:
-        return jnp.atleast_2d(self._log_number_moles)
+        return self._reshape_to_batched_species(self._log_number_moles)
 
     @property
     def log_stability(self) -> Float[Array, "#n_batch n_species"]:
-        return jnp.atleast_2d(self._log_stability)
+        return self._reshape_to_batched_species(self._log_stability)
 
     @property
     def temperature(self) -> Float[Array, "... 1"]:

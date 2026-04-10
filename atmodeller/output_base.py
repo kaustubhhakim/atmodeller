@@ -255,8 +255,8 @@ class BaseOutputDict(eqx.Module):
 
         for nn, condensate in enumerate(self.parameters.reaction_system.phase_system.condensates):
             condensate_out = condensate.output(
-                self.log_number_moles[..., condensate_slice][..., nn],
-                self.log_stability[..., condensate_slice][..., nn],
+                self.log_number_moles[..., condensate_slice][..., nn : nn + 1],
+                self.log_stability[..., condensate_slice][..., nn : nn + 1],
                 self._temperature,
                 self._pressure,
             )
