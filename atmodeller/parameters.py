@@ -13,7 +13,7 @@ This module defines immutable, JAX-friendly parameter objects used by the solver
 Factory methods validate and normalize user inputs, while ``update`` methods return new instances
 with leaf shapes kept stable for efficient JAX transformations, also within jitted workflows.
 
-Design note:
+Note:
     Construct parameter containers once outside ``jit`` (or other JAX transforms), then use
     ``update`` methods inside transformed workflows to preserve leaf signatures and avoid
     unnecessary retracing.
