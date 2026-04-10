@@ -47,7 +47,7 @@ import pickle
 from abc import abstractmethod
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -73,7 +73,7 @@ from atmodeller.phases import (
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def flatten_dictionary(d: dict, parent_key: str = "") -> dict:
+def flatten_dictionary(d: dict, parent_key: str = "") -> dict[str, Any]:
     """Recursively flattens a nested dictionary, joining keys with "." to form column names.
 
     Args:
@@ -83,7 +83,7 @@ def flatten_dictionary(d: dict, parent_key: str = "") -> dict:
     Returns:
         Flat dictionary with dot-joined keys
     """
-    items: dict = {}
+    items: dict[str, Any] = {}
 
     for k, v in d.items():
         new_key: str = f"{parent_key}.{k}" if parent_key else str(k)
@@ -95,7 +95,7 @@ def flatten_dictionary(d: dict, parent_key: str = "") -> dict:
     return items
 
 
-def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
+def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict[str, Any]:
     """Recursively merges two dictionaries.
 
     Args:
@@ -106,7 +106,7 @@ def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict:
     Returns:
         The merged dictionary
     """
-    out: dict = dict(d1)
+    out: dict[str, Any] = dict(d1)
 
     for k, v in d2.items():
         if k in out:
@@ -367,6 +367,9 @@ class BaseOutputDict(eqx.Module):
 
     def phase_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
         """Phase-level properties such as total mass, number of moles, molar mass, etc.
+
+        Args:
+            phase_output: The phase output to convert.
 
         Returns:
             A dictionary of phase-level properties
@@ -683,7 +686,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         # )
         # out["residual"] = objective_function_vmapped(self.solution, self.parameters)
 
-        # Order of operations matters here: expansion must be done before ravl, and both before
+        # Order of operations matters here: expansion must be done before ravel, and both before
         # conversion to NumPy arrays
         if expand_to_batch:
             out = expand_jax_arrays_in_pytree_to_batch(out, self.batch_size)
@@ -702,9 +705,6 @@ class OutputNamedArraysDict(BaseOutputDict):
         rtol: float,
         atol: float,
         log: bool = False,
-        d2: Optional[dict] = None,
-        path: tuple = (),
-        all_match: bool = True,
     ) -> bool:
         """Compares two nested dictionaries of output.
 
@@ -713,28 +713,47 @@ class OutputNamedArraysDict(BaseOutputDict):
             rtol: Relative tolerance for comparison
             atol: Absolute tolerance for comparison
             log: Whether to compare the base-10 logarithm of the values. Defaults to ``False``.
-            d2: Dictionary to compare against. If ``None``, compares against the current output.
-                Defaults to ``None``.
-            path: Internal parameter for tracking the current path in the nested structure during
-                recursion. Should not be set by the user. Defaults to an empty tuple.
-            all_match: Internal parameter for tracking whether all comparisons have matched so far
-                during recursion. Should not be set by the user. Defaults to ``True``.
 
         Returns:
             ``True`` if all values match within the specified tolerances, else ``False``
         """
-        if d2 is None:
-            d2 = self.to_dict(expand_to_batch=True, ravel=True, to_numpy=True)
+        d2: dict[str, Any] = self.to_dict(expand_to_batch=True, ravel=True, to_numpy=True)
 
-        keys = d1.keys()
+        return self._compare_recursive(d1, d2, rtol, atol, log)
 
-        for key in keys:
+    def _compare_recursive(
+        self,
+        d1: dict,
+        d2: dict,
+        rtol: float,
+        atol: float,
+        log: bool,
+        path: tuple[str, ...] = (),
+    ) -> bool:
+        """Recursively compares two nested dictionaries.
+
+        Args:
+            d1: First dictionary
+            d2: Second dictionary
+            rtol: Relative tolerance for comparison
+            atol: Absolute tolerance for comparison
+            log: Whether to compare the base-10 logarithm of the values
+            path: Current key path (used for logging)
+
+        Returns:
+            ``True`` if all values match within the specified tolerances, else ``False``
+        """
+        all_match: bool = True
+
+        for key in d1.keys():
             v1 = d1.get(key)
             v2 = d2.get(key)
             current_path = path + (key,)
 
             if isinstance(v1, dict) and isinstance(v2, dict):
-                all_match = self.compare(v1, rtol, atol, log, v2, current_path, all_match)
+                all_match = (
+                    self._compare_recursive(v1, v2, rtol, atol, log, current_path) and all_match
+                )
             else:
                 if isinstance(v1, (np.ndarray, float, int)) and isinstance(
                     v2, (np.ndarray, float, int)
@@ -853,14 +872,39 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             out[self.gas.phase.name]["phase"]["pressure"] = self.gas.pressure
 
             # Metallicity
-            z_by_moles = 0
-            z_by_mass = 0
-            for element in self.gas.phase.species.unique_elements:
-                if element != "H" and element != "He":
-                    z_by_moles = z_by_moles + out[element][self.gas.phase.name]["number_moles"]
-                    z_by_mass = z_by_mass + out[element][self.gas.phase.name]["mass"]
-            z_by_moles = z_by_moles / out[self.gas.phase.name]["phase"]["elements_number_moles"]
-            z_by_mass = z_by_mass / out[self.gas.phase.name]["phase"]["mass"]
+            gas_phase_dict: dict[str, Any] = out[self.gas.phase.name]["phase"]
+            total_number_moles: ArrayLike = gas_phase_dict["elements_number_moles"]
+            total_mass: ArrayLike = gas_phase_dict["mass"]
+
+            heavy_elements: tuple[str, ...] = tuple(
+                element
+                for element in self.gas.phase.species.unique_elements
+                if element not in ("H", "He")
+            )
+            if heavy_elements:
+                z_by_moles: ArrayLike = jnp.sum(
+                    jnp.stack(
+                        [
+                            out[element][self.gas.phase.name]["number_moles"]
+                            for element in heavy_elements
+                        ],
+                        axis=0,
+                    ),
+                    axis=0,
+                )
+                z_by_mass: ArrayLike = jnp.sum(
+                    jnp.stack(
+                        [out[element][self.gas.phase.name]["mass"] for element in heavy_elements],
+                        axis=0,
+                    ),
+                    axis=0,
+                )
+            else:
+                z_by_moles = jnp.zeros_like(total_number_moles)
+                z_by_mass = jnp.zeros_like(total_mass)
+
+            z_by_moles = z_by_moles / total_number_moles
+            z_by_mass = z_by_mass / total_mass
             out[self.gas.phase.name]["phase"]["metallicity_by_moles"] = z_by_moles
             out[self.gas.phase.name]["phase"]["metallicity_by_mass"] = z_by_mass
 
@@ -952,7 +996,7 @@ class Output(eqx.Module):
 
     def to_dict(
         self,
-        format: Literal["natural", "named_arrays", "elements_species"] = "named_arrays",
+        output_format: Literal["natural", "named_arrays", "elements_species"] = "named_arrays",
         to_numpy: bool = False,
         **kwargs,
     ) -> dict[str, Any]:
@@ -963,9 +1007,9 @@ class Output(eqx.Module):
             compatible with JAX transformations (jit, vmap, etc.).
 
         Args:
-            format: The format of the output dictionary. Can be ``natural`` for the natural output
-                format based on the arrays used internally, ``named_arrays`` for an alternative
-                format with named arrays, or ``elements_species`` for an alternative
+            output_format: The format of the output dictionary. Can be ``natural`` for the natural
+                output format based on the arrays used internally, ``named_arrays`` for an
+                alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
             to_numpy: Whether to convert JAX arrays to NumPy arrays. Defaults to ``False``.
                 Must be ``False`` if used within a jitted context, as NumPy arrays are not
@@ -975,20 +1019,20 @@ class Output(eqx.Module):
         Returns:
             Dictionary of the solution with JAX or NumPy arrays in the specified format
         """
-        if format == "natural":
+        if output_format == "natural":
             return OutputNaturalDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
-        elif format == "named_arrays":
+        elif output_format == "named_arrays":
             return OutputNamedArraysDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
-        elif format == "elements_species":
+        elif output_format == "elements_species":
             return OutputElementsSpeciesDict(self.parameters, self.multi_attempt_solution).to_dict(
                 to_numpy=to_numpy, **kwargs
             )
         else:
-            raise ValueError(f"Invalid output format: {format}")
+            raise ValueError(f"Invalid output format: {output_format}")
 
     def compare(self, d1: dict, rtol: float, atol: float, log: bool = False) -> bool:
         """Compares a target dictionary to the model output.
@@ -1010,7 +1054,8 @@ class Output(eqx.Module):
         )
 
     def quick_look(
-        self, format: Literal["natural", "named_arrays", "elements_species"] = "named_arrays"
+        self,
+        output_format: Literal["natural", "named_arrays", "elements_species"] = "named_arrays",
     ) -> None:
         """Quick look at the output.
 
@@ -1018,15 +1063,12 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
-            format: The format of the output dictionary. Can be ``natural`` for the natural output
-                format based on the arrays used internally, ``named_arrays`` for an alternative
-                format with named arrays, or ``elements_species`` for an alternative
+            output_format: The format of the output dictionary. Can be ``natural`` for the natural
+                output format based on the arrays used internally, ``named_arrays`` for an
+                alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
-
-        Returns:
-            A nested dictionary of the output, suitable for quick inspection and comparison.
         """
-        out: dict[str, Any] = self.to_dict(format=format, to_numpy=True)
+        out: dict[str, Any] = self.to_dict(output_format=output_format, to_numpy=True)
         logger.info("Quick look output:\n%s", pformat(out, sort_dicts=False))
 
     def _drop_unsuccessful_solves(
@@ -1050,7 +1092,7 @@ class Output(eqx.Module):
 
     def to_dataframes(
         self,
-        format: Literal["named_arrays", "elements_species"] = "named_arrays",
+        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         drop_unsuccessful_solves: bool = False,
     ) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
@@ -1061,9 +1103,9 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
-            format: The format of the output dictionary. Can be ``natural`` for the natural output
-                format based on the arrays used internally, ``named_arrays`` for an alternative
-                format with named arrays, or ``elements_species`` for an alternative
+            output_format: The format of the output dictionary. Can be ``natural`` for the natural
+                output format based on the arrays used internally, ``named_arrays`` for an
+                alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
@@ -1072,7 +1114,7 @@ class Output(eqx.Module):
             Dictionary mapping top-level keys to pandas DataFrames
         """
         nested_dict: dict[str, Any] = self.to_dict(
-            format=format, to_numpy=True, expand_to_batch=True, ravel=True
+            output_format=output_format, to_numpy=True, expand_to_batch=True, ravel=True
         )
 
         result: dict[str, pd.DataFrame] = {}
@@ -1092,8 +1134,8 @@ class Output(eqx.Module):
 
     def to_excel(
         self,
-        format: Literal["named_arrays", "elements_species"] = "named_arrays",
-        file_prefix: str = "atmodeller_out",
+        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
+        file_prefix: Path | str = "atmodeller_out",
         drop_unsuccessful_solves: bool = False,
     ) -> None:
         """Writes the output to an Excel file.
@@ -1102,19 +1144,23 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
-            format: The format of the output dictionary. Can be ``natural`` for the natural output
-                format based on the arrays used internally, ``named_arrays`` for an alternative
-                format with named arrays, or ``elements_species`` for an alternative
+            output_format: The format of the output dictionary. Can be ``natural`` for the natural
+                output format based on the arrays used internally, ``named_arrays`` for an
+                alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
-            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
+                Defaults to atmodeller_out.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
         """
         logger.info("Writing output to excel")
         out: dict[str, pd.DataFrame] = self.to_dataframes(
-            format=format, drop_unsuccessful_solves=drop_unsuccessful_solves
+            output_format=output_format, drop_unsuccessful_solves=drop_unsuccessful_solves
         )
-        output_file: str = f"{file_prefix}.xlsx"
+        output_path: Path = Path(file_prefix)
+        output_file: Path = (
+            output_path if output_path.suffix == ".xlsx" else output_path.with_suffix(".xlsx")
+        )
 
         # Convenient to highlight rows where the solver failed to find a solution for follow-up
         # analysis. Define a fill colour for highlighting rows (e.g., yellow)
@@ -1138,16 +1184,11 @@ class Output(eqx.Module):
                         cell = sheet.cell(row=idx + 2, column=col)
                         cell.fill = highlight_fill
 
-        # Without the consideration of highlighting
-        # with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        #    for df_name, df in out.items():
-        #        df.to_excel(writer, sheet_name=df_name, index=True)
-
         logger.info("Output written to %s", output_file)
 
     def to_pickle(
         self,
-        format: Literal["named_arrays", "elements_species"] = "named_arrays",
+        output_format: Literal["named_arrays", "elements_species"] = "named_arrays",
         file_prefix: Path | str = "atmodeller_out",
         drop_unsuccessful_solves: bool = False,
     ) -> None:
@@ -1157,19 +1198,23 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
 
         Args:
-            format: The format of the output dictionary. Can be ``natural`` for the natural output
-                format based on the arrays used internally, ``named_arrays`` for an alternative
-                format with named arrays, or ``elements_species`` for an alternative
+            output_format: The format of the output dictionary. Can be ``natural`` for the natural
+                output format based on the arrays used internally, ``named_arrays`` for an
+                alternative format with named arrays, or ``elements_species`` for an alternative
                 format grouped by element and species names. Defaults to ``named_arrays``.
-            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+            file_prefix: Prefix of the output file. Accepts ``str`` or :class:`pathlib.Path`.
+                Defaults to atmodeller_out.
             drop_unsuccessful_solves: Whether to drop unsuccessful solves from the output. Defaults
                 to ``False``.
         """
         logger.info("Writing output to pickle")
         out: dict[str, pd.DataFrame] = self.to_dataframes(
-            format=format, drop_unsuccessful_solves=drop_unsuccessful_solves
+            output_format=output_format, drop_unsuccessful_solves=drop_unsuccessful_solves
         )
-        output_file: Path = Path(f"{file_prefix}.pkl")
+        output_path: Path = Path(file_prefix)
+        output_file: Path = (
+            output_path if output_path.suffix == ".pkl" else output_path.with_suffix(".pkl")
+        )
 
         with open(output_file, "wb") as handle:
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -1183,136 +1228,3 @@ class Output(eqx.Module):
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
         """
         return self.multi_attempt_solution.stats_to_logger()
-
-
-# TODO: To reinstate at some point, but needs to be adapted to new output structure and parameters
-# handling
-
-# class OutputDisequilibrium:
-#     """Output disequilibrium calculations
-
-#     Args:
-#         parameters: Parameters
-#         solution: Solution
-#     """
-
-#     @override
-#     def asdict(self) -> dict[str, dict[str, NpArray]]:
-#         """All outputs in a dictionary, with caching.
-
-#         Additionally includes the disequilibrium group, compared to the base class.
-
-#         Returns:
-#             Dictionary of all output
-#         """
-#         out: dict[str, dict[str, NpArray]] = super().asdict()
-
-#         out["disequilibrium"] = self.disequilibrium_asdict()
-
-#         self._cached_dict = out  # Re-cache result for faster re-accessing
-
-#         return out
-
-#     def disequilibrium_asdict(self) -> dict[str, NpArray]:
-#         """Gets the reaction disequilibrium as a dictionary.
-
-#         Returns:
-#             Reaction disequilibrium as a dictionary
-#         """
-#         reaction_mask: NpBool = self.reaction_mask()
-#         residual: NpFloat = np.asarray(self.vmapf.objective_function(jnp.asarray(self.solution)))
-
-#         # Number of True entries per row (must be same for all rows)
-#         n_cols: NpInt = reaction_mask.sum(axis=1)[0]
-#         # logger.debug("n_cols = %s", n_cols)
-#         # Convert boolean mask to sorted column indices for each row
-#         col_indices: NpInt = np.argsort(~reaction_mask, axis=1)[:, :n_cols]
-#         # logger.debug("col_indices = %s", col_indices)
-#         # Gather the True entries in order
-#         compressed: NpFloat = np.take_along_axis(residual, col_indices, axis=1)
-#         # logger.debug("compressed = %s", compressed)
-
-#         # To compute the limiting reactant/product in each reaction we need to know the
-#         # availability of each species. We will ignore condensates later because their stability
-#         # criteria prevents a simple calculation of what is limiting the reaction.
-#         number_fraction: NpFloat = self.number_moles / np.sum(
-#             self.number_moles, axis=1, keepdims=True
-#         )
-#         # logger.debug("number_fraction = %s", number_fraction)
-#         reaction_matrix: NpFloat = self.parameters.reaction_network.reaction_matrix
-#         # logger.debug("reaction_matrix = %s", reaction_matrix)
-
-#         out: dict[str, NpArray] = {}
-
-#         for jj in range(n_cols):
-#             # logger.debug("Working on reaction %d", jj)
-#             per_mole_of_reaction: NpFloat = compressed[:, jj] * GAS_CONSTANT * self.temperature
-#             stoich: NpFloat = reaction_matrix[jj]
-#             # logger.debug("stoich = %s", stoich)
-
-#             # Normalised ratios for limiting species (ignore divide-by-zero warnings)
-#             with np.errstate(divide="ignore"):
-#                 ratios: NpFloat = np.where(stoich != 0, number_fraction / stoich, np.nan)
-#             # logger.debug("ratios = %s", ratios)
-#             limiting: NpFloat = np.full_like(per_mole_of_reaction, np.nan)
-#             # logger.debug("limiting (full_like) = %s", limiting)
-
-#             # Initialize with None placeholders for every row
-#             limiting_species_names: list[Optional[str]] = [None] * residual.shape[0]
-#             limiting_species_type: list[Optional[str]] = [None] * residual.shape[0]
-
-#             # Backward-favoured: products limit
-#             mask_back: NpBool = per_mole_of_reaction > 0
-#             # logger.debug("mask_back = %s", mask_back)
-#             if np.any(mask_back):
-#                 # Subarray of only product species for backward-favoured reactions
-#                 sub_ratios: NpFloat = ratios[mask_back][:, stoich > 0]
-#                 # Column indices of product species in the full array
-#                 sub_cols: NpInt = np.where(stoich > 0)[0]
-#                 # Value of limiting species
-#                 limiting[mask_back] = np.min(sub_ratios, axis=1)
-#                 # logger.debug("limiting[mask_back] = %s", limiting[mask_back])
-#                 # Column index (within subarray) of limiting species
-#                 min_idx_within: NpInt = np.argmin(sub_ratios, axis=1)
-#                 # Map back to global indices in ratios / species_names
-#                 min_idx_global: NpInt = sub_cols[min_idx_within]
-#                 # Get the actual species names
-#                 for row_idx, species_idx in zip(np.where(mask_back)[0], min_idx_global):
-#                     limiting_species_names[row_idx] = self.species_collection.data.species_names[
-#                         species_idx
-#                     ]
-#                     limiting_species_type[row_idx] = "Product"
-#                 # logger.debug("limiting_species_names (back) = %s", limiting_species_names)
-
-#             # Forward-favoured: reactants limit
-#             mask_fwd: NpBool = ~mask_back
-#             # logger.debug("mask_fwd = %s", mask_fwd)
-#             if np.any(mask_fwd):
-#                 sub_ratios: NpFloat = ratios[mask_fwd][:, stoich < 0]
-#                 sub_cols: NpInt = np.where(stoich < 0)[0]
-#                 # Limiting species is the largest negative ratio among reactants (closest to zero)
-#                 limiting[mask_fwd] = np.max(sub_ratios, axis=1)
-#                 # logger.debug("limiting[mask_fwd] = %s", limiting[mask_fwd])
-#                 max_idx_within: NpInt = np.argmax(sub_ratios, axis=1)
-#                 max_idx_global: NpInt = sub_cols[max_idx_within]
-#                 # Get the actual species names
-#                 for row_idx, species_idx in zip(np.where(mask_fwd)[0], max_idx_global):
-#                     limiting_species_names[row_idx] = self.species_collection.data.species_names[
-#                         species_idx
-#                     ]
-#                     limiting_species_type[row_idx] = "Reactant"
-#                 # logger.debug("limiting_species_names (fwd) = %s", limiting_species_names)
-
-#             # Compute the energy per mole of atmosphere
-#             energy_per_mol_atmosphere: NpFloat = per_mole_of_reaction * limiting
-#             logger.debug("energy_per_mol_atmosphere = %s", energy_per_mol_atmosphere)
-
-#             out[f"Reaction_{jj}"] = per_mole_of_reaction
-
-#             # TODO: To reinstate?
-#             # if self.species.gas_only:
-#             #     out[f"Reaction_{jj}_per_atmosphere"] = energy_per_mol_atmosphere
-#             #     out[f"Reaction_{jj}_limiting_species"] = np.array(limiting_species_names)
-#             #     out[f"Reaction_{jj}_limiting_species_role"] = np.array(limiting_species_type)
-
-#         return out
