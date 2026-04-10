@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Package level variables and initializes the package logger"""
+"""Package-level exports and logger initialization."""
 
 __version__: str = "2.0.0"
 
@@ -85,7 +85,7 @@ def debug_logger() -> logging.Logger:
     console_handler: logging.Handler = logging.StreamHandler()
     console_formatter: logging.Formatter = simple_formatter()
     console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
+    package_logger.addHandler(console_handler)
 
     return package_logger
 
@@ -124,12 +124,17 @@ from atmodeller.containers import (  # noqa: E402, F401
 from atmodeller.output import Output  # noqa: E402, F401
 from atmodeller.parameters import FixedActivityConstraint, Parameters  # noqa: E402, F401
 from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase  # noqa: E402, F401
-from atmodeller.reactions import (  # noqa: E402, F401
-    DissolutionNetwork,
-    ReactionNetwork,
-    ReactionSystem,
-)
 from atmodeller.sci_utils import bulk_silicate_earth_abundances, earth  # noqa: E402, F401
-from atmodeller.solvers import make_solver, make_solver_with_jit  # noqa: E402, F401
-from atmodeller.state import Planet, ThermodynamicState  # noqa: E402, F401
+from atmodeller.solvers import (  # noqa: E402, F401
+    make_solver,
+    make_solver_with_jit,  # Alias for the default solver
+    make_solver_with_jit_batch_only,
+    make_solver_with_jit_single_path,
+)
+from atmodeller.state import (  # noqa: E402, F401
+    Planet,
+    PressureScalingLawPlanet,
+    ThermodynamicState,
+    ThinAtmospherePlanet,
+)
 from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401

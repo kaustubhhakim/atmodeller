@@ -621,7 +621,7 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
 
 
 def make_solver(parameters: Parameters) -> Callable:
-    """General assembly function that constructs and returns the JIT-compiled solver.
+    """General assembly function that constructs and returns the dual-path solver.
 
     Builds a :func:`make_batch_retry_solver_from_parameters` and a tau sweep solver from
     ``parameters`` at construction time, sharing the same ``batch_retry_solver`` instance between
