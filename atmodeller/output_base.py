@@ -886,6 +886,12 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             out[self.solid.phase.name] = {}
             out[self.solid.phase.name]["phase"] = self.phase_to_dict(self.solid)
 
+        if len(self.condensate_phases) > 0:
+            for condensate in self.condensate_phases:
+                out = recursively_merge_dictionaries(out, self._phase_output_to_dict(condensate))
+                out[condensate.phase.name] = {}
+                out[condensate.phase.name]["phase"] = self.phase_to_dict(condensate)
+
         # Mass constraints
         mass_constraints: MassConstraintSet = self.parameters.mass_constraints
         unique_elements: tuple[str, ...] = mass_constraints.species.unique_elements
