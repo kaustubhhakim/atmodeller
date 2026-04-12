@@ -305,12 +305,8 @@ class MassConstraintSet(eqx.Module):
         self.species = species
         self.abundance_dict = abundance_dict
 
-    def abundance(self) -> Float[Array, " n_elements"]:
+    def abundance(self) -> Float[Array, "... n_elements"]:
         """Abundance array constructed from the abundance dictionary
-
-        .. warning::
-            This method should only be called inside a vmapped context so the abundance arrays are
-            correctly broadcast and the output array is always 1-D.
 
         Returns:
             Abundance array constructed from the abundance dictionary

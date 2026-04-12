@@ -361,7 +361,7 @@ class ReactionNetwork(BaseReactionBlock):
             - len(self.species.reaction_species.unique_elements),
         )
 
-    def get_log_Kp(self, temperature: FloatArray) -> Float[Array, "... reactions"]:
+    def get_log_Kp(self, temperature: FloatArray) -> Float[Array, "... n_reactions"]:
         """Gets log of the equilibrium constant of each reaction.
 
         Args:
@@ -370,13 +370,13 @@ class ReactionNetwork(BaseReactionBlock):
         Returns:
             Log of the equilibrium constant of each reaction
         """
-        gibbs_values: Float[Array, "... species"] = self.vmap_gibbs(
+        gibbs_values: Float[Array, "... n_species"] = self.vmap_gibbs(
             jnp.arange(self.species.reaction_species.number_species), temperature
         )
         # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
-        reaction_matrix: Float[Array, "reactions species"] = jnp.asarray(self.reaction_matrix)
+        reaction_matrix: Float[Array, "n_reactions n_species"] = jnp.asarray(self.reaction_matrix)
         # jax.debug.print("reaction_matrix = {out}", out=reaction_matrix)
-        log_Kp: Float[Array, "... reactions"] = -jnp.einsum(
+        log_Kp: Float[Array, "... n_reactions"] = -jnp.einsum(
             "rs,...s->...r", reaction_matrix, gibbs_values
         )
         # jax.debug.print("log_Kp = {out}", out=log_Kp)

@@ -27,6 +27,7 @@ from jaxtyping import Array, ArrayLike, Float, PyTree
 
 from atmodeller import override
 from atmodeller.containers import MultiAttemptSolution
+from atmodeller.initial_solution import auto_initial_guess
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Parameters
 from atmodeller.phases import (
@@ -229,8 +230,14 @@ class BaseOutputDict(eqx.Module):
         """Solution array for all species i.e. log number of moles and log stability"""
         return self.multi_attempt_solution.value
 
-    def solution_to_dict(self) -> dict[str, ArrayLike]:
-        """Returns a dictionary of solution arrays for each species.
+    def _solution_array_to_dict(
+        self, solution_array: Float[Array, "#n_batch twice_species"], suffix: str = ""
+    ) -> dict[str, ArrayLike]:
+        """Converts a solution array to a dictionary mapping.
+
+        Args:
+            solution_array: The solution array containing log number of moles and log stability
+            suffix: Optional suffix to add to the keys. Defauls to an empty string.
 
         Returns:
             Dictionary mapping species names and their stability keys to arrays of values
@@ -238,12 +245,39 @@ class BaseOutputDict(eqx.Module):
         out: dict[str, ArrayLike] = {}
 
         for nn, species_ in enumerate(self.parameters.species.species_names):
-            out[species_] = self.solution[..., nn]
-            out[f"{species_}_stability"] = self.solution[
+            out[f"{species_}{suffix}"] = solution_array[..., nn]
+            out[f"{species_}_stability{suffix}"] = solution_array[
                 ..., nn + self.parameters.species.number_species
             ]
 
         return out
+
+    def auto_initial_guess_to_dict(self) -> dict[str, ArrayLike]:
+        """Gets the automatic initial guess for the solver.
+
+        Returns:
+            Dictionary mapping species names and their stability keys to arrays of values
+        """
+        guess: Float[Array, "#n_batch twice_species"] = jnp.atleast_2d(
+            auto_initial_guess(self.parameters)
+        )
+        log_error: Float[Array, "#n_batch twice_species"] = jnp.abs(guess - self.solution)
+
+        # For convenient direct visual comparison, combine the solution, initial guess, and error
+        # into a single dictionary with appropriate suffixes.
+        out = self._solution_array_to_dict(self.solution, suffix="_solution")
+        out.update(self._solution_array_to_dict(guess, suffix="_guess"))
+        out.update(self._solution_array_to_dict(log_error, suffix="_log_error"))
+
+        return out
+
+    def solution_to_dict(self) -> dict[str, ArrayLike]:
+        """Returns a dictionary of solution arrays for each species.
+
+        Returns:
+            Dictionary mapping species names and their stability keys to arrays of values
+        """
+        return self._solution_array_to_dict(self.solution)
 
     @property
     def condensate_phases(self) -> tuple[PhaseOutput[PurePhase], ...]:
@@ -445,6 +479,7 @@ class OutputNaturalDict(BaseOutputDict):
         }
 
         out["solution"] = self.solution_to_dict()
+        out["auto_initial_guess"] = self.auto_initial_guess_to_dict()
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
 
@@ -641,6 +676,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         )
 
         out["solution"] = self.solution_to_dict()
+        out["auto_initial_guess"] = self.auto_initial_guess_to_dict()
         out["solver"] = self.solver_to_dict()
         out["state"] = self.state_to_dict()
 
