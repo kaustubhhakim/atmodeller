@@ -153,9 +153,12 @@ class ActivityConstraintSet(eqx.Module):
         Returns:
             Mask indicating whether activity constraints are active or not
         """
-        active_constraints: Bool[Array, "... species"] = jnp.stack(
-            [constraint.active() for constraint in self.ordered_constraints], axis=-1
-        )
+        arrays: list[Array] = [constraint.active() for constraint in self.ordered_constraints]
+        # Find the maximum shape (excluding the last dimension, which is n_species)
+        max_shape: tuple[int, ...] = jnp.broadcast_shapes(*[arr.shape for arr in arrays])
+        arrays = [jnp.broadcast_to(arr, max_shape) for arr in arrays]
+        active_constraints: Bool[Array, "... species"] = jnp.stack(arrays, axis=-1)
+        # jax.debug.print("active_constraints = {out}", out=active_constraints)
 
         return active_constraints
 
@@ -314,6 +317,9 @@ class MassConstraintSet(eqx.Module):
         arrays: list[Array] = [
             self.abundance_dict[element] for element in self.species.unique_elements
         ]
+        # Find the maximum shape (excluding the last dimension, which is n_elements)
+        max_shape: tuple[int, ...] = jnp.broadcast_shapes(*[arr.shape for arr in arrays])
+        arrays = [jnp.broadcast_to(arr, max_shape) for arr in arrays]
         abundance_array: Float[Array, "... n_elements"] = jnp.stack(arrays, axis=-1)
         # jax.debug.print("abundance_array = {out}", out=abundance_array)
 
