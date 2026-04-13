@@ -645,8 +645,8 @@ class ReactionSystem(BaseReactionBlock):
 
     def get_log_Kp(
         self,
-        log_number_moles: Float[Array, "... num_species"],
-        log_activity: Float[Array, "... num_species"],
+        log_number_moles: Float[Array, "... n_species"],
+        log_activity: Float[Array, "... n_species"],
         temperature: FloatArray,
         pressure: FloatArray,
     ) -> Float[Array, "... n_reactions"]:
@@ -718,7 +718,7 @@ class ReactionSystem(BaseReactionBlock):
         return self.stability_matrix
 
     def get_log_element_moles(
-        self, log_number_moles: Float[Array, "... num_species"]
+        self, log_number_moles: Float[Array, "... n_species"]
     ) -> Float[Array, "... num_elements"]:
         """Gets log number of moles of each element.
 
@@ -736,9 +736,9 @@ class ReactionSystem(BaseReactionBlock):
 
     def apply_stability(
         self,
-        residual: Float[Array, "... num_reactions"],
-        log_stability: Float[Array, "... num_species"],
-    ) -> Float[Array, "... num_reactions"]:
+        residual: Float[Array, "... n_reactions"],
+        log_stability: Float[Array, "... n_species"],
+    ) -> Float[Array, "... n_reactions"]:
         """Subtracts the stability contribution from residual.
 
         Args:
@@ -754,12 +754,12 @@ class ReactionSystem(BaseReactionBlock):
 
     def get_residual(
         self,
-        log_number_moles: Float[Array, "... num_species"],
-        log_activity: Float[Array, "... num_species"],
-        log_stability: Float[Array, "... num_species"],
+        log_number_moles: Float[Array, "... n_species"],
+        log_activity: Float[Array, "... n_species"],
+        log_stability: Float[Array, "... n_species"],
         temperature: FloatArray,
         pressure: FloatArray,
-    ) -> Float[Array, "... num_reactions"]:
+    ) -> Float[Array, "... n_reactions"]:
         """Gets the residual of the reaction network.
 
         Args:
@@ -772,11 +772,11 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Residual of the reaction network
         """
-        log_Kp: Float[Array, "... num_reactions"] = self.get_log_Kp(
+        log_Kp: Float[Array, "... n_reactions"] = self.get_log_Kp(
             log_number_moles, log_activity, temperature, pressure
         )
         # jax.debug.print("log_Kp = {out}", out=log_Kp)
-        residual: Float[Array, "... num_reactions"] = (
+        residual: Float[Array, "... n_reactions"] = (
             jnp.einsum("rs,...s->...r", self.matrix, log_activity) - log_Kp
         )
         # jax.debug.print("reaction residual before stability = {out}", out=residual)
