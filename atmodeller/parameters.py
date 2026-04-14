@@ -88,7 +88,7 @@ class FixedActivityConstraint(eqx.Module):
             - :data:`jax.numpy.nan` if the constraint is not active
         """
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
-            jnp.shape(temperature), jnp.shape(pressure)
+            jnp.shape(self.activity), jnp.shape(temperature), jnp.shape(pressure)
         )
         # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
 
