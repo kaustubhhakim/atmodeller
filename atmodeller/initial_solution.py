@@ -7,7 +7,7 @@
 import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, Bool, Float
+from jaxtyping import Array, Bool, Float, Integer
 
 from atmodeller.constants import INITIAL_LOG_STABILITY
 from atmodeller.engine import get_min_log_elemental_abundance_per_species
@@ -19,7 +19,7 @@ LOG_TRACE_VALUE: float = -20.0
 
 
 def max_moles_by_limiting_element(
-    parameters: Parameters,
+    formula_matrix: Float[Array, "n_elements n_species"],
     element_abundance: Float[Array, "... n_elements"],
     mask: Bool[Array, "... n_species"],
 ) -> Float[Array, "... n_species"]:
@@ -32,16 +32,13 @@ def max_moles_by_limiting_element(
     species not in ``mask`` or not constrained by any available element.
 
     Args:
-        parameters: Parameters
+        formula_matrix: Matrix of elemental formulas for each species
         element_abundance: Element abundance. ``NaN`` for unconstrained elements.
         mask: Boolean mask selecting the species to allocate budget to.
 
     Returns:
         Per-species mole estimates; ``NaN`` where unconstrained.
     """
-    formula_matrix: Float[Array, "n_elements n_species"] = jnp.asarray(
-        parameters.reaction_system.formula_matrix, dtype=float
-    )
     constrained_element: Bool[Array, "... n_elements"] = ~jnp.isnan(element_abundance)
 
     # Broadcast all masks to (..., n_elements, n_species)
@@ -102,7 +99,7 @@ def allocate_element_budget(
 
     # Allocate element budget to predicted-stable condensates
     n_condensate: Float[Array, "... n_species"] = max_moles_by_limiting_element(
-        parameters, element_abundance, condensate_stable_mask
+        formula_matrix, element_abundance, condensate_stable_mask
     )
     # jax.debug.print("n_condensate = {out}", out=n_condensate)
 
@@ -129,11 +126,63 @@ def allocate_element_budget(
     )
     # jax.debug.print("remaining_b = {out}", out=remaining_b)
 
-    # Allocate remaining budget to non-condensate species
-    n_other: Float[Array, "... n_species"] = max_moles_by_limiting_element(
-        parameters, remaining_b, ~condensate_mask
+    # If present, exclude O2 from the remaining budget, because otherwise the initial estimate for
+    # O2 tends to be unreasonably high since oxygen is equally shared among all O-bearing species.
+    O2_index: Float[Array, ""] = parameters.reaction_system.phase_system.gas.O2_index
+    non_condensate_no_O2_mask: Bool[Array, "... n_species"] = lax.cond(
+        jnp.isnan(O2_index),
+        lambda: ~condensate_mask,
+        lambda: (~condensate_mask).at[O2_index.astype(int)].set(False),  # Additionally turn off O2
     )
+
+    # Allocate remaining budget to non-condensate species excluding O2
+    n_other: Float[Array, "... n_species"] = max_moles_by_limiting_element(
+        formula_matrix, remaining_b, non_condensate_no_O2_mask
+    )
+    # NaNs are either O2 (if present) or condensates, both of which should be zeroed for
+    # calculating the budget
+    n_other = jnp.where(jnp.isnan(n_other), 0.0, n_other)
     # jax.debug.print("n_other = {out}", out=n_other)
+
+    # Recalculate element_used after n_other allocation
+    element_used_no_O2: Float[Array, "... n_elements"] = jnp.einsum(
+        "es,...s->...e", formula_matrix, n_other
+    )
+    # jax.debug.print("element_abundance = {out}", out=element_abundance)
+    # jax.debug.print("element_used_no_O2 = {out}", out=element_used_no_O2)
+
+    # Update element budget after allocation excluding O2, which must be positive or zero.
+    remaining_b = jnp.maximum(element_abundance - element_used - element_used_no_O2, 0.0)
+    # jax.debug.print("remaining_b (after n_other) = {out}", out=remaining_b)
+
+    def allocate_to_O2(
+        n_other: Float[Array, "... n_species"],
+        remaining_b: Float[Array, "... n_elements"],
+        formula_matrix: Float[Array, "n_elements n_species"],
+        O2_index_int: Integer[Array, ""],
+    ) -> Float[Array, "... n_species"]:
+        """Allocates remaining O budget to O2 if O2 is present in the system."""
+        # NOTE: A sentinel value is required since all branches of lax.cond are traced, but
+        # O_index will only ever be meaningful if O2 is present in the system.
+        O_index: int = (
+            parameters.element_names.index("O") if "O" in parameters.element_names else -1
+        )
+        # Compute how much O is left
+        O_remaining: Float[Array, "... 1"] = remaining_b[..., O_index]
+        # Get stoichiometry of O in O2 (should be 2)
+        O2_stoich: Float[Array, ""] = formula_matrix[O_index, O2_index_int]
+        n_O2: Float[Array, "... 1"] = O_remaining / O2_stoich
+        # Set the O2 entry in n_other
+        n_other = n_other.at[..., O2_index_int].set(n_O2)
+
+        return n_other
+
+    n_other = lax.cond(
+        jnp.isnan(O2_index),
+        lambda n_other: n_other,
+        lambda n_other: allocate_to_O2(n_other, remaining_b, formula_matrix, O2_index.astype(int)),
+        n_other,
+    )
 
     # Apply fallback logic to non-condensate species.
     # If a species is unconstrained by any available element or constrained to zero moles, fallback
@@ -202,6 +251,9 @@ def get_log_activity_estimate(
         0.0,
     )
     # jax.debug.print("log_activity = {out}", out=log_activity)
+
+    # activity: Float[Array, "... n_species"] = jnp.exp(log_activity)
+    # jax.debug.print("activity = {out}", out=activity)
 
     return log_activity
 
