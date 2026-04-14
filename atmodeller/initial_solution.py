@@ -15,7 +15,7 @@ from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import Parameters
 
 LOG_TRACE_VALUE: float = -20.0
-"""Small trace value (in log space) to assign to species that have a negligible element budget."""
+"""Small trace value (in log space) to assign to species that have a negligible element budget"""
 
 
 def max_moles_by_limiting_element(
@@ -255,58 +255,22 @@ def get_stability_signal(
 
 
 def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_species"]:
-    r"""Generates an initial solution vector from element mass constraints and activity constraints.
+    """Generates an initial guess for the solution vector.
 
-    **Pre-screen — iterative condensate stability prediction:** Starting from a gas-only element
-    distribution, the pre-screen iteratively grows the set of predicted-stable condensates using
-    :func:`jax.lax.while_loop` until the set stops changing. Each iteration:
-
-    1. Allocates element budget to currently-predicted-stable condensates (limiting-reagent).
-    2. Distributes the remaining budget to non-condensate species.
-    3. Computes ideal-gas activities from those non-condensate mole estimates.
-    4. Evaluates ``stability_matrix[r,c] * (log_Kp[r] - log_Q[r]) > 0`` for each reaction and
-       condensate species ``c``; a positive signal means the reaction is driven toward condensate
-       formation given the current gas activities.
-    5. Takes the monotone union of the new predictions with the current set (condensates already
-       predicted stable are never retracted).
-
-    This catches cascading condensation that a single-pass screen misses. Because the returned mask
-    is the monotone union of the input and new predictions (condensates are never retracted), the
-    set can grow by at least one entry per iteration and convergence to a fixed point is guaranteed
-    in at most ``n_condensates`` iterations.
-
-    **Step 1 — predicted-stable condensates (first priority):** Only condensates identified as
-    supersaturated in the pre-screen are allocated element budget. This keeps more element budget
-    available for the gas-phase species.
-
-    **Step 2 — gas species:** Each element's *remaining* budget (after condensate consumption) is
-    distributed across non-condensate species by the same limiting-reagent logic. Species whose
-    element budget is fully consumed by condensates fall back to the geometric mean of all
-    finite species estimates in the system.
-
-    **Step 3 — Fugacity-constrained gas species:** The total moles of mass-constrained gas species
-    (from step 2) are used to estimate the gas volume via the ideal gas law. The pressure is
-    estimated from the gas mass of those species via
-    :meth:`~atmodeller.interfaces.ThermodynamicStateProtocol.get_pressure`. Fugacity-constrained
-    gas species (e.g. O2 set by a redox buffer) are then assigned mole counts via
-    :math:`n_i = f_i \cdot n_\mathrm{gas,known} / P`.
-
-    # TODO: Below might actually depend on tau?
-    Log stability is initialized to a strongly negative value (``-60``) for predicted-stable
-    condensates and to :const:`~atmodeller.constants.INITIAL_LOG_STABILITY` for all other species.
-
-    # TODO: Not necessarily now, should allow also natural broadcasting of the input parameters.
-    Intended to be called inside a vmapped context (one batch element at a time).
-
-    Note:
-        This function must support native broadcasting to be compatible with output routines.
-        However, in the batch solver, the engine applies vmap to this function.
+    The algorithm:
+      - Iteratively predicts stable condensates by allocating element budgets and evaluating
+        stability signals until convergence.
+      - Allocates element budgets to predicted-stable condensates first, then distributes the
+        remainder to other species.
+      - Handles fugacity constraints for gas species if present.
+      - Initializes log stability for predicted-stable condensates and uses a default value for
+        others.
 
     Args:
-        parameters: Parameters for a single batch element
+        parameters: Parameters for a single batch element.
 
     Returns:
-        Concatenated ``[log_number_moles, log_stability]`` of length ``2 * n_species``
+        Concatenated array of [log_number_moles, log_stability]
     """
     condensate_mask: Bool[Array, " n_species"] = jnp.asarray(
         parameters.reaction_system.phase_system.condensates_species_mask
