@@ -42,7 +42,7 @@ class RedoxBuffer(eqx.Module):
         """Converts the pressure units
 
         Args:
-            pressure: Pressure in bar
+            pressure: Pressure (bar)
 
         Returns:
             Pressure in units appropriate for the calculation
@@ -53,8 +53,8 @@ class RedoxBuffer(eqx.Module):
         """Gets the log10 fugacity at the buffer
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity at the buffer
@@ -72,7 +72,7 @@ class RedoxBuffer(eqx.Module):
         """Gets the scaled pressure.
 
         Args:
-            pressure: Pressure in bar
+            pressure: Pressure (bar)
 
         Returns:
             Pressure in units appropriate for the calculation
@@ -86,27 +86,26 @@ class RedoxBuffer(eqx.Module):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity
         """
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
-    # TODO: Can remove or map from log_activity
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log fugacity
         """
         broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
-            jnp.shape(temperature), jnp.shape(pressure)
+            jnp.shape(self.log10_shift), jnp.shape(temperature), jnp.shape(pressure)
         )
         log_fugacity = jnp.log(10) * self.log10_fugacity(temperature, pressure)
 
@@ -116,18 +115,13 @@ class RedoxBuffer(eqx.Module):
         """Gets the log activity, which is the same as the log fugacity for a redox buffer
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log fugacity
         """
-        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
-            jnp.shape(temperature), jnp.shape(pressure)
-        )
-        log_fugacity = jnp.log(10) * self.log10_fugacity(temperature, pressure)
-
-        return jnp.broadcast_to(log_fugacity, broadcast_shape)
+        return self.log_fugacity(temperature, pressure)
 
 
 class IronWustiteBufferHirschmann08(RedoxBuffer):
@@ -159,8 +153,8 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity
@@ -260,7 +254,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Evaluates the fO2
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
             pressure: Pressure in GPa
             coefficients: Coefficients
 
@@ -280,7 +274,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """log10fO2 for fcc and bcc iron
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
             pressure: Pressure in GPa
 
         Return:
@@ -296,7 +290,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """log10fO2 for hcp iron
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
             pressure: Pressure in GPa
 
         Return:
@@ -312,7 +306,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Check to use hcp iron formulation for fO2
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
             pressure: Pressure in GPa
 
         Returns:
@@ -329,8 +323,8 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Gets the log10 fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity
@@ -389,7 +383,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """Check to use the low temperature buffer for fO2
 
         Args:
-            temperature: Temperature in K
+            temperature: Temperature (K)
 
         Returns:
             True/False whether to use the low temperature formulation
@@ -402,8 +396,8 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """Gets the log10 fugacity at the buffer
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature (K)
+            pressure: Pressure (bar)
 
         Returns:
             Log10 fugacity at the buffer
