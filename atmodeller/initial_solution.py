@@ -168,10 +168,10 @@ def allocate_element_budget(
             parameters.element_names.index("O") if "O" in parameters.element_names else -1
         )
         # Compute how much O is left
-        O_remaining: Float[Array, "... 1"] = remaining_b[..., O_index]
+        O_remaining: Float[Array, "..."] = remaining_b[..., O_index]
         # Get stoichiometry of O in O2 (should be 2)
         O2_stoich: Float[Array, ""] = formula_matrix[O_index, O2_index_int]
-        n_O2: Float[Array, "... 1"] = O_remaining / O2_stoich
+        n_O2: Float[Array, "..."] = O_remaining / O2_stoich
         # Set the O2 entry in n_other
         n_other = n_other.at[..., O2_index_int].set(n_O2)
 
@@ -417,14 +417,22 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
 
     # Fugacity-constrained gas species
     log_n_gas_known_total: Float[Array, "..."] = logsumexp(
-        jnp.where(gas_no_imposed_fugacity, log_number_moles, -jnp.inf),
-        axis=-1,
+        jnp.where(gas_no_imposed_fugacity, log_number_moles, -jnp.inf), axis=-1, keepdims=True
     )
+    # jax.debug.print("log_n_gas_known_total = {out}", out=log_n_gas_known_total)
+
     pressure: Float[Array, "..."] = parameters.state.get_pressure(log_number_moles)
+    # jax.debug.print("pressure = {out}", out=pressure)
+
+    # Pressure must be 1-D
     log_fug: Float[Array, "... n_species"] = parameters.activity_constraints.log_activity(
         temperature, pressure
     )
-    log_n_fug: Float[Array, "... n_species"] = log_fug + log_n_gas_known_total - jnp.log(pressure)
+    # jax.debug.print("log_fug = {out}", out=log_fug)
+
+    log_n_fug: Float[Array, "... n_species"] = (
+        log_fug + log_n_gas_known_total - jnp.log(pressure)[..., None]
+    )
     # jax.debug.print("log_n_fug = {out}", out=log_n_fug)
 
     log_number_moles = jnp.where(
