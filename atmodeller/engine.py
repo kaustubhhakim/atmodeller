@@ -71,7 +71,7 @@ def get_active_mask(parameters: Parameters) -> Bool[Array, " dim"]:
 
 def get_min_log_elemental_abundance_per_species(
     parameters: Parameters,
-) -> Float[Array, "... species"]:
+) -> Float[Array, "... n_species"]:
     """Gets the elemental mass constraint with the lowest abundance for each species.
 
     Note:
@@ -85,27 +85,31 @@ def get_min_log_elemental_abundance_per_species(
     Returns:
         A vector of the minimum log elemental abundance for each species
     """
-    formula_matrix: Integer[Array, "elements species"] = jnp.asarray(
+    formula_matrix: Integer[Array, "n_elements n_species"] = jnp.asarray(
         parameters.reaction_system.formula_matrix
     )
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
-    mask: Bool[Array, "elements species"] = formula_matrix != 0
+    mask: Bool[Array, "n_elements n_species"] = formula_matrix != 0
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
-    log_abundance: Float[Array, "... elements"] = jnp.log(parameters.mass_constraints.abundance())
+    log_abundance: Float[Array, "... n_elements"] = jnp.log(
+        parameters.mass_constraints.abundance()
+    )
     # jax.debug.print("log_abundance (engine) = {out}", out=log_abundance)
 
     # Mask log_abundance to nan where element is absent from species, then take min over elements
     # formula_matrix != 0 has shape (elements, species); log_abundance[..., :, None] broadcasts
-    # over batch dims and species to give (... elements species)
-    masked_abundance: Float[Array, "... elements species"] = jnp.where(
+    # over batch dims and species to give (... n_n_elements n_species)
+    masked_abundance: Float[Array, "... n_elements n_species"] = jnp.where(
         mask, log_abundance[..., :, None], jnp.nan
     )
     # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
 
     # Find the minimum log abundance per species
-    min_abundance_per_species: Float[Array, "... species"] = jnp.nanmin(masked_abundance, axis=-2)
+    min_abundance_per_species: Float[Array, "... n_species"] = jnp.nanmin(
+        masked_abundance, axis=-2
+    )
     # jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
 
     return min_abundance_per_species
@@ -127,7 +131,7 @@ def get_log_activity(
     temperature: FloatArray = parameters.state.temperature
     total_pressure: FloatArray = parameters.state.get_pressure(log_number_moles)
 
-    log_activity: Float[Array, "... species"] = parameters.reaction_system.get_log_activity(
+    log_activity: Float[Array, "... n_species"] = parameters.reaction_system.get_log_activity(
         log_number_moles, temperature, total_pressure
     )
 
@@ -165,11 +169,11 @@ def objective_function(
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
     total_pressure: FloatArray = parameters.state.get_pressure(log_number_moles)
 
-    log_activity: Float[Array, "... species"] = get_log_activity(parameters, solution)
+    log_activity: Float[Array, "... n_species"] = get_log_activity(parameters, solution)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Activity constraints residual (dimensionless)
-    activity_residual: Float[Array, "... species"] = (
+    activity_residual: Float[Array, "... n_species"] = (
         log_activity - parameters.activity_constraints.log_activity(temperature, total_pressure)
     )
     # jax.debug.print("activity_residual = {out}", out=activity_residual)
@@ -201,19 +205,19 @@ def objective_function(
     # )
 
     # Elemental mass balance residual
-    log_element_moles_total: Float[Array, "... elements"] = (
+    log_element_moles_total: Float[Array, "... n_elements"] = (
         parameters.reaction_system.get_log_element_moles(log_number_moles)
     )
     # jax.debug.print("log_element_moles_total = {out}", out=log_element_moles_total)
 
-    log_target_moles: Float[Array, "... elements"] = jnp.log(
+    log_target_moles: Float[Array, "... n_elements"] = jnp.log(
         parameters.mass_constraints.abundance()
     )
     # jax.debug.print("log_target_moles = {out}", out=log_target_moles)
 
     # Dimensionless (ratio error - 1)
     # More robust than log residual for poor initial guesses, which are often the case.
-    mass_residual: Float[Array, "... elements"] = (
+    mass_residual: Float[Array, "... n_elements"] = (
         safe_exp(log_element_moles_total - log_target_moles) - 1
     )
     # Log residual converges fast when near the solution, but can be very large and unstable for
@@ -235,13 +239,13 @@ def objective_function(
     # Stability residual
     log_tau: FloatArray = jnp.log(parameters.solver_parameters.tau)
     # jax.debug.print("log_tau = {out}", out=log_tau)
-    log_min_number_moles: Float[Array, "... species"] = (
+    log_min_number_moles: Float[Array, "... n_species"] = (
         get_min_log_elemental_abundance_per_species(parameters) + log_tau
     )
     # jax.debug.print("log_min_number_moles = {out}", out=log_min_number_moles)
 
     # Dimensionless (log-ratio)
-    stability_residual: Float[Array, "... species"] = (
+    stability_residual: Float[Array, "... n_species"] = (
         log_number_moles + log_stability - log_min_number_moles
     )
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
