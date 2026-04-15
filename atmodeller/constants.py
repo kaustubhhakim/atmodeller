@@ -32,18 +32,6 @@ while keeping the floor large enough to avoid excessive solver stiffness in unde
 regimes.
 """
 
-# Initial solution guess
-INITIAL_LOG_NUMBER_MOLES: float = 45.0
-"""Initial log number of moles
-
-Empirically determined. This value is mid-range for Earth-like planets.
-"""
-INITIAL_LOG_STABILITY: float = -30.0
-"""Initial log stability
-
-Empirically determined
-"""
-
 # Lower and upper bounds on the hypercube which contains the root. These are somewhat empirically
 # calibrated to bound the expected values for typical models, but in principle could require
 # adjustment for edge cases.
