@@ -34,7 +34,7 @@ jnp.set_printoptions(precision=15)  # For better clarity in printed output
 # This prevents error_if from throwing an error when encountering nan or inf values. To actually
 # find the root cause of nan or inf values, you should set this to "raise" or "breakpoint" as per
 # https://docs.kidger.site/equinox/api/errors/
-os.environ["EQX_ON_ERROR"] = "nan"
+os.environ["EQX_ON_ERROR"] = "off"
 
 # Suppress warnings (notably from Equinox about static JAX arrays)
 # if not sys.warnoptions:
