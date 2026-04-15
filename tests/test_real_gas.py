@@ -30,7 +30,7 @@ from atmodeller.state import BaseThermodynamicState, Planet
 from atmodeller.thermodata import IronWustiteBuffer
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""

@@ -4,12 +4,14 @@
 
 """Tests for C-H-O systems with stable or unstable condensates"""
 
+import logging
 from typing import Any
 
 import numpy as np
 import pytest
 from jaxtyping import ArrayLike
 
+from atmodeller import debug_logger
 from atmodeller.classes import EquilibriumModel
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import ActivityConstraintProtocol
@@ -19,6 +21,9 @@ from atmodeller.phases import PurePhase
 from atmodeller.sci_utils import earth
 from atmodeller.state import BaseThermodynamicState, Planet, ThermodynamicState
 from atmodeller.thermodata import IronWustiteBuffer
+
+logger: logging.Logger = debug_logger()
+logger.setLevel(logging.DEBUG)
 
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
