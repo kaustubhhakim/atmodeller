@@ -93,7 +93,6 @@ def solve_single_with_auto_guess(
         lambda ig: ig,
         operand=initial_guess,
     )
-    # jax.debug.print("initial_guess = {out}", out=initial_guess)
 
     sol: optx.Solution = optx.root_find(
         objective_function,
@@ -105,20 +104,6 @@ def solve_single_with_auto_guess(
         options=parameters.solver_parameters.get_options(parameters.species.number_species),
     )
     # jax.debug.print("solution = {out}", out=sol.value)
-
-    # TODO: Add to output calculation
-    # n: int = parameters.species.number_species
-    # solution_moles: Float[Array, " n_species"] = sol.value[:n]
-    # solution_stability: Float[Array, " n_species"] = sol.value[n:]
-    # rms_moles: Float[Array, ""] = jnp.sqrt(jnp.mean((initial_guess[:n] - solution_moles) ** 2))
-    # rms_stability: Float[Array, ""] = jnp.sqrt(
-    #     jnp.mean((initial_guess[n:] - solution_stability) ** 2)
-    # )
-    # jax.debug.print(
-    #     "RMS log number of moles: = {moles:.4f}, log stability = {stability:.4f}",
-    #     moles=rms_moles,
-    #     stability=rms_stability,
-    # )
 
     return sol
 
