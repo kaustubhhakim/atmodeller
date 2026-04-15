@@ -160,6 +160,8 @@ def objective_function(
         Residual vector over active constraints.
     """
     # jax.debug.print("Starting new objective_function evaluation")
+    # jax.debug.print("solution = {out}", out=solution)
+
     temperature: FloatArray = parameters.state.temperature
 
     log_number_moles, log_stability = jnp.split(solution, 2, axis=-1)
