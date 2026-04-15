@@ -14,7 +14,6 @@ from collections.abc import Mapping
 from typing import Callable
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -118,11 +117,11 @@ def value_update_workflow() -> Callable[[EquilibriumModel], bool]:
 
         # First call to the solver. This should trigger compilation.
         initial_output: Output = call_solver(model, prev_solution)
-        jax.debug.print("First call to solver complete.")
+        # jax.debug.print("First call to solver complete.")
 
         # Second call with same model structure should not retrace.
         warm_start_output: Output = call_solver(model, initial_output.solution)
-        jax.debug.print("Second call to solver complete.")
+        # jax.debug.print("Second call to solver complete.")
 
         # Update constraints and call the solver again. This should NOT trigger recompilation
         # because the pytree structure is unchanged, even though the values are
@@ -131,7 +130,7 @@ def value_update_workflow() -> Callable[[EquilibriumModel], bool]:
             mass_constraints={"H": model.parameters.mass_constraints.abundance_dict["H"] * 2}
         )
         mass_updated_output: Output = call_solver(model, warm_start_output.solution)
-        jax.debug.print("Third call to solver complete.")
+        # jax.debug.print("Third call to solver complete.")
 
         # Replace oxygen mass constraint with a fugacity-style activity constraint.
         # This still should not retrace because only values change.
@@ -139,12 +138,12 @@ def value_update_workflow() -> Callable[[EquilibriumModel], bool]:
             mass_constraints={"O": jnp.nan}, activity_constraints={"O2_g": IronWustiteBuffer(1.0)}
         )
         activity_updated_output: Output = call_solver(model, mass_updated_output.solution)
-        jax.debug.print("Fourth call to solver complete.")
+        # jax.debug.print("Fourth call to solver complete.")
 
         # Update scalar planetary state values; structure remains unchanged.
         model = model.update_state(surface_radius=earth.radius * 2, mantle_melt_fraction=0.5)
         _ = call_solver(model, activity_updated_output.solution)
-        jax.debug.print("Fifth call to solver complete.")
+        # jax.debug.print("Fifth call to solver complete.")
 
         return True
 
