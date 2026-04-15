@@ -23,7 +23,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax.tree_util import tree_map
-from jaxtyping import Array, ArrayLike, Float, PyTree
+from jaxtyping import Array, ArrayLike, Bool, Float, PyTree
 
 from atmodeller import override
 from atmodeller.containers import MultiAttemptSolution
@@ -256,18 +256,45 @@ class BaseOutputDict(eqx.Module):
         """Gets the automatic initial guess for the solver.
 
         Returns:
-            Dictionary mapping species names and their stability keys to arrays of values
+            Dictionary mapping species names and their stability keys to arrays of values,
+            plus global MAE and RMSE metrics for the log error for active solution quantities.
         """
+        out = self._solution_array_to_dict(self.solution, suffix="_solution")
+
         guess: Float[Array, "#n_batch twice_species"] = jnp.atleast_2d(
             auto_initial_guess(self.parameters)
         )
-        log_error: Float[Array, "#n_batch twice_species"] = jnp.abs(guess - self.solution)
-
-        # For convenient direct visual comparison, combine the solution, initial guess, and error
-        # into a single dictionary with appropriate suffixes.
-        out = self._solution_array_to_dict(self.solution, suffix="_solution")
         out.update(self._solution_array_to_dict(guess, suffix="_guess"))
-        out.update(self._solution_array_to_dict(log_error, suffix="_log_error"))
+
+        # Compute error metrics for active solution quantities
+        guess_log_number_moles, guess_log_stability = jnp.split(guess, 2, axis=-1)
+        diff_log_number_moles: Float[Array, "... n_species"] = (
+            guess_log_number_moles - self.log_number_moles
+        )
+        diff_log_stability: Float[Array, "... n_species"] = (
+            guess_log_stability - self.log_stability
+        )
+
+        # Mask inactive stabilities
+        active_stability: Bool[Array, " n_species"] = self.parameters.species.active_stability
+        diff_log_stability_masked: Float[Array, "... n_species"] = jnp.where(
+            active_stability, diff_log_stability, jnp.nan
+        )
+
+        # Stack differences column-wise: [log_number_moles | log_stability]
+        diff_log: Float[Array, "... twice_species"] = jnp.concatenate(
+            [diff_log_number_moles, diff_log_stability_masked], axis=-1
+        )
+        diff_log = jnp.abs(diff_log)
+        # jax.debug.print("diff_log = {out}", out=diff_log)
+
+        # Compute MAE and RMSE per batch (ignore NaNs, which are inactive solution quantities)
+        mae: Float[Array, "#n_batch"] = jnp.nanmean(diff_log, axis=-1)
+        rmse: Float[Array, "#n_batch"] = jnp.sqrt(jnp.nanmean(diff_log**2, axis=-1))
+
+        out.update(self._solution_array_to_dict(diff_log, suffix="_log_error"))
+        out["log_error_mae"] = mae
+        out["log_error_rmse"] = rmse
 
         return out
 
