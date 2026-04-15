@@ -293,7 +293,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         )
 
     @property
-    def active_stability(self) -> Bool[Array, "..."]:
+    def active_stability(self) -> Bool[Array, " n_species"]:
         """Active stability mask"""
         return jnp.array([species.solve_for_stability for species in self], dtype=bool)
 
@@ -310,7 +310,7 @@ class SpeciesCollection(eqx.Module, Generic[TSpecies_co]):
         return np.array(element_molar_masses, dtype=float)
 
     @property
-    def molar_masses(self) -> Float[Array, " species"]:
+    def molar_masses(self) -> Float[Array, " n_species"]:
         """Molar masses for all species in the collection"""
         return jnp.array([species_.data.molar_mass for species_ in self], dtype=float)
 
