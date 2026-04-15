@@ -104,7 +104,7 @@ class FixedActivityConstraint(eqx.Module):
 class ActivityConstraintSet(eqx.Module):
     """Activity/fugacity constraints applied to species in the system
 
-    Prefer constructing this object once outside ``jit`` and applying :meth:`update` inside
+    Prefer constructing this object once outside :func:`jax.jit` and applying :meth:`update` inside
     workflows.
 
     Args:
@@ -173,6 +173,14 @@ class ActivityConstraintSet(eqx.Module):
     ) -> Float[Array, "... species"]:
         """Log activity
 
+        Note:
+            This method is designed to be fully compatible with both :func:`jax.vmap` and explicit
+            batched input. It supports broadcasting of ``temperature`` and ``pressure`` to match
+            the batch size, as required by output routines that call
+            :func:`atmodeller.initial_solution.auto_initial_guess` with batched input outside of
+            :func:`jax.vmap`, while also working with per-instance vectorization as used by the
+            engine and solver.
+
         Args:
             temperature: Temperature (K)
             pressure: Pressure (bar)
@@ -180,13 +188,34 @@ class ActivityConstraintSet(eqx.Module):
         Returns:
             Log activity (dimensionless) or log fugacity referenced to 1 bar for gaseous species
         """
+        # Compute the broadcast shape for all constraints, temperature, and pressure
+        arrays: list[Array] = [constraint.active() for constraint in self.ordered_constraints]
+        temp_shape: tuple[int, ...] = jnp.shape(temperature)
+        pres_shape: tuple[int, ...] = jnp.shape(pressure)
+        broadcast_shape: tuple[int, ...] = jnp.broadcast_shapes(
+            *[arr.shape for arr in arrays], temp_shape, pres_shape
+        )
+        # jax.debug.print("broadcast_shape = {out}", out=broadcast_shape)
+
+        def make_broadcasting_log_activity(log_activity_func: Callable) -> Callable:
+            """Wrapper to ensure output is shape consistent for :func:`jax.lax.switch`"""
+
+            def wrapped_log_activity(temperature: ArrayLike, pressure: ArrayLike) -> Array:
+                out = log_activity_func(temperature, pressure)
+                return jnp.broadcast_to(out, broadcast_shape)
+
+            return wrapped_log_activity
+
         activity_funcs: list[Callable] = [
-            to_hashable(constraint.log_activity) for constraint in self.ordered_constraints
+            to_hashable(make_broadcasting_log_activity(constraint.log_activity))
+            for constraint in self.ordered_constraints
         ]
         # jax.debug.print("activity_funcs = {out}", out=activity_funcs)
 
+        # TODO: this is likely legacy code, but in case something imminently breaks it is kept here
+        # for now - DJB, 15/04/2026.
         # Temperature must be a float array to ensure branches have identical types
-        temperature = as_j64(temperature)
+        # temperature = as_j64(temperature)
 
         def apply_activity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
