@@ -2,14 +2,21 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Initial solution estimation"""
+"""Initial solution estimation
+
+All functions in this module are designed to be compatible with both :func:`jax.vmap`, as used by
+the engine and solver routines, and with explicit batched input arrays, as used by output routines.
+This means that each function should correctly handle both single-instance and batched input,
+broadcasting and returning outputs with shapes consistent with the input batch dimensions. This
+ensures seamless integration with both vectorized and batch-processing workflows throughout the
+codebase.
+"""
 
 import jax.numpy as jnp
 from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Bool, Float, Integer
 
-from atmodeller.constants import INITIAL_LOG_STABILITY
 from atmodeller.engine import get_min_log_elemental_abundance_per_species
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import Parameters
@@ -64,7 +71,10 @@ def max_moles_by_limiting_element(
     max_moles_by_limiting_element: Float[Array, "... n_species"] = jnp.nanmin(implied, axis=-2)
     # jax.debug.print("max_moles_by_limiting_element = {out}", out=max_moles_by_limiting_element)
 
-    return max_moles_by_limiting_element
+    # An extra dimension was introduced to ensure correct broadcasting for both 1-D and 2-D
+    # (batched) cases, but we can now squeeze it back out for the single-case scenario to be
+    # consistent with the shape of the elemental abundance input.
+    return jnp.squeeze(max_moles_by_limiting_element)
 
 
 def allocate_element_budget(
@@ -183,6 +193,7 @@ def allocate_element_budget(
         lambda n_other: allocate_to_O2(n_other, remaining_b, formula_matrix, O2_index.astype(int)),
         n_other,
     )
+    # jax.debug.print("n_other after O2 allocation = {out}", out=n_other)
 
     # Apply fallback logic to non-condensate species.
     # If a species is unconstrained by any available element or constrained to zero moles, fallback
@@ -260,7 +271,7 @@ def get_log_activity_estimate(
 
 def get_stability_signal(
     parameters: Parameters, species_abundance: Float[Array, "... n_species"]
-) -> Float[Array, "... n_species"]:
+) -> Float[Array, "... n_reactions n_species"]:
     """Computes the stability signal for each reaction and condensate species.
 
     The stability signal is defined as sm[r,c] * (log_Kp[r] - log_Q[r]), where sm is the
@@ -365,12 +376,15 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
         _, n_other = allocate_element_budget(
             parameters, element_abundance, condensate_stable_known
         )
+        # jax.debug.print("n_other in stability pass = {out}", out=n_other)
         stability_signal: Float[Array, "... n_reactions n_species"] = get_stability_signal(
             parameters, n_other
         )
+        # jax.debug.print("stability_signal in stability pass = {out}", out=stability_signal)
         new_predictions: Bool[Array, "... n_species"] = (
             jnp.any(stability_signal > 0, axis=-2) & condensate_mask
         )
+        # jax.debug.print("new_predictions in stability pass = {out}", out=new_predictions)
         # jax.debug.print("new_predictions = {out}", out=new_predictions)
 
         # Monotone union: condensates are never retracted once predicted stable. This ensures the
@@ -389,6 +403,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
     init_stable_broadcasted: Bool[Array, "... n_species"] = jnp.broadcast_to(
         init_stable, first_stable.shape
     )
+    # jax.debug.print("init_stable_broadcasted = {out}", out=init_stable_broadcasted)
 
     def _cond_fn(carry: tuple) -> Bool[Array, "..."]:
         prev, curr, i = carry
@@ -424,12 +439,13 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
     pressure: Float[Array, "..."] = parameters.state.get_pressure(log_number_moles)
     # jax.debug.print("pressure = {out}", out=pressure)
 
-    # Pressure must be 1-D
+    # Pressure must be 1-D in this function
     log_fug: Float[Array, "... n_species"] = parameters.activity_constraints.log_activity(
         temperature, pressure
     )
     # jax.debug.print("log_fug = {out}", out=log_fug)
 
+    # Pressure must be a column vector
     log_n_fug: Float[Array, "... n_species"] = (
         log_fug + log_n_gas_known_total - jnp.log(pressure)[..., None]
     )
@@ -443,26 +459,24 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
     # Log stability for predicted-stable condensates: initialize at the value that makes the
     # stability residual (log_n + log_s - (min_log_abundance + log_tau)) exactly zero given the
     # current mole estimate. This automatically scales with tau so no magic constant is needed.
-    # Falls back to INITIAL_LOG_STABILITY where the expression is non-finite (e.g. zero-budget
-    # elements, though those species should not be predicted stable anyway).
     log_tau_val: Float[Array, ""] = jnp.log(parameters.solver_parameters.tau)
     min_log_abundance_per_species: Float[Array, "... n_species"] = (
         get_min_log_elemental_abundance_per_species(parameters)
     )
-    log_stability_stable: Float[Array, "... n_species"] = (
+    log_stability: Float[Array, "... n_species"] = (
         min_log_abundance_per_species + log_tau_val - log_number_moles
     )
-    log_stability: Float[Array, "... n_species"] = jnp.where(
-        condensate_stable_predicted & jnp.isfinite(log_stability_stable),
-        log_stability_stable,
-        jnp.full_like(log_number_moles, INITIAL_LOG_STABILITY),
+    # jax.debug.print("log_stability_stable = {out}", out=log_stability)
+
+    # For imposed activity, min_log_abundance_per_species may be NaN due to no imposed elemental
+    # mass constraint. However, if activity is imposed then stability is not relevant (not used by
+    # the solver), and stability should just fall back to a non-NaN value. Nevertheless, for
+    # physical realism we set the stability to the most stable limit.
+    log_stability = jnp.where(active_activity_constraints, log_tau_val, log_stability)
+
+    result: Float[Array, "... twice_species"] = jnp.concatenate(
+        (log_number_moles, log_stability), axis=-1
     )
-
-    result = jnp.concatenate((log_number_moles, log_stability), axis=-1)
-
-    # TODO: Maybe clean this up, but must work for both vmapping and native broadcasting
-    # Only squeeze axis=0 if its size is 1 (single case), else return as-is (batched)
-    if result.shape[0] == 1:
-        return jnp.squeeze(result, axis=0)
+    # jax.debug.print("Initial guess (log_number_moles, log_stability) = {out}", out=result)
 
     return result
