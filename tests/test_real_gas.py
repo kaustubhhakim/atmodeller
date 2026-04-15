@@ -239,6 +239,8 @@ def test_chabrier_subNeptune_batch() -> None:
 
     output: Output = model.solve_with_default()
 
+    # output.to_excel(file_prefix="test_chabrier_subNeptune_batch", output_format="named_arrays")
+
     target: dict[str, Any] = {
         "gas": {
             "species": {
@@ -398,7 +400,7 @@ def test_subNeptune_melt_phase() -> None:
         },
     }
 
-    # output.to_excel(file_prefix="test_subNeptune_melt_phase")
+    # output.to_excel(file_prefix="test_subNeptune_melt_phase", output_format="named_arrays")
 
     # We can also dump a summary of the solver stats to the logger for debugging purposes
     output.solver_stats_to_logger()
