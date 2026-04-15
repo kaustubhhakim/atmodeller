@@ -9,7 +9,7 @@ from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Bool
+from jaxtyping import Array, ArrayLike, Bool, Float
 
 from atmodeller import override
 from atmodeller.jax_utils import Scalar, as_j64, to_native_floats
@@ -19,16 +19,16 @@ from atmodeller.sci_utils import ExperimentalCalibration, unit_conversion
 class RedoxBuffer(eqx.Module):
     """Redox buffer
 
-    This must adhere to ActivityConstraintProtocol
+    This must adhere to :class:`atmodeller.interfaces.ActivityConstraintProtocol`.
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
-            the total pressure will be used, but this can give rise to multiple solutions and
-            should be used with caution.
+        evaluation_pressure: Pressure (bar) to evaluate the buffer at. Defaults to 1 bar. If
+        ``None``, then the total pressure will be used, but this can give rise to multiple
+            solutions and should be used with caution.
     """
 
-    log10_shift: Array
+    log10_shift: Float[Array, "..."]
     """Log10 shift"""
     evaluation_pressure: Optional[Scalar]
     """Evaluation pressure"""
@@ -39,7 +39,7 @@ class RedoxBuffer(eqx.Module):
 
     @abstractmethod
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
-        """Converts the pressure units
+        """Converts the pressure units.
 
         Args:
             pressure: Pressure (bar)
@@ -50,7 +50,7 @@ class RedoxBuffer(eqx.Module):
 
     @abstractmethod
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Gets the log10 fugacity at the buffer
+        """Gets the log10 fugacity at the buffer.
 
         Args:
             temperature: Temperature (K)
@@ -83,7 +83,7 @@ class RedoxBuffer(eqx.Module):
             return self.convert_pressure_units(pressure)
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Gets the log10 fugacity
+        """Gets the log10 fugacity.
 
         Args:
             temperature: Temperature (K)
@@ -94,8 +94,14 @@ class RedoxBuffer(eqx.Module):
         """
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Gets the log fugacity
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, "..."]:
+        """Gets the log fugacity.
+
+        Note:
+            This method is designed to be fully compatible with both :func:`jax.vmap` and explicit
+            batched input. It supports broadcasting of ``temperature`` and ``pressure`` to match
+            the batch size, as required by output routines (called via :meth:`log_activity`), while
+            also working with per-instance vectorization as used by the engine and solver.
 
         Args:
             temperature: Temperature (K)
@@ -112,7 +118,7 @@ class RedoxBuffer(eqx.Module):
         return jnp.broadcast_to(log_fugacity, broadcast_shape)
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Gets the log activity, which is the same as the log fugacity for a redox buffer
+        """Gets the log activity, which is the same as the log fugacity for a redox buffer.
 
         Args:
             temperature: Temperature (K)
@@ -131,9 +137,9 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
-            the total pressure will be used, but this can give rise to multiple solutions and
-            should be used with caution.
+        evaluation_pressure: Pressure (bar) to evaluate the buffer at. Defaults to 1 bar. If
+            ``None``, then the total pressure will be used, but this can give rise to multiple
+            solutions and should be used with caution.
     """
 
     calibration: ExperimentalCalibration
@@ -150,7 +156,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
 
     @override
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Gets the log10 fugacity
+        """Gets the log10 fugacity.
 
         Args:
             temperature: Temperature (K)
@@ -179,9 +185,9 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
-            the total pressure will be used, but this can give rise to multiple solutions and
-            should be used with caution.
+        evaluation_pressure: Pressure (bar) to evaluate the buffer at. Defaults to 1 bar. If
+            ``None``, then the total pressure will be used, but this can give rise to multiple
+            solutions and should be used with caution.
     """
 
     calibration: ExperimentalCalibration
@@ -349,9 +355,9 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
-            the total pressure will be used, but this can give rise to multiple solutions and
-            should be used with caution.
+        evaluation_pressure: Pressure (bar) to evaluate the buffer at. Defaults to 1 bar. If
+            ``None``, then the total pressure will be used, but this can give rise to multiple
+            solutions and should be used with caution.
     """
 
     calibration: ExperimentalCalibration
