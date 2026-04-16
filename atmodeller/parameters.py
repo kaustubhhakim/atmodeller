@@ -290,6 +290,10 @@ class MassConstraintSet(eqx.Module):
         mass_constraints: Dictionary mapping element or species names to mass/abundance arrays.
             Defaults to ``None``.
         units: Units of ``mass_constraints``. Defaults to ``mass``.
+        squeeze_input: Whether to squeeze input arrays to remove any singleton dimensions
+            since this class is designed to store per-element abundances as 1D arrays. This allows
+            users to input mass constraints direct from output dictionaries without having to
+            manually squeeze batch dimensions. Defaults to ``True``.
     """
 
     species: SpeciesCollection
@@ -302,6 +306,7 @@ class MassConstraintSet(eqx.Module):
         species: SpeciesCollection,
         mass_constraints: Optional[Mapping[str, ArrayLike]] = None,
         units: Literal["mass", "moles"] = "mass",
+        squeeze_input: bool = True,
     ):
         units = _validate_mass_units(units)
 
@@ -335,10 +340,15 @@ class MassConstraintSet(eqx.Module):
                         scale = element_composition.count
                     element_sum += scale * value_
 
+            element_sum = as_j64(element_sum)
+
+            if squeeze_input:
+                element_sum = jnp.squeeze(element_sum)
+
             # All elements must be included as keys in the abundance dictionary, even if they
             # are not present in any constraints. In the latter case, the abundance is set to
             # NaN to indicate that the constraint is inactive.
-            abundance_dict[element] = as_j64(element_sum) if has_constraint else as_j64(jnp.nan)
+            abundance_dict[element] = element_sum if has_constraint else as_j64(jnp.nan)
 
         self.species = species
         self.abundance_dict = abundance_dict
@@ -393,7 +403,10 @@ class MassConstraintSet(eqx.Module):
         return self.abundance_mol(batch_size) * self.species.element_molar_masses
 
     def update(
-        self, new_abundances: Mapping[str, ArrayLike], units: Literal["mass", "moles"] = "mass"
+        self,
+        new_abundances: Mapping[str, ArrayLike],
+        units: Literal["mass", "moles"] = "mass",
+        squeeze_input: bool = True,
     ) -> Self:
         """Updates the abundance constraints with new values from a dictionary.
 
@@ -411,6 +424,10 @@ class MassConstraintSet(eqx.Module):
                 abundances that are not included in the ``new_abundance`` dictionary will be
                 retained. Unknown element keys are ignored.
             units: Units of ``new_abundances``. Defaults to ``mass``.
+            squeeze_input: Whether to squeeze input arrays to remove any singleton dimensions
+                since this class is designed to store per-element abundances as 1D arrays. This
+                allows users to input mass constraints direct from output dictionaries without
+                having to manually squeeze batch dimensions. Defaults to ``True``.
 
         Returns:
             An instance with updated abundance constraints
@@ -432,6 +449,10 @@ class MassConstraintSet(eqx.Module):
                 value_array = value_array / element_molar_mass
             # Cast once at the end to ensure we match the original_value dtype after any arithmetic
             value_array = jnp.asarray(value_array, dtype=original_value.dtype)
+
+            if squeeze_input:
+                value_array = jnp.squeeze(value_array)
+
             abundance_dict[element] = jnp.broadcast_to(value_array, original_value.shape)
 
         mass_constraint_set_updated: MassConstraintSet = eqx.tree_at(
