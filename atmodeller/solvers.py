@@ -297,18 +297,25 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             new_result_value: Integer[Array, "..."] = new_sol.result._value  # pyright: ignore
             # jax.debug.print("new_result_value = {out}", out=new_result_value)
 
-            # If the solver result is broadcast from a scalar we can't use it to decide which
-            # individual models failed. Instead we must perform a per-system check.
-            new_successful: Bool[Array, "..."] = (
+            # Perform a per-system convergence check.
+            new_converged: Bool[Array, "..."] = (
                 max_norm(objective_fn, new_solution, parameters) < tolerance
             )
-            # jax.debug.print("new_successful = {out}", out=new_successful)
+            # jax.debug.print("new_converged = {out}", out=new_converged)
+
+            # Also get the status of the solver
+            new_solver_success: Bool[Array, "..."] = new_sol.solver_success
+            # jax.debug.print("new_solver_success = {out}", out=new_solver_success)
+
+            # Failback solution to initial guess for failed models
+            new_success: Bool[Array, "..."] = jnp.logical_and(new_converged, new_solver_success)
+            # jax.debug.print("new_success = {out}", out=new_success)
 
             new_num_steps: Integer[Array, "..."] = new_sol.stats["num_steps"]
             # jax.debug.print("new_num_steps = {out}", out=new_num_steps)
 
             # Determine which entries to update: previously failed, now succeeded
-            update_mask: Bool[Array, "..."] = jnp.logical_and(failed_mask, new_successful)
+            update_mask: Bool[Array, "..."] = jnp.logical_and(failed_mask, new_success)
             # jax.debug.print("update_mask = {out}", out=update_mask)
             updated_solution: Float[Array, "... solution"] = cast(
                 Array, jnp.where(update_mask[..., None], new_solution, solution)
@@ -388,6 +395,9 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
         )
         # jax.debug.print("first_converged = {out}", out=first_converged)
 
+        first_solver_success: Bool[Array, "..."] = first_sol.solver_success
+        # jax.debug.print("first_solver_success = {out}", out=first_solver_success)
+
         first_result_value: Integer[Array, "..."] = jnp.broadcast_to(
             first_sol.result._value, first_converged.shape
         )
@@ -399,11 +409,11 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
         # jax.debug.print("first_num_steps = {out}", out=first_num_steps)
 
         # Failback solution to initial guess for failed models
-        first_converged_bc: Bool[Array, "... 1"] = first_converged[..., None]
-        # jax.debug.print("first_converged_bc = {out}", out=first_converged_bc)
+        first_success: Bool[Array, "..."] = jnp.logical_and(first_converged, first_solver_success)
+        # jax.debug.print("first_success = {out}", out=first_success)
 
         solution: Float[Array, "... solution"] = cast(
-            Array, jnp.where(first_converged_bc, first_solution, initial_guess)
+            Array, jnp.where(first_success[..., None], first_solution, initial_guess)
         )
         # jax.debug.print("solution = {out}", out=solution)
         # jax.debug.print("Completed iteration: 1")
@@ -414,7 +424,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             solution,
             first_result_value,
             first_num_steps,
-            first_converged.astype(int),  # 1 for solved, otherwise 0
+            first_success.astype(int),  # 1 for solved, otherwise 0
         )
 
         _, _, final_solution, final_result_value, final_num_steps, final_attempt = lax.while_loop(

@@ -605,13 +605,19 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
         """Solver statistics from the underlying Optimistix solution"""
         return self.solution.stats
 
+    @property
+    def success(self) -> Bool[Array, " batch"]:
+        """Whether the solution is successful based on both convergence and solver success"""
+        return jnp.logical_and(self.converged, self.solver_success)
+
     def asdict(self) -> dict[str, ArrayLike]:
         """Converts pertinent solution statistics to a dictionary"""
         return {
-            "status": self.solver_success,
+            "solver_success": self.solver_success,
             "steps": self.num_steps,
             "attempts": self.attempts,
             "converged": self.converged,
+            "success": self.success,
         }
 
     def stats_to_logger(self) -> None:

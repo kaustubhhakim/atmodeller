@@ -256,10 +256,10 @@ class Output(eqx.Module):
         # analysis. Define a fill colour for highlighting rows (e.g., yellow)
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-        # Get the indices where the converged mask is False
-        unsuccessful_indices: NpArray = np.where(
-            ~np.asarray(self.multi_attempt_solution.converged)
-        )[0]
+        # Get the indices which agrees with both convergence post-check and solver success.
+        unsuccessful_indices: NpArray = np.where(~np.asarray(self.multi_attempt_solution.success))[
+            0
+        ]
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for df_name, df in out.items():
