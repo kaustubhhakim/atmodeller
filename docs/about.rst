@@ -6,7 +6,7 @@ About
 Citation
 --------
 
-If you use *Atmodeller*, or data from *Atmodeller*, please cite :cite:t:`BTT25`. An accompanying ArXiv preprint is available at `2507.00499 <https://arxiv.org/abs/2507.00499>`_. In addition, please consult the *Atmodeller* source code for citations related to specific components, such as solubility laws and real gas equations of state. Thermodynamic data are sourced from :cite:t:`MZG02`.
+If you use *Atmodeller*, or data from *Atmodeller*, please cite :cite:t:`BTH25`. An accompanying ArXiv preprint is available at `2507.00499 <https://arxiv.org/abs/2507.00499>`_. In addition, please consult the *Atmodeller* source code for citations related to specific components, such as solubility laws and real gas equations of state. Thermodynamic data are sourced from :cite:t:`MZG02`.
 
 Authors
 -------

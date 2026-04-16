@@ -9,6 +9,6 @@ Open-access links are provided where available.
 
 *Atmodeller* has been used in the following studies:
 
-1. :cite:t:`BTT25`
+1. :cite:t:`BTH25`
 2. :cite:t:`Cherubim2025`
 3. :cite:t:`Hakim2026`
