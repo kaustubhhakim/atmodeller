@@ -169,7 +169,13 @@ class EarthParameters(PlanetParameters):
 
 
 earth: EarthParameters = EarthParameters()
-
+"""Earth parameters"""
+trappist1e: PlanetParameters = PlanetParameters(
+    mass=0.6919722531398028 * earth.mass,
+    radius=0.9199497724062157 * earth.radius,
+    core_mass_fraction=earth.core_mass_fraction,
+)
+"""Parameters for TRAPPIST-1e based on :cite:t:`ADG21` and used by :cite:t:`BTH25`"""
 
 GAS_CONSTANT: float = constants.gas_constant
 r"""Gas constant (:math:`\mathrm{J}\mathrm{K}^{-1}\mathrm{mol}^{-1}`)"""
