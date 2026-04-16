@@ -701,6 +701,9 @@ def make_solver_with_jit_dual_path(parameters: Parameters) -> Callable:
     return eqx.filter_jit(dual_path_solver)
 
 
+# Useful for debugging to ensure that the solver is not being re-compiled unnecessarily during
+# development iterations
+# @eqx.debug.assert_max_traces(max_traces=5)
 def make_solver_with_jit_single_path(parameters: Parameters) -> Callable:
     """Gets a JIT-compiled solver with optimized compilation by eliminating unused branches.
 
