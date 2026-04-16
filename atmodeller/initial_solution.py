@@ -18,7 +18,7 @@ from jax import lax
 from jax.scipy.special import logsumexp
 from jaxtyping import Array, Bool, Float, Integer
 
-from atmodeller.engine import get_min_log_elemental_abundance_per_species
+from atmodeller.engine import compute_implied_log_stability
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import Parameters
 
@@ -457,25 +457,8 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
     )
     # jax.debug.print("log_number_moles after fugacity constraints = {out}", out=log_number_moles)
 
-    # Log stability. Initialize at the value that makes the stability residual
-    # (log_n + log_s - (min_log_abundance + log_tau)) exactly zero given the current mole
-    # estimates. This ensures that the complementarity conditions are all satisfied by the initial
-    # solution estimate.
-    log_tau_val: Float[Array, ""] = jnp.log(parameters.solver_parameters.tau)
-    min_log_abundance_per_species: Float[Array, "... n_species"] = (
-        get_min_log_elemental_abundance_per_species(parameters)
-    )
-    log_stability: Float[Array, "... n_species"] = (
-        min_log_abundance_per_species + log_tau_val - log_number_moles
-    )
-    # jax.debug.print("log_stability_stable = {out}", out=log_stability)
-
-    # min_log_abundance_per_species propagates NaNs if there is not an imposed elemental mass
-    # constraint for a species. This means that stability is not a solution quantity (not used by
-    # the solver), and therefore should fall back to an arbitrary non-NaN value. For consistency
-    # with the implied logic that the species must be stable (present in the system but no mass
-    # constraints), we assign the limit of a stable species, which is log_tau_val.
-    log_stability = jnp.where(jnp.isnan(log_stability), log_tau_val, log_stability)
+    log_stability = compute_implied_log_stability(parameters, log_number_moles)
+    # jax.debug.print("log_stability = {out}", out=log_stability
 
     result: Float[Array, "... twice_species"] = jnp.concatenate(
         (log_number_moles, log_stability), axis=-1

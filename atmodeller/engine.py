@@ -138,6 +138,44 @@ def get_log_activity(
     return log_activity
 
 
+def compute_implied_log_stability(
+    parameters: Parameters, log_number_moles: Float[Array, "... n_species"]
+) -> Float[Array, "... n_species"]:
+    """Computes the implied log stability of each species based on the log number of moles.
+
+    This function computes the implied log stability that would exactly satisfy the stability
+    constraint for the given log number of moles. This is useful for reconstructing the stability
+    value that would yield a zero stability residual.
+
+    Args:
+        parameters: Parameters
+        log_number_moles: Log number of moles for each species
+
+    Returns:
+        Implied log stability of each species
+    """
+    # Ensure the stability residual is exactly zero for the initial number of moles
+    log_tau_val: Float[Array, ""] = jnp.log(parameters.solver_parameters.tau)
+    min_log_abundance_per_species: Float[Array, "... n_species"] = (
+        get_min_log_elemental_abundance_per_species(parameters)
+    )
+    implied_log_stability: Float[Array, "... n_species"] = (
+        min_log_abundance_per_species + log_tau_val - log_number_moles
+    )
+
+    # min_log_abundance_per_species propagates NaNs if there is not an imposed elemental mass
+    # constraint for a species. This means that stability is not a solution quantity (not used by
+    # the solver), and therefore should fall back to an arbitrary non-NaN value. For consistency
+    # with the implied logic that the species must be stable (present in the system but no mass
+    # constraints), we assign the limit of a stable species, which is log_tau_val.
+    implied_log_stability = jnp.where(
+        jnp.isnan(implied_log_stability), log_tau_val, implied_log_stability
+    )
+    # jax.debug.print("implied_log_stability = {out}", out=implied_log_stability)
+
+    return implied_log_stability
+
+
 @eqx.filter_jit
 def objective_function(
     solution: Float[Array, "... twice_species"], parameters: Parameters

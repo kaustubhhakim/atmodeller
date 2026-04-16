@@ -56,7 +56,7 @@ from optimistix import Solution
 
 from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import MultiAttemptSolution
-from atmodeller.engine import objective_function
+from atmodeller.engine import compute_implied_log_stability, objective_function
 from atmodeller.initial_solution import auto_initial_guess
 from atmodeller.jax_utils import FloatArray, expand_mask, max_norm, vmap_axes_spec
 from atmodeller.output import Output
@@ -237,7 +237,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             # jax.debug.print("failed_mask = {out}", out=failed_mask)
 
             # Split solution into log_number_moles and log_stability
-            log_number_moles, log_stability = jnp.split(solution, 2, axis=-1)
+            log_number_moles, _ = jnp.split(solution, 2, axis=-1)
 
             # Perturbation for log number of moles
             key, subkey = random.split(key)
@@ -251,36 +251,15 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             )
             # jax.debug.print("perturbations = {out}", out=perturbations)
             new_log_number_moles: Float[Array, "... n_species"] = log_number_moles + perturbations
-
-            # Perturbation for stability
-            key, subkey = random.split(key)
-            log_tau: Float[Array, ""] = jnp.log(parameters.solver_parameters.tau)
-            perturb_shape = log_stability.shape
-
-            # The logic here is guided but ultimately arbitrary. The goal is to introduce some
-            # diversity in the log stability estimates while keeping them bounded and not too
-            # large. This heuristic algorithm maintains the original log stability with 25%
-            # probability, and otherwise, also with 25% probability, sets it to either 0.25, 0.5,
-            # or 0.75 times log_tau to explore the possible range of allowable stability values.
-            # The perturbation is only applied to active stability entries.
-            rand_vals = random.uniform(subkey, shape=perturb_shape, minval=0.0, maxval=1.0)
-            stability_new: Float[Array, "... n_species"] = jnp.select(
-                [rand_vals < 0.25, rand_vals < 0.5, rand_vals < 0.75],
-                [0.25 * log_tau, 0.5 * log_tau, 0.75 * log_tau],
-                default=log_stability,
+            # jax.debug.print("new_log_number_moles = {out}", out=new_log_number_moles)
+            new_log_stability: Float[Array, "... n_species"] = compute_implied_log_stability(
+                parameters, new_log_number_moles
             )
-            # Only update entries where stability is active
-            # jax.debug.print(
-            #    "active_stability = {out}", out=parameters.reaction_system.species.active_stability
-            # )
-            stability_new = jnp.where(
-                parameters.reaction_system.species.active_stability, stability_new, log_stability
-            )
-            # jax.debug.print("stability_new = {out}", out=stability_new)
+            # jax.debug.print("new_log_stability = {out}", out=new_log_stability)
 
             # Recombine
             new_initial_solution: Float[Array, "... twice_species"] = jnp.concatenate(
-                [new_log_number_moles, stability_new], axis=-1
+                [new_log_number_moles, new_log_stability], axis=-1
             )
             # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
