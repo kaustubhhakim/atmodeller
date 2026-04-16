@@ -17,6 +17,7 @@
         "notebook.source.organizeImports": "explicit"
     },
     "python.testing.pytestArgs": [
+        "-s",
         "tests"
     ],
     "python.testing.unittestEnabled": false,
