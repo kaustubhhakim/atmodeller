@@ -383,18 +383,3 @@ def max_norm(
         L-infinity norm
     """
     return jnp.linalg.norm(objective_function(solution, parameters), ord=jnp.inf, axis=-1)
-
-
-def expand_mask(
-    mask: Bool[Array, "..."], target: Float[Array, "... solution"]
-) -> Bool[Array, "..."]:
-    """Expands a batch mask to broadcast over trailing solution dimensions.
-
-    Args:
-        mask: Boolean array indicating entries to update
-        target: Array with shape ``(... solution)`` that the mask will be expanded to match
-
-    Returns:
-        Boolean array broadcastable to the shape of ``target``
-    """
-    return jnp.reshape(mask, mask.shape + (1,) * (target.ndim - mask.ndim))

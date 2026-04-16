@@ -54,11 +54,15 @@ from jax import lax, random
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
-from atmodeller.constants import TAU, TAU_MAX, TAU_NUM
+from atmodeller.constants import (
+    TAU,
+    TAU_MAX,
+    TAU_NUM,
+)
 from atmodeller.containers import MultiAttemptSolution
 from atmodeller.engine import compute_implied_log_stability, objective_function
-from atmodeller.initial_solution import auto_initial_guess
-from atmodeller.jax_utils import FloatArray, expand_mask, max_norm, vmap_axes_spec
+from atmodeller.initial_solution import generate_initial_guess
+from atmodeller.jax_utils import FloatArray, max_norm, vmap_axes_spec
 from atmodeller.output import Output
 from atmodeller.parameters import Parameters
 
@@ -69,31 +73,20 @@ POSTCHECK_TOLERANCE: float = 1.0e-6
 attempt"""
 
 
-def solve_single_with_auto_guess(
-    initial_guess: FloatArray, parameters: Parameters
-) -> optx.Solution:
-    """Solves a single (unbatched) system via :func:`optimistix.root_find`.
+def solve_single(initial_guess: FloatArray, parameters: Parameters) -> optx.Solution:
+    """Solves a single (unbatched) system using :func:`optimistix.root_find`.
 
     Intended to be wrapped with :func:`equinox.filter_vmap` by :func:`make_batch_solver`
     rather than called directly. All solver configuration is read from
     ``parameters.solver_parameters``.
 
     Args:
-        initial_guess: Initial guess for the solution vector. If any element is ``NaN``,
-            the initial guess is replaced by the auto-generated guess from
-            :func:`~atmodeller.initial_solution.auto_initial_guess`.
+        initial_guess: Initial guess for the solution vector
         parameters: Parameters providing the solver instance, step limit, and options
 
     Returns:
         :class:`optimistix.Solution` object
     """
-    initial_guess = lax.cond(
-        jnp.any(jnp.isnan(initial_guess)),
-        lambda _: auto_initial_guess(parameters),
-        lambda ig: ig,
-        operand=initial_guess,
-    )
-
     sol: optx.Solution = optx.root_find(
         objective_function,
         parameters.solver_parameters.get_solver_instance(),
@@ -111,19 +104,19 @@ def solve_single_with_auto_guess(
 def make_batch_solver(parameters: Parameters) -> Callable:
     """Gets a vmapped batch solver for independent systems.
 
-    Wraps :func:`solve_single_with_auto_guess` with :func:`equinox.filter_vmap` so that each batch
-    element is solved independently, producing per-element convergence statistics. The vmapping
-    axes are fixed from ``parameters`` at construction time.
+    Wraps :func:`solve_single` with :func:`equinox.filter_vmap` so that each batch element is
+    solved independently, producing per-element convergence statistics. The vmapping axes are
+    fixed from ``parameters`` at construction time.
 
     Args:
         parameters: Parameters used to derive the vmapping axes at construction time
 
     Returns:
-        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` with ``attempts=1``
+        Callable that returns a :class:`atmodeller.containers.MultiAttemptSolution` with
+        ``attempts=1``
     """
     solver_function_vmapped: Callable = eqx.filter_vmap(
-        solve_single_with_auto_guess,
-        in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters)),
+        solve_single, in_axes=(LOG_NUMBER_MOLES_VMAP_AXES, vmap_axes_spec(parameters))
     )
 
     def batch_single_pass_solver(
@@ -237,24 +230,48 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             # jax.debug.print("failed_mask = {out}", out=failed_mask)
 
             # Split solution into log_number_moles and log_stability
-            log_number_moles, _ = jnp.split(solution, 2, axis=-1)
+            log_number_moles, log_stability = jnp.split(solution, 2, axis=-1)
 
             # Perturbation for log number of moles
             key, subkey = random.split(key)
             perturb_shape: tuple[int, ...] = log_number_moles.shape
             raw_perturb = random.uniform(subkey, shape=perturb_shape, minval=-1.0, maxval=1.0)
             # jax.debug.print("raw_perturb = {out}", out=raw_perturb)
-            perturbations = jnp.where(
-                expand_mask(failed_mask, raw_perturb),
-                perturb_scale * raw_perturb,
-                jnp.zeros_like(log_number_moles),
+
+            # Compute a central tendency for perturbation:
+            # - In a batch, leverage the successful solves to find a central value for each species
+            #   (column), and perturb failed cases around this value. This assumes batch entries
+            #   are similar enough for the median to be a meaningful reference, which is often true
+            #   in practice.
+            # - For a single-species or single-case batch, this reduces to perturbing around the
+            #   only available value.
+            # - If all cases fail, the median will just be the original (failed) guess, so the
+            #   perturbation will still provide some diversity for the solver to escape poor
+            #   regions.
+
+            # Median for each species
+            central_value: Float[Array, "... n_species"] = jnp.median(
+                log_number_moles, axis=0, keepdims=True
             )
-            # jax.debug.print("perturbations = {out}", out=perturbations)
-            new_log_number_moles: Float[Array, "... n_species"] = log_number_moles + perturbations
+            # jax.debug.print("central_value = {out}", out=central_value)
+
+            # Perturb only the failed cases, keep successful cases unchanged
+            new_log_number_moles: Float[Array, "... n_species"] = cast(
+                Float[Array, "... n_species"],
+                jnp.where(
+                    failed_mask[..., None],
+                    perturb_scale * raw_perturb + central_value,
+                    log_number_moles,
+                ),
+            )
             # jax.debug.print("new_log_number_moles = {out}", out=new_log_number_moles)
+
+            # Re-compute log stability for the new perturbed guess for failed cases, keep unchanged
+            # for successful cases
             new_log_stability: Float[Array, "... n_species"] = compute_implied_log_stability(
                 parameters, new_log_number_moles
             )
+            new_log_stability = jnp.where(failed_mask[..., None], new_log_stability, log_stability)
             # jax.debug.print("new_log_stability = {out}", out=new_log_stability)
 
             # Recombine
@@ -284,7 +301,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             update_mask: Bool[Array, "..."] = jnp.logical_and(failed_mask, new_successful)
             # jax.debug.print("update_mask = {out}", out=update_mask)
             updated_solution: Float[Array, "... solution"] = cast(
-                Array, jnp.where(expand_mask(update_mask, new_solution), new_solution, solution)
+                Array, jnp.where(update_mask[..., None], new_solution, solution)
             )
             updated_result_value: Integer[Array, "..."] = jnp.where(
                 update_mask, new_result_value, result_value
@@ -372,7 +389,7 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
         # jax.debug.print("first_num_steps = {out}", out=first_num_steps)
 
         # Failback solution to initial guess for failed models
-        first_converged_bc: Bool[Array, "... 1"] = expand_mask(first_converged, first_solution)
+        first_converged_bc: Bool[Array, "... 1"] = first_converged[..., None]
         # jax.debug.print("first_converged_bc = {out}", out=first_converged_bc)
 
         solution: Float[Array, "... solution"] = cast(
@@ -648,6 +665,8 @@ def make_solver(parameters: Parameters) -> Callable:
         Returns:
             :class:`~atmodeller.output.Output` object
         """
+        base_solution_array = generate_initial_guess(parameters, base_solution_array)
+
         # Define the condition to check if active stability is enabled
         condition: Bool[Array, ""] = jnp.any(parameters.reaction_system.species.active_stability)
         # jax.debug.print("condition (active stability) = {out}", out=condition)
@@ -736,6 +755,7 @@ def make_solver_with_jit_single_path(parameters: Parameters) -> Callable:
     ) -> Output:
         """Tau sweep solver path for systems with active stability species."""
         _, subkey = jax.random.split(key)
+        base_solution_array = generate_initial_guess(parameters, base_solution_array)
         multi_sol = tau_sweep_solver(base_solution_array, parameters, subkey)
         return Output(parameters, multi_sol)
 
@@ -747,6 +767,7 @@ def make_solver_with_jit_single_path(parameters: Parameters) -> Callable:
     ) -> Output:
         """Generic batch retry solver path for systems without active stability."""
         _, subkey = jax.random.split(key)
+        base_solution_array = generate_initial_guess(parameters, base_solution_array)
         multi_sol = batch_retry_solver(
             base_solution_array,
             parameters,
@@ -790,6 +811,7 @@ def make_solver_with_jit_batch_only(parameters: Parameters) -> Callable:
         """Basic batch solver path without retry or tau-sweep enhancements."""
         # Note: key is unused in basic batch solver, but included for interface compatibility
         del key
+        base_solution_array = generate_initial_guess(parameters, base_solution_array)
         multi_sol = batch_solver(base_solution_array, parameters)
         return Output(parameters, multi_sol)
 

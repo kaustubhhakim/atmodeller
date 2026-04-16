@@ -318,8 +318,8 @@ def get_stability_signal(
     return stability_signal
 
 
-def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_species"]:
-    """Generates an initial guess for the solution vector.
+def generate_auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_species"]:
+    """Generates an automatic initial guess for the solution vector.
 
     The algorithm:
       - Iteratively predicts stable condensates by allocating element budgets and evaluating
@@ -331,7 +331,7 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
         others.
 
     Args:
-        parameters: Parameters for a single batch element.
+        parameters: Parameters for a single batch element
 
     Returns:
         Concatenated array of [log_number_moles, log_stability]
@@ -469,6 +469,39 @@ def auto_initial_guess(parameters: Parameters) -> Float[Array, "... twice_specie
         result,
         jnp.any(jnp.isnan(result)),
         "Initial guess contains NaNs, which will break the solver.",
+    )
+
+    return result
+
+
+def generate_initial_guess(
+    parameters: Parameters, initial_guess: Float[Array, "... twice_species"]
+) -> Float[Array, "... twice_species"]:
+    """Generates an initial guess for the solution vector.
+
+    This function checks the provided ``initial_guess`` for NaN values. If any NaNs are present for
+    a given batch element, an automatic initial guess is generated for that element using
+    :func:`generate_auto_initial_guess`.
+
+    Args:
+        parameters: Parameters
+
+    Returns:
+        Concatenated array of [log_number_moles, log_stability]
+    """
+    auto_initial_guess: Float[Array, "... twice_species"] = generate_auto_initial_guess(parameters)
+
+    # Mask: True for rows where any entry is NaN along the last axis
+    nan_mask: Bool[Array, " ... 1"] = jnp.any(jnp.isnan(initial_guess), axis=-1, keepdims=True)
+    # Select auto_initial_guess for rows with any NaN, otherwise keep initial_guess
+    result: Float[Array, "... twice_species"] = jnp.where(
+        nan_mask, auto_initial_guess, initial_guess
+    )
+
+    result = eqx.error_if(
+        result,
+        jnp.any(jnp.isnan(result)),
+        "NaN encountered in initial guess, which will break the solver.",
     )
 
     return result

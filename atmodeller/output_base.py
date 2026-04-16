@@ -27,7 +27,7 @@ from jaxtyping import Array, ArrayLike, Bool, Float, PyTree
 
 from atmodeller import override
 from atmodeller.containers import MultiAttemptSolution
-from atmodeller.initial_solution import auto_initial_guess
+from atmodeller.initial_solution import generate_auto_initial_guess
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Parameters
 from atmodeller.phases import (
@@ -262,7 +262,7 @@ class BaseOutputDict(eqx.Module):
         out = self._solution_array_to_dict(self.solution, suffix="_solution")
 
         guess: Float[Array, "#n_batch twice_species"] = jnp.atleast_2d(
-            auto_initial_guess(self.parameters)
+            generate_auto_initial_guess(self.parameters)
         )
         out.update(self._solution_array_to_dict(guess, suffix="_guess"))
 
