@@ -92,6 +92,9 @@ dev = [
 
 [tool.pytest.ini_options]
 beartype_packages = "atmodeller"
+markers = [
+    "performance: marks tests as performance (deselect with '-m \"not performance\"')"
+]
 
 [build-system]
 requires = ["hatchling"]
