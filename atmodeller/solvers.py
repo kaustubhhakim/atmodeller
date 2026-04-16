@@ -51,10 +51,12 @@ import jax.numpy as jnp
 import optimistix as optx
 from equinox._enum import EnumerationItem
 from jax import lax, random
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 from optimistix import Solution
 
 from atmodeller.constants import (
+    LOG_NUMBER_MOLES_LOWER,
+    LOG_NUMBER_MOLES_UPPER,
     TAU,
     TAU_MAX,
     TAU_NUM,
@@ -169,7 +171,6 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
         initial_guess: Float[Array, "... solution"],
         parameters: Parameters,
         key: PRNGKeyArray,
-        perturb_scale: ArrayLike,
         max_retries: int,
         tolerance: float = POSTCHECK_TOLERANCE,
     ) -> MultiAttemptSolution:
@@ -193,8 +194,6 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             initial_guess: Batched array of initial guesses for the solver
             parameters: Model parameters passed to the solver
             key: JAX PRNG key for reproducible random perturbations
-            perturb_scale: Array or scalar that scales the random perturbation to the log number
-                of moles applied to failed solutions
             max_retries: Maximum number of solver retries per batch entry
             tolerance: Tolerance for the objective-based convergence validation performed after
                 each solve attempt. Defaults to :obj:`POSTCHECK_TOLERANCE`.
@@ -255,14 +254,25 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             )
             # jax.debug.print("central_value = {out}", out=central_value)
 
+            # Compute per-species data range (max - min) for log_number_moles to get a sense of the
+            # scale per species across the batch.
+            data_max: Float[Array, "... n_species"] = jnp.max(
+                log_number_moles, axis=0, keepdims=True
+            )
+            data_min: Float[Array, "... n_species"] = jnp.min(
+                log_number_moles, axis=0, keepdims=True
+            )
+            data_range: Float[Array, "... n_species"] = data_max - data_min
+            # jax.debug.print("data_range = {out}", out=data_range)
+            perturbed: Float[Array, " ..n_species"] = data_range / 2 * raw_perturb + central_value
+            perturbed = jnp.minimum(perturbed, LOG_NUMBER_MOLES_UPPER)
+            perturbed = jnp.maximum(perturbed, LOG_NUMBER_MOLES_LOWER)
+            # jax.debug.print("perturbed = {out}", out=perturbed)
+
             # Perturb only the failed cases, keep successful cases unchanged
             new_log_number_moles: Float[Array, "... n_species"] = cast(
                 Float[Array, "... n_species"],
-                jnp.where(
-                    failed_mask[..., None],
-                    perturb_scale * raw_perturb + central_value,
-                    log_number_moles,
-                ),
+                jnp.where(failed_mask[..., None], perturbed, log_number_moles),
             )
             # jax.debug.print("new_log_number_moles = {out}", out=new_log_number_moles)
 
@@ -533,7 +543,6 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
                 solution,
                 new_parameters,
                 subkey,
-                parameters.solver_parameters.retry_perturbation,
                 parameters.solver_parameters.max_starts - 1,
                 parameters.solver_parameters.atol,
             )
@@ -558,7 +567,6 @@ def make_tau_sweep_solver(batch_retry_solver: Callable) -> Callable:
             initial_guess,
             initial_parameters,
             subkey,
-            parameters.solver_parameters.retry_perturbation,
             parameters.solver_parameters.max_starts - 1,
             parameters.solver_parameters.atol,
         )
@@ -683,7 +691,6 @@ def make_solver(parameters: Parameters) -> Callable:
                 base_solution_array,
                 parameters,
                 subkey,
-                parameters.solver_parameters.retry_perturbation,
                 parameters.solver_parameters.max_starts - 1,
                 parameters.solver_parameters.atol,
             )
@@ -772,7 +779,6 @@ def make_solver_with_jit_single_path(parameters: Parameters) -> Callable:
             base_solution_array,
             parameters,
             subkey,
-            parameters.solver_parameters.retry_perturbation,
             parameters.solver_parameters.max_starts - 1,
             parameters.solver_parameters.atol,
         )

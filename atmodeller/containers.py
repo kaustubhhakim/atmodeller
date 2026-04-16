@@ -466,14 +466,11 @@ class SolverParameters(RootFindParameters):  # pragma: no cover
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either ``fwd`` or ``bwd``. Defaults to ``fwd``.
         max_starts: Maximum number of starts. Defaults to ``10``.
-        retry_perturbation: Perturbation for retry. Defaults to ``20``.
         tau: Tau factor for species stability. Defaults to :const:`~atmodeller.constants.TAU`.
     """
 
     max_starts: int = 10
     """Maximum number of starts"""
-    retry_perturbation: float = 20.0
-    """Perturbation for retry, in this case for the log number of moles of a species"""
     tau: Array = eqx.field(converter=as_j64, default=TAU)
     """Tau factor for species stability"""
 
@@ -623,9 +620,9 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
         .. warning::
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
         """
-        total_models: int = int(self.solver_success.size)
-        num_successful_models: int = jnp.count_nonzero(self.solver_success).item()
-        num_failed_models: int = jnp.count_nonzero(~self.solver_success).item()
+        total_models: int = int(self.converged.size)
+        num_successful_models: int = jnp.count_nonzero(self.converged).item()
+        num_failed_models: int = jnp.count_nonzero(~self.converged).item()
 
         logger.info(
             "Solve complete: %d (%0.2f%%) successful model(s)",

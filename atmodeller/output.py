@@ -256,9 +256,9 @@ class Output(eqx.Module):
         # analysis. Define a fill colour for highlighting rows (e.g., yellow)
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-        # Get the indices where the successful_solves mask is False
+        # Get the indices where the converged mask is False
         unsuccessful_indices: NpArray = np.where(
-            ~np.asarray(self.multi_attempt_solution.solver_success)
+            ~np.asarray(self.multi_attempt_solution.converged)
         )[0]
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
