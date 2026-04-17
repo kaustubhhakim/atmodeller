@@ -43,7 +43,7 @@ Most solvers return results as :class:`atmodeller.containers.MultiAttemptSolutio
 """
 
 from collections.abc import Callable
-from typing import cast
+from typing import Literal, cast
 
 import equinox as eqx
 import jax
@@ -242,29 +242,23 @@ def make_batch_retry_solver(solver_function: Callable, objective_fn: Callable) -
             #   (column), and perturb failed cases around this value. This assumes batch entries
             #   are similar enough for the median to be a meaningful reference, which is often true
             #   in practice.
-            # - For a single-species or single-case batch, this reduces to perturbing around the
-            #   only available value.
-            # - If all cases fail, the median will just be the original (failed) guess, so the
-            #   perturbation will still provide some diversity for the solver to escape poor
-            #   regions.
+            # - For a single system, simply use the median of the log_number_moles as the central
+            #   value for perturbation, and similarly compute the data range across all species.
 
-            # Median for each species
-            central_value: Float[Array, "... n_species"] = jnp.median(
-                log_number_moles, axis=0, keepdims=True
-            )
+            if log_number_moles.ndim == 2:
+                # Batched: shape (batch, n_species)
+                axis: Literal[0, None] = 0
+            else:
+                # Single system: shape (n_species,)
+                axis = None
+
+            central_value: FloatArray = jnp.median(log_number_moles, axis=axis, keepdims=True)
+            data_max: FloatArray = jnp.max(log_number_moles, axis=axis, keepdims=True)
+            data_min: FloatArray = jnp.min(log_number_moles, axis=axis, keepdims=True)
+            data_range: FloatArray = data_max - data_min
             # jax.debug.print("central_value = {out}", out=central_value)
-
-            # Compute per-species data range (max - min) for log_number_moles to get a sense of the
-            # scale per species across the batch.
-            data_max: Float[Array, "... n_species"] = jnp.max(
-                log_number_moles, axis=0, keepdims=True
-            )
-            data_min: Float[Array, "... n_species"] = jnp.min(
-                log_number_moles, axis=0, keepdims=True
-            )
-            data_range: Float[Array, "... n_species"] = data_max - data_min
             # jax.debug.print("data_range = {out}", out=data_range)
-            perturbed: Float[Array, " ..n_species"] = data_range / 2 * raw_perturb + central_value
+            perturbed: Float[Array, "... n_species"] = data_range / 2 * raw_perturb + central_value
             perturbed = jnp.minimum(perturbed, LOG_NUMBER_MOLES_UPPER)
             perturbed = jnp.maximum(perturbed, LOG_NUMBER_MOLES_LOWER)
             # jax.debug.print("perturbed = {out}", out=perturbed)
