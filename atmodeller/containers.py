@@ -646,12 +646,11 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
         successful_attempts = self.attempts[self.attempts > 0]
         unique_vals, counts = jnp.unique(successful_attempts, return_counts=True)
         for val, count in zip(unique_vals.tolist(), counts.tolist()):
-            logger.info(
-                "Attempt summary (solved): %d (%0.2f%%) model(s) required %d attempt(s)",
-                count,
-                count * 100 / total_models,
-                val,
-            )
+            if val == 1:
+                msg = "Solve attempt %d: %d (%0.2f%%) model(s) solved"
+            else:
+                msg = "Solve attempt %d: %d (%0.2f%%) additional model(s) solved"
+            logger.info(msg, val, count, count * 100 / total_models)
 
         # Steps of 0 indicate no solution; replace with nan and report the max over solved models
         steps_float: Array = cast(
