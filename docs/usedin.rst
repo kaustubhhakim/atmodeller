@@ -12,3 +12,4 @@ Open-access links are provided where available.
 1. :cite:t:`BTH25`
 2. :cite:t:`Cherubim2025`
 3. :cite:t:`Hakim2026`
+4. :cite:t:`Seidler26`
