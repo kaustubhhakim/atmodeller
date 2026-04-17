@@ -123,6 +123,9 @@ napoleon_preprocess_types = False
 napoleon_type_aliases = None
 napoleon_attr_annotations = True
 
+# For development where the notebooks may (temporarily) break, set to True
+nbsphinx_allow_errors = False
+
 # https://sphinxcontrib-bibtex.readthedocs.io/en/latest/usage.html#known-issues-and-workarounds
 
 
