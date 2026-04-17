@@ -620,23 +620,26 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
             "success": self.success,
         }
 
-    def stats_to_logger(self) -> None:
+    def stats_to_logger(self, logger_: logging.Logger = logger) -> None:
         """Logs solver statistics.
 
         .. warning::
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
+
+        Args:
+            logger_: Logger to log the statistics to. Defaults to :obj:`logger`.
         """
         total_models: int = int(self.converged.size)
         num_successful_models: int = jnp.count_nonzero(self.converged).item()
         num_failed_models: int = jnp.count_nonzero(~self.converged).item()
 
-        logger.info(
+        logger_.info(
             "Solve complete: %d (%0.2f%%) successful model(s)",
             num_successful_models,
             num_successful_models * 100 / total_models,
         )
         if num_failed_models > 0:
-            logger.warning(
+            logger_.warning(
                 "%d (%0.2f%%) model(s) still failed",
                 num_failed_models,
                 num_failed_models * 100 / total_models,
@@ -650,11 +653,11 @@ class MultiAttemptSolution(eqx.Module):  # pragma: no cover
                 msg = "Solve attempt %d: %d (%0.2f%%) model(s) solved"
             else:
                 msg = "Solve attempt %d: %d (%0.2f%%) additional model(s) solved"
-            logger.info(msg, val, count, count * 100 / total_models)
+            logger_.info(msg, val, count, count * 100 / total_models)
 
         # Steps of 0 indicate no solution; replace with nan and report the max over solved models
         steps_float: Array = cast(
             Array, jnp.where(self.num_steps == 0, jnp.nan, self.num_steps.astype(float))
         )
         max_steps: Array = jnp.nanmax(steps_float)
-        logger.info("Solver steps (max) = %s", int(max_steps.item()))
+        logger_.info("Solver steps (max) = %s", int(max_steps.item()))
