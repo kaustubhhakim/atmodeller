@@ -319,10 +319,10 @@ class Output(eqx.Module):
 
         logger.info("Output written to %s", output_file)
 
-    def solver_stats_to_logger(self) -> None:
+    def solver_stats_to_logger(self, logger_: logging.Logger = logger) -> None:
         """Logs solver statistics.
 
         .. warning::
             Not compatible with JAX-compiled workflows (e.g., inside a :func:`jax.jit` context)
         """
-        return self.multi_attempt_solution.stats_to_logger()
+        return self.multi_attempt_solution.stats_to_logger(logger_)
