@@ -129,6 +129,7 @@ from atmodeller.sci_utils import (  # noqa: E402, F401
     earth,
     unit_conversion,
 )
+from atmodeller.solubility import get_solubility_models  # noqa: E402, F401
 from atmodeller.solvers import (  # noqa: E402, F401
     make_solver,
     make_solver_with_jit,  # Alias for the default solver
@@ -141,4 +142,5 @@ from atmodeller.state import (  # noqa: E402, F401
     ThermodynamicState,
     ThinAtmospherePlanet,
 )
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401
 from atmodeller.thermodata.core import ActivityCoefficient  # noqa: E402, F401
