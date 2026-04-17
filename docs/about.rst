@@ -6,13 +6,13 @@ About
 Citation
 --------
 
-If you use *Atmodeller*, or data from *Atmodeller*, please cite :cite:t:`BTH25`. An accompanying ArXiv preprint is available at `2507.00499 <https://arxiv.org/abs/2507.00499>`_. In addition, please consult the *Atmodeller* source code for citations related to specific components, such as solubility laws and real gas equations of state. Thermodynamic data are sourced from :cite:t:`MZG02`.
+If you use *Atmodeller*, or data from *Atmodeller*, please cite :cite:t:`BTH25`. In addition, please consult the *Atmodeller* source code for citations related to specific model components, such as solubility laws and real gas equations of state. Thermodynamic data are sourced from :cite:t:`MZG02`.
 
 Authors
 -------
 
 * Dan J. Bower (lead developer, ETH Zurich)
-* Maggie A. Thompson (ETH Zurich/Carnegie)
+* Maggie A. Thompson (Carnegie Institution for Science)
 * Kaustubh Hakim (KU Leuven/Royal Observatory of Belgium)
 * Meng Tian (LMU Munich)
 * Paolo A. Sossi (ETH Zurich)
