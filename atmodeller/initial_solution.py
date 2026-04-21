@@ -24,6 +24,13 @@ from atmodeller.parameters import Parameters
 
 LOG_TRACE_VALUE: float = -20.0
 """Small trace value (in log space) to assign to species that have a negligible element budget"""
+CONDENSATE_ALLOCATION_FRACTION: float = 0.5
+"""Fraction of the element budget to allocate to predicted-stable condensates
+
+This value, although arbitrary to some extent, prevents condensates from being allocated an 
+excessively large portion of the element budget, which can drive gas species to unrealistically low
+initial abundances.
+"""
 
 
 def max_moles_by_limiting_element(
@@ -113,6 +120,8 @@ def allocate_element_budget(
         formula_matrix, element_abundance, condensate_stable_mask
     )
     # jax.debug.print("n_condensate = {out}", out=n_condensate)
+
+    n_condensate = n_condensate * CONDENSATE_ALLOCATION_FRACTION
 
     # Assign fallback values to unconstrained (NaN) entries after stable-condensate allocation.
     # Species with NaN allocation are considered unstable or absent for element accounting and are
