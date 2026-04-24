@@ -18,6 +18,7 @@ The available phase types are:
   per-species properties such as activity are always computed from raw species amounts.
 - :class:`SolidPhase`: Multicomponent silicate solid, with similar background handling as the
   melt phase.
+- :class:`MetalPhase`: Multicomponent metal, with similar background handling as the melt phase.
 - :class:`PurePhase`: Single-species, unity-activity phase (e.g., a pure mineral, ice, or
   liquid). Only one species is permitted, and its activity is fixed at unity.
 
@@ -75,6 +76,9 @@ background mass is non-zero)"""
 SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
 """Molar mass of SiO\\ :sub:`2` (kg mol\\ :sup:`-1`), used as the default background molar mass
 for condensed phases"""
+FE_MOLAR_MASS: float = Formula("Fe").mass * unit_conversion.g_to_kg
+"""Molar mass of Fe (kg mol\\ :sup:`-1`), used as the default background molar mass for a metal 
+phase"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -853,6 +857,23 @@ class SolidPhase(CondensedPhase[SpeciesProtocol]):
         species: Iterable[SpeciesProtocol] = (),
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
+    ):
+        super().__init__(species, background_mass, background_molar_mass)
+
+
+class MetalPhase(CondensedPhase[SpeciesProtocol]):
+    """Multicomponent metal phase"""
+
+    name: str = "metal"
+
+    # Without an override pylance gets confused, throwing missing argument warnings even though
+    # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
+    @override
+    def __init__(
+        self,
+        species: Iterable[SpeciesProtocol] = (),
+        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
+        background_molar_mass: ArrayLike = FE_MOLAR_MASS,
     ):
         super().__init__(species, background_mass, background_molar_mass)
 

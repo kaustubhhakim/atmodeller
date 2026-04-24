@@ -33,6 +33,7 @@ from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Para
 from atmodeller.phases import (
     GasPhaseOutput,
     MeltPhase,
+    MetalPhase,
     PhaseOutput,
     PurePhase,
     SolidPhase,
@@ -358,6 +359,23 @@ class BaseOutputDict(eqx.Module):
         return melt_output
 
     @property
+    def metal(self) -> PhaseOutput[MetalPhase]:
+        """Metal phase output"""
+
+        metal_slice: slice = self.parameters.reaction_system.phase_system.metal_slice
+
+        metal_output: PhaseOutput[MetalPhase] = (
+            self.parameters.reaction_system.phase_system.metal.output(
+                self.log_number_moles[..., metal_slice],
+                self.log_stability[..., metal_slice],
+                self._temperature,
+                self._pressure,
+            )
+        )
+
+        return metal_output
+
+    @property
     def solid(self) -> PhaseOutput[SolidPhase]:
         """Solid phase output"""
 
@@ -479,6 +497,10 @@ class OutputNaturalDict(BaseOutputDict):
         if not self.solid.is_empty:
             phase_name = self.solid.phase.name
             out[phase_name] = self._phase_output_to_dict(self.solid)
+
+        if not self.metal.is_empty:
+            phase_name = self.metal.phase.name
+            out[phase_name] = self._phase_output_to_dict(self.metal)
 
         if len(self.condensate_phases) > 0:
             # This retains symmetry with the output structure of the other phases (gas, melt, and
@@ -659,6 +681,9 @@ class OutputNamedArraysDict(BaseOutputDict):
 
         if not self.solid.is_empty:
             out[self.solid.phase.name] = self._phase_output_to_dict(self.solid)
+
+        if not self.metal.is_empty:
+            out[self.metal.phase.name] = self._phase_output_to_dict(self.metal)
 
         if len(self.condensate_phases) > 0:
             condensate_dict: dict = {}
@@ -948,6 +973,11 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.solid))
             out[self.solid.phase.name] = {}
             out[self.solid.phase.name]["phase"] = self.phase_to_dict(self.solid)
+
+        if not self.metal.is_empty:
+            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.metal))
+            out[self.metal.phase.name] = {}
+            out[self.metal.phase.name]["phase"] = self.phase_to_dict(self.metal)
 
         if len(self.condensate_phases) > 0:
             for condensate in self.condensate_phases:

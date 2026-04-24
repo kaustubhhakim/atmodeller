@@ -48,7 +48,7 @@ from atmodeller.jax_utils import (
     safe_exp,
     to_hashable,
 )
-from atmodeller.phases import GasPhase, MeltPhase, PurePhase, SolidPhase
+from atmodeller.phases import GasPhase, MeltPhase, MetalPhase, PurePhase, SolidPhase
 from atmodeller.thermodata import thermodynamic_data_source
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -133,6 +133,7 @@ class PhaseSystem(eqx.Module):
         gas: Gas phase
         melt: Melt phase. Defaults to an empty melt phase if not provided.
         solid: Solid phase. Defaults to an empty solid phase if not provided.
+        metal: Metal phase. Defaults to an empty metal phase if not provided.
         condensates: Condensate phases. Defaults to an empty tuple if not provided.
     """
 
@@ -142,6 +143,8 @@ class PhaseSystem(eqx.Module):
     """Melt"""
     solid: SolidPhase
     """Solid"""
+    metal: MetalPhase
+    """Metal"""
     condensates: tuple[PurePhase, ...]
     """Condensates"""
     species: SpeciesCollection[SpeciesProtocol]
@@ -155,20 +158,22 @@ class PhaseSystem(eqx.Module):
         *,
         melt: Optional[MeltPhase] = None,
         solid: Optional[SolidPhase] = None,
+        metal: Optional[MetalPhase] = None,
         condensates: Optional[Iterable[PurePhase]] = None,
     ):
         self.gas = gas
         self.melt = MeltPhase.empty() if melt is None else melt
         self.solid = SolidPhase.empty() if solid is None else solid
+        self.metal = MetalPhase.empty() if metal is None else metal
         if condensates is None:
             self.condensates = ()
         else:
             self.condensates = tuple(condensates)
 
-        # The order of phases is significant! "gas" -> "melt" -> "solid" -> "condensates" must be
-        # preserved because reaction matrices, phase slices, and activity concatenation rely on
-        # this ordering.
-        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "condensates")
+        # The order of phases is significant! "gas" -> "melt" -> "solid" -> "metal" ->
+        # "condensates" must be preserved because reaction matrices, phase slices, and activity
+        # concatenation rely on this ordering.
+        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "metal", "condensates")
 
         # Flatten all species. Index 0 because pure phases can only have one species.
         condensate_species: tuple[ChemicalSpecies, ...] = tuple(
@@ -178,6 +183,7 @@ class PhaseSystem(eqx.Module):
             self.gas.species.species
             + self.melt.species.species
             + self.solid.species.species
+            + self.metal.species.species
             + condensate_species
         )
         self.species = SpeciesCollection(all_species)
@@ -187,7 +193,7 @@ class PhaseSystem(eqx.Module):
         self._phase_indices = {}
 
         for phase_name, phase_collection in zip(
-            phase_order, [self.gas, self.melt, self.solid, self.condensates]
+            phase_order, [self.gas, self.melt, self.solid, self.metal, self.condensates]
         ):
             n: int = len(phase_collection)
             self._phase_indices[phase_name] = PhaseIndex(start, start + n)
@@ -208,6 +214,14 @@ class PhaseSystem(eqx.Module):
     @property
     def melt_species_mask(self) -> NpBool:
         return self.phase_mask("melt")
+
+    @property
+    def metal_slice(self) -> slice:
+        return self.phase_slice("metal")
+
+    @property
+    def metal_species_mask(self) -> NpBool:
+        return self.phase_mask("metal")
 
     @property
     def solid_slice(self) -> slice:
