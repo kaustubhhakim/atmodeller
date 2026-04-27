@@ -142,8 +142,6 @@ f_calibration: Array = H2_chabrier21_bounded.fugacity(as_j64(T_calibration), as_
 X_calibration: Scalar = 0.0019
 
 H2_kite19: Solubility = _H2_chachan18(
-    f_calibration=float(f_calibration),
-    T_calibration=T_calibration,
-    X_calibration=X_calibration,
+    f_calibration=float(f_calibration), T_calibration=T_calibration, X_calibration=X_calibration
 )
 """H2 by combining theory and experiment :cite:p:`KFS19`."""
