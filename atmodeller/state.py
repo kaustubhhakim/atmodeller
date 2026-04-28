@@ -289,7 +289,9 @@ class ThermodynamicState(BaseThermodynamicState):
         base_dict["silicate_melt_mass"] = self.get_silicate_melt_mass(log_number_moles)
         base_dict["silicate_solid_mass"] = self.get_silicate_solid_mass(log_number_moles)
         base_dict["silicate_melt_fraction"] = self.get_silicate_melt_fraction(log_number_moles)
-        base_dict["mass"] = base_dict["melt_mass"] + base_dict["solid_mass"]
+        base_dict["silicate_mass"] = (
+            base_dict["silicate_melt_mass"] + base_dict["silicate_solid_mass"]
+        )
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.pressure
 
