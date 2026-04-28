@@ -585,7 +585,9 @@ class BasePlanet(BaseThermodynamicState):
                 as_j64(core_mass_fraction), self.background_metallic_core_mass.shape
             )
             state_updated = eqx.tree_at(
-                lambda s: s.reaction_system.phase_system[self.metal_phase_index].background_mass,
+                lambda s: (
+                    s.reaction_system.phase_system.phases[self.metal_phase_index].background_mass
+                ),
                 state_updated,
                 state_updated.background_planet_mass * core_mass_fraction,
             )
@@ -596,14 +598,18 @@ class BasePlanet(BaseThermodynamicState):
             )
             state_updated = eqx.tree_at(
                 lambda s: (
-                    s.reaction_system.phase_system[self.silicate_melt_phase_index].background_mass
+                    s.reaction_system.phase_system.phases[
+                        self.silicate_melt_phase_index
+                    ].background_mass
                 ),
                 state_updated,
                 mantle_mass * mantle_melt_fraction,
             )
             state_updated = eqx.tree_at(
                 lambda s: (
-                    s.reaction_system.phase_system[self.silicate_solid_phase_index].background_mass
+                    s.reaction_system.phase_system.phases[
+                        self.silicate_solid_phase_index
+                    ].background_mass
                 ),
                 state_updated,
                 mantle_mass * (1 - mantle_melt_fraction),
