@@ -184,7 +184,11 @@ GAS_CONSTANT_BAR: float = GAS_CONSTANT * unit_conversion.Pa_to_bar
 r"""Gas constant (:math:`\mathrm{m}^3\mathrm{bar}^{-1}\mathrm{K}^{-1}\mathrm{mol}^{-1}`)"""
 
 SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
-r"""Molar mass of SiO\ :sub:`2` (kg mol\ :sup:`-1`)"""
+"""Molar mass of SiO\\ :sub:`2` (kg mol\\ :sup:`-1`)"""
+
+FE_MOLAR_MASS: float = Formula("Fe").mass * unit_conversion.g_to_kg
+"""Molar mass of Fe (kg mol\\ :sup:`-1`), used as the default background molar mass for a metal 
+phase"""
 
 
 class ExperimentalCalibration(eqx.Module):

@@ -30,7 +30,7 @@ from atmodeller.containers import MultiAttemptSolution
 from atmodeller.initial_solution import generate_auto_initial_guess
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Parameters
-from atmodeller.phases import BasePhase, GasPhaseOutput, PhaseOutput, TPhase_co
+from atmodeller.phases import BasePhase, GasPhaseOutput, PhaseOutput
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class BaseOutputDict(eqx.Module):
     multi_attempt_solution: MultiAttemptSolution
 
     @abstractmethod
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         """Dictionary representation of the phase output
 
         Returns:
@@ -368,7 +368,7 @@ class BaseOutputDict(eqx.Module):
         """Pressure in bar"""
         return jnp.atleast_1d(self._pressure)[:, None]
 
-    def phase_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def phase_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         """Phase-level properties such as total mass, number of moles, molar mass, etc.
 
         Args:
@@ -406,7 +406,7 @@ class OutputNaturalDict(BaseOutputDict):
     """
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         out: dict[str, Any] = {}
 
         # Phase-level properties
@@ -506,7 +506,7 @@ class OutputNamedArraysDict(BaseOutputDict):
             out_dict[name] = split_data[ii]
 
     def _split_by_elements_and_add(
-        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+        self, phase_output: PhaseOutput[BasePhase], inarray: Array, output: dict, keyname: str
     ) -> None:
         """Splits the element-level data by element and adds them to the output.
 
@@ -522,7 +522,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         )
 
     def _split_by_species_and_add(
-        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+        self, phase_output: PhaseOutput[BasePhase], inarray: Array, output: dict, keyname: str
     ) -> None:
         """Splits the species-level data by species' and adds them to the output.
 
@@ -536,7 +536,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         self._split_by_name_and_add(phase_output.phase.species_names, inarray, output, keyname)
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
 
         out: dict[str, Any] = {}
 
@@ -774,7 +774,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         return jnp.split(inarray, max(len(names), 1), axis=-1)
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
 
         out: dict[str, Any] = {}
 

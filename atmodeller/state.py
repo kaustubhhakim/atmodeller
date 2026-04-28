@@ -28,9 +28,9 @@ from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64
-from atmodeller.phases import FE_MOLAR_MASS, BasePhase, CondensedPhase, GasPhase, PurePhase
+from atmodeller.phases import BasePhase, CondensedPhase, GasPhase, PurePhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
-from atmodeller.sci_utils import SIO2_MOLAR_MASS, earth, unit_conversion
+from atmodeller.sci_utils import FE_MOLAR_MASS, SIO2_MOLAR_MASS, earth, unit_conversion
 
 
 class BaseThermodynamicState(eqx.Module):

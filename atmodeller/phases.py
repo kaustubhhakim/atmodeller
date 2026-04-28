@@ -59,7 +59,7 @@ from atmodeller import override
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol, TSpecies_co
 from atmodeller.jax_utils import FloatArray, as_j64, masked_logsumexp, safe_exp, to_hashable
-from atmodeller.sci_utils import GAS_CONSTANT_BAR, unit_conversion
+from atmodeller.sci_utils import GAS_CONSTANT_BAR
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 # Due to a Pyright bug (#4965). See Equinox documentation.
@@ -73,12 +73,6 @@ DEFAULT_BACKGROUND_MASS: float = 0.0
 DUMMY_MOLAR_MASS: float = 1.0
 """Default molar mass of the background component (kg mol\\ :sup:`-1`) (only meaningful when
 background mass is non-zero)"""
-SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
-"""Molar mass of SiO\\ :sub:`2` (kg mol\\ :sup:`-1`), used as the default background molar mass
-for condensed phases"""
-FE_MOLAR_MASS: float = Formula("Fe").mass * unit_conversion.g_to_kg
-"""Molar mass of Fe (kg mol\\ :sup:`-1`), used as the default background molar mass for a metal 
-phase"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -104,11 +98,11 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         name: Phase name
         species: An iterable of species in the phase
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
         background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``1.0``; only meaningful when ``background_mass`` is not zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
     name: str
@@ -697,11 +691,11 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         species: An iterable of species in the phase
         name: Name of the phase. Defaults to ``gas``.
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
         background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``1.0``; only meaningful when ``background_mass`` is not zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
     output_class: ClassVar[type[PhaseOutput]] = GasPhaseOutput
@@ -754,12 +748,11 @@ class CondensedPhase(BasePhase[SpeciesProtocol]):
         species: An iterable of species in the phase
         name: Name of the phase. Defaults to ``condensed``.
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
-        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`).  Should
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``0.06`` (i.e., SiO\\ :sub:`2`); only meaningful when ``background_mass`` is not
-            zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
     output_class: ClassVar[type["PhaseOutput"]] = PhaseOutput[Self]
@@ -773,13 +766,24 @@ class CondensedPhase(BasePhase[SpeciesProtocol]):
         species: Iterable[TSpecies_co] = (),
         name: str = "condensed_phase",
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
+        background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
     ):
         super().__init__(name, species, background_mass, background_molar_mass)
 
 
 class PurePhase(CondensedPhase):
-    """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid)"""
+    """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid)
+
+    Args:
+        species: An iterable of species in the phase
+        name: Name of the phase. Defaults to ``pure_phase``.
+        background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
+            be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
+    """
 
     # Without an override pylance gets confused, throwing missing argument warnings even though
     # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
@@ -818,7 +822,7 @@ class PurePhase(CondensedPhase):
             hill_formula: str = Formula(species_).formula
             species_list.append(ChemicalSpecies.create_condensed(hill_formula, **kwargs))
 
-        # Pure phase name always corresponds to the single species it contains
+        # Pure phase name should always correspond to the single species it contains
         phase_name: str = species_list[0].name
 
         return cls(species_list, phase_name)
