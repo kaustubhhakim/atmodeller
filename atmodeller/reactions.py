@@ -26,7 +26,7 @@ import logging
 import pprint
 from abc import abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Optional
+from typing import Optional, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -35,7 +35,7 @@ from jax import lax
 from jaxtyping import Array, ArrayLike, Float, Integer
 
 from atmodeller.constants import DISSOLUTION_PPMW_FLOOR, GAS_STATE
-from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
+from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import (
     FloatArray,
@@ -48,7 +48,7 @@ from atmodeller.jax_utils import (
     safe_exp,
     to_hashable,
 )
-from atmodeller.phases import GasPhase, MeltPhase, MetalPhase, PurePhase, SolidPhase
+from atmodeller.phases import BasePhase, GasPhase
 from atmodeller.thermodata import thermodynamic_data_source
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -127,139 +127,80 @@ class PhaseIndex(eqx.Module):
 class PhaseSystem(eqx.Module):
     """A phase system containing multiple phases.
 
-    This class represents a complete set of coexisting phases (gas, melt, solid, condensates).
+    This class represents a complete set of coexisting phases.
 
     Args:
         gas: Gas phase
-        melt: Melt phase. Defaults to an empty melt phase if not provided.
-        solid: Solid phase. Defaults to an empty solid phase if not provided.
-        metal: Metal phase. Defaults to an empty metal phase if not provided.
-        condensates: Condensate phases. Defaults to an empty tuple if not provided.
+        other_phases: Tuple of other phases
+
+    Attributes:
+        phases: All phases, where the first phase is always the gas phase by construction
+        species: All species
     """
 
-    gas: GasPhase
-    """Gas"""
-    melt: MeltPhase
-    """Melt"""
-    solid: SolidPhase
-    """Solid"""
-    metal: MetalPhase
-    """Metal"""
-    condensates: tuple[PurePhase, ...]
-    """Condensates"""
+    phases: tuple[BasePhase, ...]
+    """all phases, where the first phase is always the gas phase by construction"""
     species: SpeciesCollection[SpeciesProtocol]
     """All species"""
-    _phase_indices: dict[str, PhaseIndex]
+    _phase_indices: dict[int, PhaseIndex]
     """Phase indices for slicing species arrays"""
 
-    def __init__(
-        self,
-        gas: GasPhase,
-        *,
-        melt: Optional[MeltPhase] = None,
-        solid: Optional[SolidPhase] = None,
-        metal: Optional[MetalPhase] = None,
-        condensates: Optional[Iterable[PurePhase]] = None,
-    ):
-        self.gas = gas
-        self.melt = MeltPhase.empty() if melt is None else melt
-        self.solid = SolidPhase.empty() if solid is None else solid
-        self.metal = MetalPhase.empty() if metal is None else metal
-        if condensates is None:
-            self.condensates = ()
-        else:
-            self.condensates = tuple(condensates)
+    def __init__(self, gas: GasPhase, *, other_phases: Optional[tuple[BasePhase, ...]] = None):
+        other_phases_ = tuple() if other_phases is None else other_phases
+        self.phases = (gas,) + other_phases_
 
-        # The order of phases is significant! "gas" -> "melt" -> "solid" -> "metal" ->
-        # "condensates" must be preserved because reaction matrices, phase slices, and activity
-        # concatenation rely on this ordering.
-        phase_order: tuple[str, ...] = ("gas", "melt", "solid", "metal", "condensates")
+        other_species: tuple[SpeciesProtocol, ...] = tuple(
+            species for phase in other_phases_ for species in phase.species.species
+        )
+        all_species: tuple[SpeciesProtocol, ...] = self.gas.species.species + other_species
 
-        # Flatten all species. Index 0 because pure phases can only have one species.
-        condensate_species: tuple[ChemicalSpecies, ...] = tuple(
-            condensate.species[0] for condensate in self.condensates
-        )
-        all_species: tuple[SpeciesProtocol, ...] = (
-            self.gas.species.species
-            + self.melt.species.species
-            + self.solid.species.species
-            + self.metal.species.species
-            + condensate_species
-        )
         self.species = SpeciesCollection(all_species)
 
         # Phase indexing
         start: int = 0
         self._phase_indices = {}
 
-        for phase_name, phase_collection in zip(
-            phase_order, [self.gas, self.melt, self.solid, self.metal, self.condensates]
-        ):
-            n: int = len(phase_collection)
-            self._phase_indices[phase_name] = PhaseIndex(start, start + n)
+        for nn, phase in enumerate(self.phases):
+            n: int = len(phase)
+            self._phase_indices[nn] = PhaseIndex(start, start + n)
             start += n
 
     @property
+    def gas(self) -> GasPhase:
+        """Gas phase"""
+        return cast(GasPhase, self.phases[0])
+
+    @property
     def gas_slice(self) -> slice:
-        return self.phase_slice("gas")
+        """Gas is always the first phase by construction"""
+        return self.phase_slice(0)
 
     @property
     def gas_species_mask(self) -> NpBool:
-        return self.phase_mask("gas")
+        """Gas is always the first phase by construction"""
+        return self.phase_mask(0)
 
-    @property
-    def melt_slice(self) -> slice:
-        return self.phase_slice("melt")
-
-    @property
-    def melt_species_mask(self) -> NpBool:
-        return self.phase_mask("melt")
-
-    @property
-    def metal_slice(self) -> slice:
-        return self.phase_slice("metal")
-
-    @property
-    def metal_species_mask(self) -> NpBool:
-        return self.phase_mask("metal")
-
-    @property
-    def solid_slice(self) -> slice:
-        return self.phase_slice("solid")
-
-    @property
-    def solid_species_mask(self) -> NpBool:
-        return self.phase_mask("solid")
-
-    @property
-    def condensates_slice(self) -> slice:
-        return self.phase_slice("condensates")
-
-    @property
-    def condensates_species_mask(self) -> NpBool:
-        return self.phase_mask("condensates")
-
-    def phase_slice(self, phase_name: str) -> slice:
-        """Slice object for a given phase.
+    def phase_slice(self, phase_index: int) -> slice:
+        """Slice object for a given phase index
 
         Args:
-            phase_name: Name of the phase
+            phase_index: Index of the phase
 
         Returns:
             Slice object for the phase
         """
-        return self._phase_indices[phase_name].slice
+        return self._phase_indices[phase_index].slice
 
-    def phase_mask(self, phase_name: str) -> NpBool:
-        """Boolean mask for a given phase.
+    def phase_mask(self, phase_index: int) -> NpBool:
+        """Boolean mask for a given phase index
 
         Args:
-            phase_name: Name of the phase
+            phase_index: Index of the phase
 
         Returns:
             Boolean mask for the phase
         """
-        return self._phase_indices[phase_name].mask(len(self.species))
+        return self._phase_indices[phase_index].mask(len(self.species))
 
 
 class BaseReactionBlock(eqx.Module):
@@ -622,37 +563,17 @@ class ReactionSystem(BaseReactionBlock):
         Returns:
             Log activity of each species
         """
-        log_activity_gas: Float[Array, "... n_gas_species"] = (
-            self.phase_system.gas.get_log_activity(
-                log_number_moles[..., self.phase_system.gas_slice], temperature, pressure
+        log_activities = []
+
+        for phase_index, phase in enumerate(self.phase_system.phases):
+            # jax.debug.print("phase.name = {out}", out=phase.name)
+            phase_slice: slice = self.phase_system.phase_slice(phase_index)
+            log_activity: Float[Array, "... n_phase_species"] = phase.get_log_activity(
+                log_number_moles[..., phase_slice], temperature, pressure
             )
-        )
-        # jax.debug.print("log_activity_gas = {out}", out=log_activity_gas)
+            log_activities.append(log_activity)
 
-        log_activity_melt: Float[Array, "... n_melt_species"] = (
-            self.phase_system.melt.get_log_activity(
-                log_number_moles[..., self.phase_system.melt_slice], temperature, pressure
-            )
-        )
-        # jax.debug.print("activity_melt = {out}", out=jnp.exp(log_activity_melt))
-
-        log_activity_solid: Float[Array, "... n_solid_species"] = (
-            self.phase_system.solid.get_log_activity(
-                log_number_moles[..., self.phase_system.solid_slice], temperature, pressure
-            )
-        )
-        # jax.debug.print("activity_solid = {out}", out=jnp.exp(log_activity_solid))
-
-        # TODO: Swap out to use same get_log_activity method on condensed phases?
-        log_activity_condensates: Float[Array, "... n_condensates"] = jnp.zeros(
-            (log_activity_solid.shape[:-1] + (len(self.phase_system.condensates),))
-        )
-        # jax.debug.print("activity_condensates = {out}", out=jnp.exp(log_activity_condensates))
-
-        log_activity: Float[Array, "... n_species"] = jnp.concatenate(
-            (log_activity_gas, log_activity_melt, log_activity_solid, log_activity_condensates),
-            axis=-1,
-        )
+        log_activity: Float[Array, "... n_species"] = jnp.concatenate(log_activities, axis=-1)
         # jax.debug.print("log_activity = {out}", out=log_activity)
 
         return log_activity
@@ -703,8 +624,12 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("fO2 = {out}", out=fO2)
 
-        log_solvent_molar_mass: FloatArray = self.phase_system.melt.get_log_phase_molar_mass(
-            log_number_moles[..., self.phase_system.melt_slice]
+        # FIXME: This is hacky, but assume the melt phase always follows the gas phase
+        melt_slice: slice = self.phase_system.phase_slice(1)
+        melt_phase: BasePhase = self.phase_system.phases[1]
+
+        log_solvent_molar_mass: FloatArray = melt_phase.get_log_phase_molar_mass(
+            log_number_moles[..., melt_slice]
         )
         # jax.debug.print("log_solvent_molar_mass = {out}", out=log_solvent_molar_mass)
 
