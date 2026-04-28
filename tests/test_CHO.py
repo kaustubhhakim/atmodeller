@@ -79,7 +79,9 @@ def CH_model() -> EquilibriumModel:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
     melt_species: tuple[SpeciesProtocol, ...] = (H2O_d, CO2_d)
 
-    planet: BaseThermodynamicState = Planet.from_species(gas_species, melt_species=melt_species)
+    planet: BaseThermodynamicState = Planet.from_species(
+        gas_species, silicate_melt_species=melt_species
+    )
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
