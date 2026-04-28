@@ -28,7 +28,7 @@ from atmodeller import override
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64
-from atmodeller.phases import FE_MOLAR_MASS, GasPhase, MeltPhase, MetalPhase, PurePhase, SolidPhase
+from atmodeller.phases import FE_MOLAR_MASS, BasePhase, CondensedPhase, GasPhase, PurePhase
 from atmodeller.reactions import PhaseSystem, ReactionSystem
 from atmodeller.sci_utils import SIO2_MOLAR_MASS, earth, unit_conversion
 
@@ -49,6 +49,22 @@ class BaseThermodynamicState(eqx.Module):
         """Phase system representing the thermodynamic state of the planetary body"""
         return self.reaction_system.phase_system
 
+    @property
+    def gas_phase_index(self) -> int:
+        return 0
+
+    @property
+    def silicate_melt_phase_index(self) -> int:
+        return 1
+
+    @property
+    def silicate_solid_phase_index(self) -> int:
+        return 2
+
+    @property
+    def metal_phase_index(self) -> int:
+        return 3
+
     @abstractmethod
     def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
         """Pressure (bar)"""
@@ -64,26 +80,33 @@ class BaseThermodynamicState(eqx.Module):
         """Updates the state."""
         ...
 
-    def get_solid_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
-        """Gets the solid silicate mass.
+    def get_silicate_solid_mass(
+        self, log_number_moles: Float[Array, "... n_species"]
+    ) -> FloatArray:
+        """Gets the silicate solid mass.
 
         Args:
             log_number_moles: Log number of moles for all species in the system
 
         Returns:
-            Solid silicate mass (kg)
+            Silicate solid mass (kg)
         """
+        solid: BasePhase = self.phase_system.phases[self.silicate_solid_phase_index]
+        solid_slice: slice = self.phase_system.phase_slice(self.silicate_solid_phase_index)
+
         log_number_moles_solid: Float[Array, "... solid_species"] = log_number_moles[
-            ..., self.phase_system.solid_slice
+            ..., solid_slice
         ]
         solid_mass: Float[Array, "... 1"] = jnp.exp(
-            self.phase_system.solid.get_log_phase_mass(log_number_moles_solid)
+            solid.get_log_phase_mass(log_number_moles_solid)
         )
         solid_mass_squeeze: FloatArray = jnp.squeeze(solid_mass, axis=-1)
 
         return solid_mass_squeeze
 
-    def get_melt_mass(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+    def get_silicate_melt_mass(
+        self, log_number_moles: Float[Array, "... n_species"]
+    ) -> FloatArray:
         """Gets the silicate melt mass.
 
         Args:
@@ -92,12 +115,11 @@ class BaseThermodynamicState(eqx.Module):
         Returns:
             Silicate melt mass (kg)
         """
-        log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[
-            ..., self.phase_system.melt_slice
-        ]
-        melt_mass: Float[Array, "... 1"] = jnp.exp(
-            self.phase_system.melt.get_log_phase_mass(log_number_moles_melt)
-        )
+        melt: BasePhase = self.phase_system.phases[self.silicate_melt_phase_index]
+        melt_slice: slice = self.phase_system.phase_slice(self.silicate_melt_phase_index)
+
+        log_number_moles_melt: Float[Array, "... melt_species"] = log_number_moles[..., melt_slice]
+        melt_mass: Float[Array, "... 1"] = jnp.exp(melt.get_log_phase_mass(log_number_moles_melt))
         melt_mass_squeeze: FloatArray = jnp.squeeze(melt_mass, axis=-1)
 
         return melt_mass_squeeze
@@ -111,17 +133,22 @@ class BaseThermodynamicState(eqx.Module):
         Returns:
             Metal mass (kg)
         """
+        metal: BasePhase = self.phase_system.phases[self.metal_phase_index]
+        metal_slice: slice = self.phase_system.phase_slice(self.metal_phase_index)
+
         log_number_moles_metal: Float[Array, "... metal_species"] = log_number_moles[
-            ..., self.phase_system.metal_slice
+            ..., metal_slice
         ]
         metal_mass: Float[Array, "... 1"] = jnp.exp(
-            self.phase_system.metal.get_log_phase_mass(log_number_moles_metal)
+            metal.get_log_phase_mass(log_number_moles_metal)
         )
         metal_mass_squeeze: FloatArray = jnp.squeeze(metal_mass, axis=-1)
 
         return metal_mass_squeeze
 
-    def get_melt_fraction(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:
+    def get_silicate_melt_fraction(
+        self, log_number_moles: Float[Array, "... n_species"]
+    ) -> FloatArray:
         """Gets the silicate melt fraction.
 
         .. math::
@@ -135,10 +162,10 @@ class BaseThermodynamicState(eqx.Module):
         Returns:
             Melt fraction (between 0 and 1) (kgkg\\ :sup:`-1`)
         """
-        melt_mass: FloatArray = self.get_melt_mass(log_number_moles)
-        solid_mass: FloatArray = self.get_solid_mass(log_number_moles)
+        silicate_melt_mass: FloatArray = self.get_silicate_melt_mass(log_number_moles)
+        silicate_solid_mass: FloatArray = self.get_silicate_solid_mass(log_number_moles)
 
-        melt_fraction: FloatArray = melt_mass / (melt_mass + solid_mass)
+        melt_fraction: FloatArray = silicate_melt_mass / (silicate_melt_mass + silicate_solid_mass)
 
         return melt_fraction
 
@@ -180,8 +207,8 @@ class ThermodynamicState(BaseThermodynamicState):
         background_silicate_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
         background_metal_mass: ArrayLike = 0.0,
         background_metal_molar_mass: ArrayLike = FE_MOLAR_MASS,
-        melt_species: Iterable[SpeciesProtocol] = (),
-        solid_species: Iterable[SpeciesProtocol] = (),
+        silicate_melt_species: Iterable[SpeciesProtocol] = (),
+        silicate_solid_species: Iterable[SpeciesProtocol] = (),
         metal_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
@@ -198,10 +225,10 @@ class ThermodynamicState(BaseThermodynamicState):
             background_metal_mass: Background mass of the metal phase, Defaults to ``0``.
             background_metal_molar_mass: Background molar mass of the metal phase. Defaults
                 to :data:`~atmodeller.sci_utils.FE_MOLAR_MASS`.
-            melt_species: Iterable of species in the silicate melt phase. Defaults to an empty
-                tuple.
-            solid_species: Iterable of species in the silicate solid phase. Defaults to an empty
-                tuple.
+            silicate_melt_species: Iterable of species in the silicate melt phase. Defaults to an
+                empty tuple.
+            silicate_solid_species: Iterable of species in the silicate solid phase. Defaults to an
+                empty tuple.
             metal_species: Iterable of species in the metal phase. Defaults to an empty tuple.
             condensates: Iterable of pure phases representing condensates in the system. Defaults
                 to an empty tuple.
@@ -213,18 +240,26 @@ class ThermodynamicState(BaseThermodynamicState):
         background_silicate_solid_mass: ArrayLike = mass * (1 - melt_fraction)
 
         gas: GasPhase = GasPhase(gas_species)
-        melt: MeltPhase = MeltPhase(
-            melt_species, background_silicate_melt_mass, background_silicate_molar_mass
+        silicate_melt: CondensedPhase = CondensedPhase(
+            silicate_melt_species,
+            "silicate_melt",
+            background_silicate_melt_mass,
+            background_silicate_molar_mass,
         )
-        solid: SolidPhase = SolidPhase(
-            solid_species, background_silicate_solid_mass, background_silicate_molar_mass
+        silicate_solid: CondensedPhase = CondensedPhase(
+            silicate_solid_species,
+            "silicate_solid",
+            background_silicate_solid_mass,
+            background_silicate_molar_mass,
         )
-        metal: MetalPhase = MetalPhase(
-            metal_species, background_metal_mass, background_metal_molar_mass
+        metal: CondensedPhase = CondensedPhase(
+            metal_species, "metal", background_metal_mass, background_metal_molar_mass
         )
-        phase_system = PhaseSystem(
-            gas, melt=melt, solid=solid, metal=metal, condensates=tuple(condensates)
+        # NOTE: This ordering must be maintained
+        other_phases: tuple[BasePhase, ...] = (silicate_melt, silicate_solid, metal) + tuple(
+            condensates
         )
+        phase_system: PhaseSystem = PhaseSystem(gas, other_phases=other_phases)
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
         return cls(reaction_system, temperature, pressure)
@@ -251,9 +286,9 @@ class ThermodynamicState(BaseThermodynamicState):
             A dictionary of the values
         """
         base_dict = {}
-        base_dict["melt_mass"] = self.get_melt_mass(log_number_moles)
-        base_dict["solid_mass"] = self.get_solid_mass(log_number_moles)
-        base_dict["melt_fraction"] = self.get_melt_fraction(log_number_moles)
+        base_dict["silicate_melt_mass"] = self.get_silicate_melt_mass(log_number_moles)
+        base_dict["silicate_solid_mass"] = self.get_silicate_solid_mass(log_number_moles)
+        base_dict["silicate_melt_fraction"] = self.get_silicate_melt_fraction(log_number_moles)
         base_dict["mass"] = base_dict["melt_mass"] + base_dict["solid_mass"]
         base_dict["temperature"] = self.temperature
         base_dict["pressure"] = self.pressure
@@ -342,8 +377,9 @@ class BasePlanet(BaseThermodynamicState):
         temperature: ArrayLike = 2000,
         pressure: ArrayLike = jnp.nan,
         background_silicate_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
-        melt_species: Iterable[SpeciesProtocol] = (),
-        solid_species: Iterable[SpeciesProtocol] = (),
+        background_metal_molar_mass: ArrayLike = FE_MOLAR_MASS,
+        silicate_melt_species: Iterable[SpeciesProtocol] = (),
+        silicate_solid_species: Iterable[SpeciesProtocol] = (),
         metal_species: Iterable[SpeciesProtocol] = (),
         condensates: Iterable[PurePhase] = (),
     ) -> Self:
@@ -363,8 +399,12 @@ class BasePlanet(BaseThermodynamicState):
                 balance at the surface.
             background_silicate_molar_mass: Background molar mass of a silicate phase. Defaults to
                 :data:`~atmodeller.sci_utils.SIO2_MOLAR_MASS`.
-            melt_species: Iterable of species in the melt phase. Defaults to an empty tuple.
-            solid_species: Iterable of species in the solid phase. Defaults to an empty tuple.
+            background_metal_molar_mass: Background molar mass of the metal phase. Defaults
+                to :data:`~atmodeller.sci_utils.FE_MOLAR_MASS`.
+            silicate_melt_species: Iterable of species in the silicate melt phase. Defaults to an
+                empty tuple.
+            silicate_solid_species: Iterable of species in the silicate solid phase. Defaults to an
+                empty tuple.
             metal_species: Iterable of species in the metal phase. Defaults to an empty tuple.
             condensates: Iterable of pure phases representing condensates in the system. Defaults
                 to an empty tuple.
@@ -378,16 +418,26 @@ class BasePlanet(BaseThermodynamicState):
         metallic_core_mass: ArrayLike = planet_mass * core_mass_fraction
 
         gas: GasPhase = GasPhase(gas_species)
-        melt: MeltPhase = MeltPhase(
-            melt_species, background_melt_mass, background_silicate_molar_mass
+        silicate_melt: CondensedPhase = CondensedPhase(
+            silicate_melt_species,
+            "silicate_melt",
+            background_melt_mass,
+            background_silicate_molar_mass,
         )
-        solid: SolidPhase = SolidPhase(
-            solid_species, background_solid_mass, background_silicate_molar_mass
+        silicate_solid: CondensedPhase = CondensedPhase(
+            silicate_solid_species,
+            "silicate_solid",
+            background_solid_mass,
+            background_silicate_molar_mass,
         )
-        metal: MetalPhase = MetalPhase(metal_species, metallic_core_mass)
-        phase_system = PhaseSystem(
-            gas, melt=melt, solid=solid, metal=metal, condensates=tuple(condensates)
+        metal: CondensedPhase = CondensedPhase(
+            metal_species, "metal", metallic_core_mass, background_metal_molar_mass
         )
+        # NOTE: This ordering must be maintained
+        other_phases: tuple[BasePhase, ...] = (silicate_melt, silicate_solid, metal) + tuple(
+            condensates
+        )
+        phase_system = PhaseSystem(gas, other_phases=other_phases)
         reaction_system: ReactionSystem = ReactionSystem(phase_system)
 
         return cls(reaction_system, surface_radius, temperature, pressure, planet_mass)
@@ -399,7 +449,7 @@ class BasePlanet(BaseThermodynamicState):
         This value will only be equal to the actual metallic core mass if ``include_in_phase_mass``
         is ``False`` for all species in the metal phase.
         """
-        return self.phase_system.metal.background_mass
+        return self.phase_system.phases[self.metal_phase_index].background_mass
 
     @property
     def background_mantle_mass(self) -> FloatArray:
@@ -408,7 +458,10 @@ class BasePlanet(BaseThermodynamicState):
         This value will only be equal to the actual mantle mass if ``include_in_phase_mass`` is
         ``False`` for all species in the melt and solid phases.
         """
-        return self.phase_system.melt.background_mass + self.phase_system.solid.background_mass
+        return (
+            self.phase_system.phases[self.silicate_melt_phase_index].background_mass
+            + self.phase_system.phases[self.silicate_solid_phase_index].background_mass
+        )
 
     @property
     def surface_area(self) -> FloatArray:
@@ -432,8 +485,8 @@ class BasePlanet(BaseThermodynamicState):
         Returns:
             Planet mass (kg)
         """
-        mantle_melt_mass: FloatArray = self.get_melt_mass(log_number_moles)
-        mantle_solid_mass: FloatArray = self.get_solid_mass(log_number_moles)
+        mantle_melt_mass: FloatArray = self.get_silicate_melt_mass(log_number_moles)
+        mantle_solid_mass: FloatArray = self.get_silicate_solid_mass(log_number_moles)
         metal_mass: FloatArray = self.get_metal_mass(log_number_moles)
         planet_mass = mantle_melt_mass + mantle_solid_mass + metal_mass
 
@@ -475,10 +528,10 @@ class BasePlanet(BaseThermodynamicState):
             A dictionary of the values
         """
         base_dict = {}
-        base_dict["mantle_melt_mass"] = self.get_melt_mass(log_number_moles)
-        base_dict["mantle_solid_mass"] = self.get_solid_mass(log_number_moles)
+        base_dict["mantle_melt_mass"] = self.get_silicate_melt_mass(log_number_moles)
+        base_dict["mantle_solid_mass"] = self.get_silicate_solid_mass(log_number_moles)
         base_dict["mantle_mass"] = base_dict["mantle_melt_mass"] + base_dict["mantle_solid_mass"]
-        base_dict["mantle_melt_fraction"] = self.get_melt_fraction(log_number_moles)
+        base_dict["mantle_melt_fraction"] = self.get_silicate_melt_fraction(log_number_moles)
         base_dict["metallic_core_mass"] = self.get_metal_mass(log_number_moles)
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.get_surface_gravity(log_number_moles)
@@ -530,7 +583,7 @@ class BasePlanet(BaseThermodynamicState):
                 as_j64(core_mass_fraction), self.background_metallic_core_mass.shape
             )
             state_updated = eqx.tree_at(
-                lambda s: s.reaction_system.phase_system.metal.background_mass,
+                lambda s: s.reaction_system.phase_system[self.metal_phase_index].background_mass,
                 state_updated,
                 state_updated.background_planet_mass * core_mass_fraction,
             )
@@ -540,12 +593,16 @@ class BasePlanet(BaseThermodynamicState):
                 state_updated.background_planet_mass - state_updated.background_metallic_core_mass
             )
             state_updated = eqx.tree_at(
-                lambda s: s.reaction_system.phase_system.melt.background_mass,
+                lambda s: (
+                    s.reaction_system.phase_system[self.silicate_melt_phase_index].background_mass
+                ),
                 state_updated,
                 mantle_mass * mantle_melt_fraction,
             )
             state_updated = eqx.tree_at(
-                lambda s: s.reaction_system.phase_system.solid.background_mass,
+                lambda s: (
+                    s.reaction_system.phase_system[self.silicate_solid_phase_index].background_mass
+                ),
                 state_updated,
                 mantle_mass * (1 - mantle_melt_fraction),
             )
