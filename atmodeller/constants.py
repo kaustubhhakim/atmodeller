@@ -32,6 +32,17 @@ while keeping the floor large enough to avoid excessive solver stiffness in unde
 regimes.
 """
 
+# Phase indices. These are used to index into the phase system. TODO: Make Atmodeller completely
+# agnostic to phase ordering.
+GAS_PHASE_INDEX: int = 0
+"""Gas phase index"""
+SILICATE_MELT_PHASE_INDEX: int = 1
+"""Silicate melt phase index"""
+SILICATE_SOLID_PHASE_INDEX: int = 2
+"""Silicate solid phase index"""
+METAL_PHASE_INDEX: int = 3
+"""Metal phase index"""
+
 # Lower and upper bounds on the hypercube which contains the root. These are somewhat empirically
 # calibrated to bound the expected values for typical models, but in principle could require
 # adjustment for edge cases.

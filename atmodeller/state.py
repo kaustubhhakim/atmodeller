@@ -25,6 +25,12 @@ from jaxtyping import Array, ArrayLike, Bool, Float
 from scipy.constants import gravitational_constant
 
 from atmodeller import override
+from atmodeller.constants import (
+    GAS_PHASE_INDEX,
+    METAL_PHASE_INDEX,
+    SILICATE_MELT_PHASE_INDEX,
+    SILICATE_SOLID_PHASE_INDEX,
+)
 from atmodeller.containers import ChemicalSpecies
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import FloatArray, as_j64
@@ -51,19 +57,19 @@ class BaseThermodynamicState(eqx.Module):
 
     @property
     def gas_phase_index(self) -> int:
-        return 0
+        return GAS_PHASE_INDEX
 
     @property
     def silicate_melt_phase_index(self) -> int:
-        return 1
+        return SILICATE_MELT_PHASE_INDEX
 
     @property
     def silicate_solid_phase_index(self) -> int:
-        return 2
+        return SILICATE_SOLID_PHASE_INDEX
 
     @property
     def metal_phase_index(self) -> int:
-        return 3
+        return METAL_PHASE_INDEX
 
     @abstractmethod
     def get_pressure(self, log_number_moles: Float[Array, "... n_species"]) -> FloatArray:

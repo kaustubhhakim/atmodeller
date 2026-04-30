@@ -34,7 +34,7 @@ import numpy as np
 from jax import lax
 from jaxtyping import Array, ArrayLike, Float, Integer
 
-from atmodeller.constants import DISSOLUTION_PPMW_FLOOR, GAS_STATE
+from atmodeller.constants import DISSOLUTION_PPMW_FLOOR, GAS_STATE, SILICATE_MELT_PHASE_INDEX
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import SpeciesProtocol
 from atmodeller.jax_utils import (
@@ -624,9 +624,10 @@ class ReactionSystem(BaseReactionBlock):
         )
         # jax.debug.print("fO2 = {out}", out=fO2)
 
-        # FIXME: This is hacky, but assume the melt phase always follows the gas phase
-        melt_slice: slice = self.phase_system.phase_slice(1)
-        melt_phase: BasePhase = self.phase_system.phases[1]
+        # TODO: This could probably be refactored to obtain the index directly from
+        # self.phase_system(?)
+        melt_slice: slice = self.phase_system.phase_slice(SILICATE_MELT_PHASE_INDEX)
+        melt_phase: BasePhase = self.phase_system.phases[SILICATE_MELT_PHASE_INDEX]
 
         log_solvent_molar_mass: FloatArray = melt_phase.get_log_phase_molar_mass(
             log_number_moles[..., melt_slice]

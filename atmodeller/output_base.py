@@ -57,7 +57,7 @@ def flatten_dictionary(d: dict, parent_key: str = "") -> dict[str, Any]:
     return items
 
 
-def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict[str, Any]:
+def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict[Any, Any]:
     """Recursively merges two dictionaries.
 
     Args:
@@ -252,7 +252,7 @@ class BaseOutputDict(eqx.Module):
             Dictionary mapping species names and their stability keys to arrays of values,
             plus global MAE and RMSE metrics for the log error for active solution quantities.
         """
-        out = self._solution_array_to_dict(self.solution, suffix="_solution")
+        out: dict[str, ArrayLike] = self._solution_array_to_dict(self.solution, suffix="_solution")
 
         guess: Float[Array, "#n_batch twice_species"] = jnp.atleast_2d(
             generate_auto_initial_guess(self.parameters)
@@ -299,33 +299,13 @@ class BaseOutputDict(eqx.Module):
         """
         return self._solution_array_to_dict(self.solution)
 
-    # TODO: Kept until it is confirmed that condensates are broadcasted correctly
-    # @property
-    # def condensate_phases(self) -> tuple[PhaseOutput[PurePhase], ...]:
-    #     """Pure phase condensates output"""
-
-    #     condensate_slice: slice = self.parameters.reaction_system.phase_system.condensates_slice
-
-    #     condensates_out = []
-
-    #     for nn, condensate in enumerate(self.parameters.reaction_system.phase_system.condensates):
-    #         condensate_out = condensate.output(
-    #             self.log_number_moles[..., condensate_slice][..., nn : nn + 1],
-    #             self.log_stability[..., condensate_slice][..., nn : nn + 1],
-    #             self._temperature,
-    #             self._pressure,
-    #         )
-    #         condensates_out.append(condensate_out)
-
-    #     return tuple(condensates_out)
-
     @property
     def gas(self) -> GasPhaseOutput:
-        """Gas phase output"""
-        return cast(GasPhaseOutput, self.other_phase(0))
+        """Gas phase output. By construction, the gas phase is at index 0 in the phase system."""
+        return cast(GasPhaseOutput, self.get_phase_output_from_index(0))
 
-    def other_phase(self, phase_index: int) -> PhaseOutput:
-        """Gets the output for a phase by index.
+    def get_phase_output_from_index(self, phase_index: int) -> PhaseOutput:
+        """Gets the output for a phase from the phase index.
 
         Args:
             phase_index: The index of the phase to get the output for, where 0 corresponds to the
@@ -334,8 +314,6 @@ class BaseOutputDict(eqx.Module):
         Returns:
             The phase output for the specified phase index
         """
-        # TODO: phase_slice might break for phases with single species, i.e. pure phases due to
-        # collapsing to a 1-D array and not a 2-D (column) array.
         phase_slice: slice = self.parameters.reaction_system.phase_system.phase_slice(phase_index)
         phase: BasePhase = self.parameters.reaction_system.phase_system.phases[phase_index]
 
@@ -439,7 +417,7 @@ class OutputNaturalDict(BaseOutputDict):
         # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
         for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
             if not phase.is_empty:
-                phase_output: PhaseOutput = self.other_phase(phase_index)
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
                 out[phase.name] = self._phase_output_to_dict(phase_output)
 
         # Extra outputs for the gas phase
@@ -606,7 +584,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
         for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
             if not phase.is_empty:
-                phase_output: PhaseOutput = self.other_phase(phase_index)
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
                 out[phase.name] = self._phase_output_to_dict(phase_output)
 
         # Extra outputs for the gas phase
@@ -839,7 +817,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
         for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
             if not phase.is_empty:
-                phase_output: PhaseOutput = self.other_phase(phase_index)
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
                 out_ = self._phase_output_to_dict(phase_output)
                 out = recursively_merge_dictionaries(out, out_)
                 out[phase.name] = {}
