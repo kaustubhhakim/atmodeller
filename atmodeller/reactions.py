@@ -32,7 +32,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jaxtyping import Array, ArrayLike, Float, Integer
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.constants import DISSOLUTION_PPMW_FLOOR, GAS_STATE, SILICATE_MELT_PHASE_INDEX
 from atmodeller.containers import SpeciesCollection, get_formula_matrix
@@ -164,6 +164,11 @@ class PhaseSystem(eqx.Module):
             n: int = len(phase)
             self._phase_indices[nn] = PhaseIndex(start, start + n)
             start += n
+
+    @property
+    def condensates_species_mask(self) -> Bool[Array, " n_species"]:
+        """Boolean mask for condensate species for generating the auto initial condition"""
+        return jnp.logical_and(~self.gas_species_mask, self.species.reaction_species_mask)
 
     @property
     def gas(self) -> GasPhase:
