@@ -59,7 +59,7 @@ from atmodeller import override
 from atmodeller.containers import ChemicalSpecies, SpeciesCollection, get_formula_matrix
 from atmodeller.interfaces import RedoxBufferProtocol, SpeciesProtocol, TSpecies_co
 from atmodeller.jax_utils import FloatArray, as_j64, masked_logsumexp, safe_exp, to_hashable
-from atmodeller.sci_utils import GAS_CONSTANT_BAR, unit_conversion
+from atmodeller.sci_utils import GAS_CONSTANT_BAR
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
 # Due to a Pyright bug (#4965). See Equinox documentation.
@@ -73,12 +73,6 @@ DEFAULT_BACKGROUND_MASS: float = 0.0
 DUMMY_MOLAR_MASS: float = 1.0
 """Default molar mass of the background component (kg mol\\ :sup:`-1`) (only meaningful when
 background mass is non-zero)"""
-SIO2_MOLAR_MASS: float = Formula("SiO2").mass * unit_conversion.g_to_kg
-"""Molar mass of SiO\\ :sub:`2` (kg mol\\ :sup:`-1`), used as the default background molar mass
-for condensed phases"""
-FE_MOLAR_MASS: float = Formula("Fe").mass * unit_conversion.g_to_kg
-"""Molar mass of Fe (kg mol\\ :sup:`-1`), used as the default background molar mass for a metal 
-phase"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -101,15 +95,18 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         and batched calculations.
 
     Args:
+        name: Phase name
         species: An iterable of species in the phase
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
         background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``1.0``; only meaningful when ``background_mass`` is not zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
+    name: str
+    """Phase name"""
     species: SpeciesCollection[TSpecies_co]
     """Collection of species in the phase"""
     background_mass: FloatArray
@@ -118,19 +115,17 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
     """Molar mass of the background component"""
     vmap_log_activity: Callable
     """Vectorized log activity functions for each species in the phase"""
-    name: eqx.AbstractVar[str]
-    """Phase name"""
-    factory_class: AbstractClassVar[Callable]
-    """Factory class for constructing species in the phase from Hill formulas"""
     output_class: AbstractClassVar[type["PhaseOutput"]]
     """Output class for the phase"""
 
     def __init__(
         self,
+        name: str,
         species: Iterable[TSpecies_co] = (),
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
     ):
+        self.name = name
         self.species = SpeciesCollection(species)
         self.background_mass = as_j64(background_mass)
         self.background_molar_mass = as_j64(background_molar_mass)
@@ -155,48 +150,13 @@ class BasePhase(eqx.Module, Generic[TSpecies_co]):
         )
 
     @classmethod
-    def from_species(
-        cls,
-        species: str | Iterable[str] = (),
-        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
-        **kwargs,
-    ) -> Self:
-        r"""Creates a phase instance from species names using the factory class.
-
-        Args:
-            species: A single species name or an iterable of names
-            background_mass: Mass of the background component (kg). Should be a scalar or a 1-D
-                array matching the batch dimension if batching is used. Defaults to zero (i.e., no
-                background mass).
-            background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`).
-                Should be a scalar or a 1-D array matching the batch dimension if batching is used.
-                Defaults to ``1.0``; only meaningful when ``background_mass`` is not zero.
-            **kwargs: Arbitrary keyword arguments to pass to the factory class when constructing
-                species instances.
-
-        Returns:
-            An instance of the phase with the specified species and background properties
-        """
-        if isinstance(species, str):
-            species = [species]
-
-        species_list: list[TSpecies_co] = []
-
-        for species_ in species:
-            hill_formula: str = Formula(species_).formula
-            species_list.append(cls.factory_class(hill_formula, **kwargs))
-
-        return cls(species_list, background_mass, background_molar_mass)
-
-    @classmethod
-    def empty(cls) -> Self:
+    def empty(cls) -> "BasePhase":
         """Creates an empty phase instance with no species and zero background mass.
 
         Returns:
             An empty phase instance
         """
-        return cls()
+        return cls("empty")
 
     @property
     def is_empty(self) -> bool:
@@ -729,18 +689,15 @@ class GasPhase(BasePhase[ChemicalSpecies]):
 
     Args:
         species: An iterable of species in the phase
+        name: Name of the phase. Defaults to ``gas``.
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
         background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``1.0``; only meaningful when ``background_mass`` is not zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
-    name: str = "gas"
-    """Phase name"""
-    factory_class: ClassVar[Callable] = ChemicalSpecies.create_gas
-    """Factory class for constructing gas species from Hill formulas"""
     output_class: ClassVar[type[PhaseOutput]] = GasPhaseOutput
     """Output class for the phase"""
 
@@ -750,10 +707,11 @@ class GasPhase(BasePhase[ChemicalSpecies]):
     def __init__(
         self,
         species: Iterable[ChemicalSpecies] = (),
+        name: str = "gas",
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
         background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
     ):
-        super().__init__(species, background_mass, background_molar_mass)
+        super().__init__(name, species, background_mass, background_molar_mass)
 
     @property
     def O2_index(self) -> Float[Array, ""]:
@@ -773,7 +731,7 @@ class GasPhase(BasePhase[ChemicalSpecies]):
         return jnp.array(jnp.nan, dtype=float)
 
 
-class CondensedPhase(BasePhase[TSpecies_co]):
+class CondensedPhase(BasePhase[SpeciesProtocol]):
     """Multicomponent condensed phase (e.g., silicate melt or solid)
 
     A condensed phase can optionally treat dissolved and/or condensed species as additional to the
@@ -788,19 +746,15 @@ class CondensedPhase(BasePhase[TSpecies_co]):
 
     Args:
         species: An iterable of species in the phase
+        name: Name of the phase. Defaults to ``condensed``.
         background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
-            matching the batch dimension if batching is used. Defaults to zero (i.e., no background
-            mass).
-        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`).  Should
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
             be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
-            to ``0.06`` (i.e., SiO\\ :sub:`2`); only meaningful when ``background_mass`` is not
-            zero.
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
     """
 
-    name: str = "condensed"
-    """Phase name"""
-    factory_class: ClassVar[Callable] = ChemicalSpecies.create_condensed
-    """Factory class for constructing species from Hill formulas"""
     output_class: ClassVar[type["PhaseOutput"]] = PhaseOutput[Self]
     """Output class for the phase"""
 
@@ -810,76 +764,26 @@ class CondensedPhase(BasePhase[TSpecies_co]):
     def __init__(
         self,
         species: Iterable[TSpecies_co] = (),
+        name: str = "condensed_phase",
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
+        background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
     ):
-        super().__init__(species, background_mass, background_molar_mass)
-
-    @classmethod
-    @override
-    def from_species(
-        cls,
-        species: str | Iterable[str] = (),
-        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
-        **kwargs,
-    ) -> Self:
-        return super().from_species(species, background_mass, background_molar_mass, **kwargs)
+        super().__init__(name, species, background_mass, background_molar_mass)
 
 
-class MeltPhase(CondensedPhase[SpeciesProtocol]):
-    """Multicomponent silicate melt with optionally dissolved volatiles"""
+class PurePhase(CondensedPhase):
+    """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid)
 
-    name: str = "melt"
-
-    # Without an override pylance gets confused, throwing missing argument warnings even though
-    # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
-    @override
-    def __init__(
-        self,
-        species: Iterable[SpeciesProtocol] = (),
-        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
-    ):
-        super().__init__(species, background_mass, background_molar_mass)
-
-
-class SolidPhase(CondensedPhase[SpeciesProtocol]):
-    """Multicomponent silicate solid"""
-
-    name: str = "solid"
-
-    # Without an override pylance gets confused, throwing missing argument warnings even though
-    # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
-    @override
-    def __init__(
-        self,
-        species: Iterable[SpeciesProtocol] = (),
-        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
-    ):
-        super().__init__(species, background_mass, background_molar_mass)
-
-
-class MetalPhase(CondensedPhase[SpeciesProtocol]):
-    """Multicomponent metal phase"""
-
-    name: str = "metal"
-
-    # Without an override pylance gets confused, throwing missing argument warnings even though
-    # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
-    @override
-    def __init__(
-        self,
-        species: Iterable[SpeciesProtocol] = (),
-        background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = FE_MOLAR_MASS,
-    ):
-        super().__init__(species, background_mass, background_molar_mass)
-
-
-class PurePhase(CondensedPhase[ChemicalSpecies]):
-    """Single-species, unity-activity phase (e.g., a pure mineral, ice, or liquid)"""
+    Args:
+        species: An iterable of species in the phase
+        name: Name of the phase. Defaults to ``pure_phase``.
+        background_mass: Mass of the background component (kg). Should be a scalar or a 1-D array
+            matching the batch dimension if batching is used. Defaults to
+            :data:`DEFAULT_BACKGROUND_MASS`.
+        background_molar_mass: Molar mass of the background component (kg mol\\ :sup:`-1`). Should
+            be a scalar or a 1-D array matching the batch dimension if batching is used. Defaults
+            to :data:`DUMMY_MOLAR_MASS`; only meaningful when ``background_mass`` is not zero.
+    """
 
     # Without an override pylance gets confused, throwing missing argument warnings even though
     # defaults are provided in the base class. This avoids reporting this false-alarm to the user.
@@ -887,18 +791,38 @@ class PurePhase(CondensedPhase[ChemicalSpecies]):
     def __init__(
         self,
         species: Iterable[ChemicalSpecies] = (),
+        name: str = "pure_phase",
         background_mass: ArrayLike = DEFAULT_BACKGROUND_MASS,
-        background_molar_mass: ArrayLike = SIO2_MOLAR_MASS,
+        background_molar_mass: ArrayLike = DUMMY_MOLAR_MASS,
     ):
-        super().__init__(species, background_mass, background_molar_mass)
+        super().__init__(species, name, background_mass, background_molar_mass)
 
     def __check_init__(self):
         if self.species.number_species != 1:
             raise ValueError("A pure phase must contain exactly one species.")
 
-    @property
-    def name(self) -> str:  # pyright: ignore - This should work as an override (see Equinox docs)
-        """Name of the pure phase, given by the single species it contains"""
-        # Keep name string-typed even on vmapped in_axes placeholder trees (non-array leaves may be
-        # None during beartype/Equinox repr).
-        return str(self.species.species_names[0])
+    @classmethod
+    def from_species(cls, species: str | Iterable[str] = (), **kwargs) -> Self:
+        r"""Creates a phase instance from species names using the factory class.
+
+        Args:
+            species: A single species name or an iterable of names
+            **kwargs: Arbitrary keyword arguments to pass to the factory class when constructing
+                species instances.
+
+        Returns:
+            An instance of the phase with the specified species and background properties
+        """
+        if isinstance(species, str):
+            species = [species]
+
+        species_list: list[ChemicalSpecies] = []
+
+        for species_ in species:
+            hill_formula: str = Formula(species_).formula
+            species_list.append(ChemicalSpecies.create_condensed(hill_formula, **kwargs))
+
+        # Pure phase name should always correspond to the single species it contains
+        phase_name: str = species_list[0].name
+
+        return cls(species_list, phase_name)

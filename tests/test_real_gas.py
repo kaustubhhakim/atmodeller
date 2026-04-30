@@ -287,7 +287,7 @@ def test_pH2_fO2_real_gas() -> None:
     gas_species: tuple[ChemicalSpecies, ...] = (H2O_g, H2_g, O2_g)
     melt_species: tuple[ReservoirSpecies, ...] = (H2O_d,)
 
-    planet: Planet = Planet.from_species(gas_species, melt_species=melt_species)
+    planet: Planet = Planet.from_species(gas_species, silicate_melt_species=melt_species)
 
     activity_constraints: dict[str, ActivityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(0.072885576196744)
@@ -349,7 +349,7 @@ def test_subNeptune_melt_phase() -> None:
 
     planet: Planet = Planet.from_species(
         gas_species_subneptune,
-        melt_species=melt_species,
+        silicate_melt_species=melt_species,
         temperature=surface_temperature,
         planet_mass=planet_mass,
         surface_radius=surface_radius,

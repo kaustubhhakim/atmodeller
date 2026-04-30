@@ -202,7 +202,7 @@ def trappist1e_with_solubility(request) -> EquilibriumModel:
         planet_mass=trappist1e_parameters.mass,
         surface_radius=trappist1e_parameters.radius,
         mantle_melt_fraction=mantle_melt_fraction,
-        melt_species=melt_species,
+        silicate_melt_species=melt_species,
         condensates=condensates_graphite_only,
     )
 

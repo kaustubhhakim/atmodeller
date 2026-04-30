@@ -30,15 +30,7 @@ from atmodeller.containers import MultiAttemptSolution
 from atmodeller.initial_solution import generate_auto_initial_guess
 from atmodeller.jax_utils import FloatArray
 from atmodeller.parameters import ActivityConstraintSet, MassConstraintSet, Parameters
-from atmodeller.phases import (
-    GasPhaseOutput,
-    MeltPhase,
-    MetalPhase,
-    PhaseOutput,
-    PurePhase,
-    SolidPhase,
-    TPhase_co,
-)
+from atmodeller.phases import BasePhase, GasPhaseOutput, PhaseOutput
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -65,7 +57,7 @@ def flatten_dictionary(d: dict, parent_key: str = "") -> dict[str, Any]:
     return items
 
 
-def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict[str, Any]:
+def recursively_merge_dictionaries(d1: dict, d2: dict) -> dict[Any, Any]:
     """Recursively merges two dictionaries.
 
     Args:
@@ -175,7 +167,7 @@ class BaseOutputDict(eqx.Module):
     multi_attempt_solution: MultiAttemptSolution
 
     @abstractmethod
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         """Dictionary representation of the phase output
 
         Returns:
@@ -260,7 +252,7 @@ class BaseOutputDict(eqx.Module):
             Dictionary mapping species names and their stability keys to arrays of values,
             plus global MAE and RMSE metrics for the log error for active solution quantities.
         """
-        out = self._solution_array_to_dict(self.solution, suffix="_solution")
+        out: dict[str, ArrayLike] = self._solution_array_to_dict(self.solution, suffix="_solution")
 
         guess: Float[Array, "#n_batch twice_species"] = jnp.atleast_2d(
             generate_auto_initial_guess(self.parameters)
@@ -308,89 +300,31 @@ class BaseOutputDict(eqx.Module):
         return self._solution_array_to_dict(self.solution)
 
     @property
-    def condensate_phases(self) -> tuple[PhaseOutput[PurePhase], ...]:
-        """Pure phase condensates output"""
-
-        condensate_slice: slice = self.parameters.reaction_system.phase_system.condensates_slice
-
-        condensates_out = []
-
-        for nn, condensate in enumerate(self.parameters.reaction_system.phase_system.condensates):
-            condensate_out = condensate.output(
-                self.log_number_moles[..., condensate_slice][..., nn : nn + 1],
-                self.log_stability[..., condensate_slice][..., nn : nn + 1],
-                self._temperature,
-                self._pressure,
-            )
-            condensates_out.append(condensate_out)
-
-        return tuple(condensates_out)
-
-    @property
     def gas(self) -> GasPhaseOutput:
-        """Gas phase output"""
+        """Gas phase output. By construction, the gas phase is at index 0 in the phase system."""
+        return cast(GasPhaseOutput, self.get_phase_output_from_index(0))
 
-        gas_slice: slice = self.parameters.reaction_system.phase_system.gas_slice
+    def get_phase_output_from_index(self, phase_index: int) -> PhaseOutput:
+        """Gets the output for a phase from the phase index.
 
-        gas_output: PhaseOutput = self.parameters.reaction_system.phase_system.gas.output(
-            self.log_number_moles[..., gas_slice],
-            self.log_stability[..., gas_slice],
+        Args:
+            phase_index: The index of the phase to get the output for, where 0 corresponds to the
+                gas phase by construction.
+
+        Returns:
+            The phase output for the specified phase index
+        """
+        phase_slice: slice = self.parameters.reaction_system.phase_system.phase_slice(phase_index)
+        phase: BasePhase = self.parameters.reaction_system.phase_system.phases[phase_index]
+
+        phase_output: PhaseOutput = phase.output(
+            self.log_number_moles[..., phase_slice],
+            self.log_stability[..., phase_slice],
             self._temperature,
             self._pressure,
         )
 
-        return cast(GasPhaseOutput, gas_output)
-
-    @property
-    def melt(self) -> PhaseOutput[MeltPhase]:
-        """Melt phase output"""
-
-        melt_slice: slice = self.parameters.reaction_system.phase_system.melt_slice
-
-        melt_output: PhaseOutput[MeltPhase] = (
-            self.parameters.reaction_system.phase_system.melt.output(
-                self.log_number_moles[..., melt_slice],
-                self.log_stability[..., melt_slice],
-                self._temperature,
-                self._pressure,
-            )
-        )
-
-        return melt_output
-
-    @property
-    def metal(self) -> PhaseOutput[MetalPhase]:
-        """Metal phase output"""
-
-        metal_slice: slice = self.parameters.reaction_system.phase_system.metal_slice
-
-        metal_output: PhaseOutput[MetalPhase] = (
-            self.parameters.reaction_system.phase_system.metal.output(
-                self.log_number_moles[..., metal_slice],
-                self.log_stability[..., metal_slice],
-                self._temperature,
-                self._pressure,
-            )
-        )
-
-        return metal_output
-
-    @property
-    def solid(self) -> PhaseOutput[SolidPhase]:
-        """Solid phase output"""
-
-        solid_slice: slice = self.parameters.reaction_system.phase_system.solid_slice
-
-        solid_output: PhaseOutput[SolidPhase] = (
-            self.parameters.reaction_system.phase_system.solid.output(
-                self.log_number_moles[..., solid_slice],
-                self.log_stability[..., solid_slice],
-                self._temperature,
-                self._pressure,
-            )
-        )
-
-        return solid_output
+        return phase_output
 
     @property
     def _temperature(self) -> FloatArray:
@@ -412,7 +346,7 @@ class BaseOutputDict(eqx.Module):
         """Pressure in bar"""
         return jnp.atleast_1d(self._pressure)[:, None]
 
-    def phase_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def phase_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         """Phase-level properties such as total mass, number of moles, molar mass, etc.
 
         Args:
@@ -450,7 +384,7 @@ class OutputNaturalDict(BaseOutputDict):
     """
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
         out: dict[str, Any] = {}
 
         # Phase-level properties
@@ -480,36 +414,20 @@ class OutputNaturalDict(BaseOutputDict):
         del kwargs
         out: dict[str, Any] = {}
 
-        if not self.gas.is_empty:
+        # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
+        for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
+            if not phase.is_empty:
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
+                out[phase.name] = self._phase_output_to_dict(phase_output)
+
+        # Extra outputs for the gas phase
+        if not self.gas.phase.is_empty:
             phase_name: str = self.gas.phase.name
-            out[phase_name] = self._phase_output_to_dict(self.gas)
-            # Additional outputs for the gas phase only
             out[phase_name]["species"]["partial_pressure"] = self.gas.species_partial_pressure
             out[phase_name]["phase"]["volume"] = self.gas.volume
             out[phase_name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
             out[phase_name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
             out[phase_name]["phase"]["pressure"] = self.gas.pressure
-
-        if not self.melt.is_empty:
-            phase_name = self.melt.phase.name
-            out[phase_name] = self._phase_output_to_dict(self.melt)
-
-        if not self.solid.is_empty:
-            phase_name = self.solid.phase.name
-            out[phase_name] = self._phase_output_to_dict(self.solid)
-
-        if not self.metal.is_empty:
-            phase_name = self.metal.phase.name
-            out[phase_name] = self._phase_output_to_dict(self.metal)
-
-        if len(self.condensate_phases) > 0:
-            # This retains symmetry with the output structure of the other phases (gas, melt, and
-            # solid), where condensates are ordered in a list and identified by their species name
-            # within the species sub-category.
-            condensate_out: list = []
-            for condensate in self.condensate_phases:
-                condensate_out.append(self._phase_output_to_dict(condensate))
-            out["condensates"] = condensate_out
 
         out["constraints"] = {
             "elements": {
@@ -566,7 +484,7 @@ class OutputNamedArraysDict(BaseOutputDict):
             out_dict[name] = split_data[ii]
 
     def _split_by_elements_and_add(
-        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+        self, phase_output: PhaseOutput[BasePhase], inarray: Array, output: dict, keyname: str
     ) -> None:
         """Splits the element-level data by element and adds them to the output.
 
@@ -582,7 +500,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         )
 
     def _split_by_species_and_add(
-        self, phase_output: PhaseOutput[TPhase_co], inarray: Array, output: dict, keyname: str
+        self, phase_output: PhaseOutput[BasePhase], inarray: Array, output: dict, keyname: str
     ) -> None:
         """Splits the species-level data by species' and adds them to the output.
 
@@ -596,7 +514,7 @@ class OutputNamedArraysDict(BaseOutputDict):
         self._split_by_name_and_add(phase_output.phase.species_names, inarray, output, keyname)
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
 
         out: dict[str, Any] = {}
 
@@ -663,8 +581,14 @@ class OutputNamedArraysDict(BaseOutputDict):
         del kwargs
         out: dict[str, Any] = {}
 
+        # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
+        for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
+            if not phase.is_empty:
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
+                out[phase.name] = self._phase_output_to_dict(phase_output)
+
+        # Extra outputs for the gas phase
         if not self.gas.is_empty:
-            out[self.gas.phase.name] = self._phase_output_to_dict(self.gas)
             self._split_by_species_and_add(
                 self.gas,
                 self.gas.species_partial_pressure,
@@ -675,24 +599,6 @@ class OutputNamedArraysDict(BaseOutputDict):
             out[self.gas.phase.name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
             out[self.gas.phase.name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
             out[self.gas.phase.name]["phase"]["pressure"] = self.gas.pressure
-
-        if not self.melt.is_empty:
-            out[self.melt.phase.name] = self._phase_output_to_dict(self.melt)
-
-        if not self.solid.is_empty:
-            out[self.solid.phase.name] = self._phase_output_to_dict(self.solid)
-
-        if not self.metal.is_empty:
-            out[self.metal.phase.name] = self._phase_output_to_dict(self.metal)
-
-        if len(self.condensate_phases) > 0:
-            condensate_dict: dict = {}
-            for condensate in self.condensate_phases:
-                condensate_dict[condensate.phase.species.species_names[0]] = (
-                    self._phase_output_to_dict(condensate)
-                )
-
-            out["condensates"] = condensate_dict
 
         out["constraints"] = {}
         elements_out: dict = out["constraints"].setdefault("elements", {})
@@ -846,7 +752,7 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         return jnp.split(inarray, max(len(names), 1), axis=-1)
 
     @override
-    def _phase_output_to_dict(self, phase_output: PhaseOutput[TPhase_co]) -> dict[str, Any]:
+    def _phase_output_to_dict(self, phase_output: PhaseOutput[BasePhase]) -> dict[str, Any]:
 
         out: dict[str, Any] = {}
 
@@ -908,9 +814,17 @@ class OutputElementsSpeciesDict(BaseOutputDict):
         del kwargs
         out: dict[str, Any] = {}
 
-        if not self.gas.is_empty:
-            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.gas))
+        # Save all phases, including gas, silicate melt, silicate solid, and condensates (if any)
+        for phase_index, phase in enumerate(self.parameters.reaction_system.phase_system.phases):
+            if not phase.is_empty:
+                phase_output: PhaseOutput = self.get_phase_output_from_index(phase_index)
+                out_ = self._phase_output_to_dict(phase_output)
+                out = recursively_merge_dictionaries(out, out_)
+                out[phase.name] = {}
+                out[phase.name]["phase"] = self.phase_to_dict(phase_output)
 
+        # Extra outputs for the gas phase
+        if not self.gas.is_empty:
             # Add the partial pressure of each species in the gas phase to the output
             species_partial_pressure: list[Array] = self._split_array_by_names(
                 self.gas.phase.species_names, self.gas.species_partial_pressure
@@ -920,8 +834,6 @@ class OutputElementsSpeciesDict(BaseOutputDict):
                 phase_dict: dict[str, Any] = species_dict.setdefault(self.gas.phase.name, {})
                 phase_dict["partial_pressure"] = species_partial_pressure[nn]
 
-            out[self.gas.phase.name] = {}
-            out[self.gas.phase.name]["phase"] = self.phase_to_dict(self.gas)
             out[self.gas.phase.name]["phase"]["volume"] = self.gas.volume
             out[self.gas.phase.name]["phase"]["log10dIW_1_bar"] = self.gas.log10dIW_1_bar
             out[self.gas.phase.name]["phase"]["log10dIW_P"] = self.gas.log10dIW_P
@@ -963,27 +875,6 @@ class OutputElementsSpeciesDict(BaseOutputDict):
             z_by_mass = z_by_mass / total_mass
             out[self.gas.phase.name]["phase"]["metallicity_by_moles"] = z_by_moles
             out[self.gas.phase.name]["phase"]["metallicity_by_mass"] = z_by_mass
-
-        if not self.melt.is_empty:
-            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.melt))
-            out[self.melt.phase.name] = {}
-            out[self.melt.phase.name]["phase"] = self.phase_to_dict(self.melt)
-
-        if not self.solid.is_empty:
-            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.solid))
-            out[self.solid.phase.name] = {}
-            out[self.solid.phase.name]["phase"] = self.phase_to_dict(self.solid)
-
-        if not self.metal.is_empty:
-            out = recursively_merge_dictionaries(out, self._phase_output_to_dict(self.metal))
-            out[self.metal.phase.name] = {}
-            out[self.metal.phase.name]["phase"] = self.phase_to_dict(self.metal)
-
-        if len(self.condensate_phases) > 0:
-            for condensate in self.condensate_phases:
-                out = recursively_merge_dictionaries(out, self._phase_output_to_dict(condensate))
-                out[condensate.phase.name] = {}
-                out[condensate.phase.name]["phase"] = self.phase_to_dict(condensate)
 
         # Mass constraints
         mass_constraints: MassConstraintSet = self.parameters.mass_constraints
